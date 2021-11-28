@@ -1,0 +1,5 @@
+@import url("https://use.typekit.net/ueo0bvh.css");
+
+#menu-toggle:checked + #menu {
+  display: block;
+}
