@@ -2,11 +2,7 @@ module View.Footer exposing (..)
 
 import Css
 import Html.Styled exposing (..)
-import Html.Styled.Attributes exposing (alt, attribute, css, for, href, id, src, type_)
-import Path exposing (Path)
-import Svg.Styled as SVG
-import Svg.Styled.Attributes as SvgAttr
-import Tailwind.Breakpoints as Bp
+import Html.Styled.Attributes exposing (alt, attribute, css, href, rel, src, target)
 import Tailwind.Utilities as Tw
 
 
@@ -48,5 +44,7 @@ contactPoint url imagePath altName =
             , Css.hover [ Tw.scale_125 ]
             ]
         , href url
+        , target "_blank"
+        , rel "noopener noreferrer"
         ]
         [ img [ src imagePath, alt altName ] [] ]
