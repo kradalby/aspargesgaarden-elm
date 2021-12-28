@@ -13,14 +13,24 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      - name: Install xmllint
+        run: sudo apt-get install -y dos2unix fd-find
+
       - uses: actions/checkout@v2
+
       - name: Use Node.js 16
         uses: actions/setup-node@v2
         with:
           node-version: 16
           cache: "npm"
+
       - name: Install dependencies
         run: yarn
+
+      # TODO: figure out if we can avoid this
+      - name: dos2unix
+        run: fdfind . node_modules/ -x dos2unix {}
+
       - name: Build with elm-pages
         run: yarn build
 
