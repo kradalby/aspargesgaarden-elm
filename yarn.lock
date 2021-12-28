@@ -932,11 +932,6 @@ elm-json@^0.2.10:
   dependencies:
     binwrap "^0.2.2"
 
-elm-oembed@^0.0.6:
-  version "0.0.6"
-  resolved "https://registry.yarnpkg.com/elm-oembed/-/elm-oembed-0.0.6.tgz#3d4f6b0824bf56f8d61e96cff512d315325716b1"
-  integrity sha512-EbDvhEgs5FmUF7T45HzcynsGnm/hqFslYU9z81UkjiE74/czedrQr8RXfMjSqnZ+Oloo7pi7ClO6xHHHyxcGKA==
-
 elm-optimize-level-2@^0.2.3:
   version "0.2.3"
   resolved "https://registry.yarnpkg.com/elm-optimize-level-2/-/elm-optimize-level-2-0.2.3.tgz#76ed397e2d52d5cf53e71622cf59dacef0d7967a"

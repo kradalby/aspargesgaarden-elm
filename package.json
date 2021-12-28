@@ -7,7 +7,6 @@
   },
   "devDependencies": {
     "@tailwindcss/typography": "^0.5.0",
-    "elm-oembed": "^0.0.6",
     "elm-optimize-level-2": "^0.2.3",
     "elm-pages": "2.1.11",
     "elm-review": "^2.7.0",
