@@ -2,26 +2,23 @@ module Page.Facilities exposing (Data, Model, Msg, page)
 
 -- import MarkdownCodec
 
-import Css
 import DataSource exposing (DataSource)
-import DataSource.File as File
 import DataSource.Glob as Glob
 import Head
 import Head.Seo as Seo
 import Html.Styled exposing (..)
-import Html.Styled.Attributes exposing (alt, attribute, css, for, href, id, src, type_)
+import Html.Styled.Attributes exposing (css, src)
 import MarkdownCodec
 import OptimizedDecoder
-import Page exposing (Page, PageWithState, StaticPayload)
+import Page exposing (Page, StaticPayload)
 import Pages.PageUrl exposing (PageUrl)
 import Pages.Url
 import Shared
-import String.Format
 import Tailwind.Breakpoints as Bp
 import Tailwind.Utilities as Tw
 import TailwindMarkdownRenderer
 import View exposing (View)
-import View.Misc exposing (contact, headline, paragraph)
+import View.Misc exposing (headline, container)
 
 
 type alias Model =
@@ -61,10 +58,43 @@ type alias Data =
     List Section
 
 
+facilitiesGlob : DataSource (List String)
+facilitiesGlob =
+    Glob.succeed (\s -> s)
+        |> Glob.match (Glob.literal "content/facilities/")
+        |> Glob.capture Glob.wildcard
+        |> Glob.match (Glob.literal ".md")
+        |> Glob.toDataSource
+
+
+data : DataSource Data
+data =
+    facilitiesGlob
+        |> DataSource.map
+            (\contentList ->
+                List.map
+                    (\content ->
+                        MarkdownCodec.withFrontmatter Section
+                            frontmatterDecoder
+                            TailwindMarkdownRenderer.renderer
+                            ("content/facilities/" ++ content ++ ".md")
+                    )
+                    contentList
+            )
+        |> DataSource.resolve
+
+
+frontmatterDecoder : OptimizedDecoder.Decoder Metadata
+frontmatterDecoder =
+    OptimizedDecoder.map2 Metadata
+        (OptimizedDecoder.field "title" OptimizedDecoder.string)
+        (OptimizedDecoder.field "image" OptimizedDecoder.string)
+
+
 head :
     StaticPayload Data RouteParams
     -> List Head.Tag
-head static =
+head _ =
     Seo.summary
         { canonicalUrlOverride = Nothing
         , siteName = "elm-pages"
@@ -86,14 +116,9 @@ view :
     -> Shared.Model
     -> StaticPayload Data RouteParams
     -> View Msg
-view maybeUrl sharedModel static =
+view _ _ static =
     View.html "Muligheter"
-        [ div
-            [ css
-                [ Tw.flex
-                , Tw.flex_col
-                ]
-            ]
+        [ container
             [ div [] [ headline "Muligheter" ] ]
         , div
             [ css
@@ -169,7 +194,7 @@ section index sect =
             , Tw.flex_wrap
             ]
                 ++ (if isEven index then
-                        [ Tw.bg_brown, Tw.bg_opacity_20, Tw.flex_row_reverse ]
+                        [ Tw.pl_12, Tw.bg_brown, Tw.bg_opacity_20, Tw.flex_row_reverse ]
 
                     else
                         [ Tw.flex_row ]
@@ -186,36 +211,3 @@ isEven num =
 
         _ ->
             True
-
-
-facilitiesGlob : DataSource (List String)
-facilitiesGlob =
-    Glob.succeed (\s -> s)
-        |> Glob.match (Glob.literal "content/facilities/")
-        |> Glob.capture Glob.wildcard
-        |> Glob.match (Glob.literal ".md")
-        |> Glob.toDataSource
-
-
-data : DataSource Data
-data =
-    facilitiesGlob
-        |> DataSource.map
-            (\contentList ->
-                List.map
-                    (\content ->
-                        MarkdownCodec.withFrontmatter Section
-                            frontmatterDecoder
-                            TailwindMarkdownRenderer.renderer
-                            ("content/facilities/" ++ content ++ ".md")
-                    )
-                    contentList
-            )
-        |> DataSource.resolve
-
-
-frontmatterDecoder : OptimizedDecoder.Decoder Metadata
-frontmatterDecoder =
-    OptimizedDecoder.map2 Metadata
-        (OptimizedDecoder.field "title" OptimizedDecoder.string)
-        (OptimizedDecoder.field "image" OptimizedDecoder.string)

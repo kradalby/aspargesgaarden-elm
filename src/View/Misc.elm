@@ -1,18 +1,11 @@
-module View.Misc exposing (contact, headline, paragraph)
+module View.Misc exposing (contact, container, headline, paragraph, viewIf)
 
 import Css
-import DataSource exposing (DataSource)
-import Head
-import Head.Seo as Seo
 import Html.Styled exposing (..)
-import Html.Styled.Attributes exposing (alt, attribute, css, for, href, id, src, type_)
-import Page exposing (Page, StaticPayload)
-import Pages.PageUrl exposing (PageUrl)
-import Pages.Url
-import Shared
+import Html.Styled.Attributes exposing (alt, css, href, src)
 import Tailwind.Breakpoints as Bp
 import Tailwind.Utilities as Tw
-import View exposing (View)
+import View
 
 
 contact : Html msg
@@ -44,7 +37,6 @@ headline content =
             , Bp.lg [ Tw.pt_12 ]
             , Bp.md
                 [ Tw.text_left
-                , Tw.pl_24
                 , Tw.text_8xl
                 ]
             , Tw.text_center
@@ -56,3 +48,24 @@ headline content =
             ]
         ]
         [ text content ]
+
+
+container : List (Html msg) -> Html msg
+container child =
+    div
+        [ css
+            [ Bp.md [ Tw.px_24 ]
+            , Tw.flex
+            , Tw.flex_col
+            ]
+        ]
+        child
+
+
+viewIf : Bool -> Html msg -> Html msg
+viewIf condition content =
+    if condition then
+        content
+
+    else
+        text ""

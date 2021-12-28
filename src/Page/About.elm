@@ -14,7 +14,7 @@ import String.Format
 import Tailwind.Breakpoints as Bp
 import Tailwind.Utilities as Tw
 import View exposing (View)
-import View.Misc exposing (contact, headline, paragraph)
+import View.Misc exposing (contact, container, headline, paragraph)
 
 
 type alias Model =
@@ -74,12 +74,7 @@ view :
     -> View Msg
 view maybeUrl sharedModel static =
     View.html "Om oss"
-        [ div
-            [ css
-                [ Tw.flex
-                , Tw.flex_col
-                ]
-            ]
+        [ container
             [ div [] [ headline "Om oss" ]
             , div
                 [ css
@@ -90,7 +85,7 @@ view maybeUrl sharedModel static =
                 ]
                 [ div
                     [ css
-                        [ Bp.md [ Tw.w_1over2, Tw.px_24 ]
+                        [ Bp.md [ Tw.w_1over2, Tw.px_0 ]
                         , Tw.w_full
                         , Tw.px_5
                         , Tw.text_brown_text
@@ -103,7 +98,7 @@ view maybeUrl sharedModel static =
                     ]
                 , div
                     [ css
-                        [ Bp.md [ Tw.w_1over2, Tw.pr_24 ]
+                        [ Bp.md [ Tw.w_1over2, Tw.neg_mt_12 ]
                         , Tw.w_full
                         , Tw.flex
                         , Tw.flex_row

@@ -9,6 +9,7 @@
     "dependencies": {
         "direct": {
             "MartinSStewart/elm-serialize": "1.2.6",
+            "MaybeJustJames/yaml": "2.1.0",
             "dillonkearns/elm-markdown": "7.0.0",
             "dillonkearns/elm-oembed": "1.0.0",
             "dillonkearns/elm-pages": "8.0.2",
