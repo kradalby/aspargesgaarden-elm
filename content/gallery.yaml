@@ -1,0 +1,22 @@
+---
+photographers:
+  sophia:
+    name: Sophia Karlsen Edwards
+    website: ""
+
+photos:
+  - path: galleri/sophia_fjoset2.jpg
+    photographer: sophia
+    description: ""
+  - path: galleri/sophia_fjoset5.jpg
+    photographer: sophia
+    description: ""
+  - path: galleri/sophia_lysthus1.jpg
+    photographer: sophia
+    description: ""
+  - path: galleri/sophia_lysthus2.jpg
+    photographer: sophia
+    description: ""
+  - path: galleri/sophia_lysthus3.jpg
+    photographer: sophia
+    description: ""

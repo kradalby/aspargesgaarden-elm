@@ -106,10 +106,11 @@ view currentPath =
                     , id "menu"
                     ]
                     [ headerLink currentPath "about" "Om oss"
-                    , headerLink currentPath "stable" "Fjøset"
-                    , headerLink currentPath "barn" "Låven"
+
+                    -- , headerLink currentPath "stable" "Fjøset"
+                    -- , headerLink currentPath "barn" "Låven"
                     , headerLink currentPath "facilities" "Muligheter"
-                    , headerLink currentPath "gallery" "Bilder"
+                    , headerLink currentPath "gallery" "Galleri"
                     , headerLink currentPath "contact" "Kontakt"
                     ]
                 ]
