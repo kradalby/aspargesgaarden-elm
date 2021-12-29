@@ -54,7 +54,9 @@ container : List (Html msg) -> Html msg
 container child =
     div
         [ css
-            [ Bp.md [ Tw.px_24 ]
+            [ Bp.md
+                [ Tw.px_24
+                ]
             , Tw.flex
             , Tw.flex_col
             ]
