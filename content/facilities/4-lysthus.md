@@ -1,5 +1,5 @@
 ---
-{ "title": "Engelsk lysthus og uteområder", "image": "bilder/muligheter.jpeg" }
+{ "title": "Engelsk lysthus og uteområder", "image": "muligheter/lysthus.jpg" }
 ---
 
 # Engelsk lysthus og uteområder
