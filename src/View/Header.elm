@@ -105,12 +105,11 @@ view currentPath =
                         ]
                     , id "menu"
                     ]
-                    [ headerLink currentPath "about" "Om oss"
-
                     -- , headerLink currentPath "stable" "Fjøset"
                     -- , headerLink currentPath "barn" "Låven"
-                    , headerLink currentPath "facilities" "Muligheter"
+                    [ headerLink currentPath "facilities" "Muligheter"
                     , headerLink currentPath "gallery" "Galleri"
+                    , headerLink currentPath "about" "Om oss"
                     , headerLink currentPath "contact" "Kontakt"
                     ]
                 ]
