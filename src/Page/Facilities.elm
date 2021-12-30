@@ -18,7 +18,7 @@ import Tailwind.Breakpoints as Bp
 import Tailwind.Utilities as Tw
 import TailwindMarkdownRenderer
 import View exposing (View)
-import View.Misc exposing (headline, container)
+import View.Misc exposing (container, headline)
 
 
 type alias Model =
@@ -194,7 +194,7 @@ section index sect =
             , Tw.flex_wrap
             ]
                 ++ (if isEven index then
-                        [ Tw.pl_12, Tw.bg_brown, Tw.bg_opacity_20, Tw.flex_row_reverse ]
+                        [ Bp.md [ Tw.pl_12 ], Tw.bg_brown, Tw.bg_opacity_20, Tw.flex_row_reverse ]
 
                     else
                         [ Tw.flex_row ]
