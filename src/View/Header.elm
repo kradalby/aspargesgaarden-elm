@@ -109,7 +109,7 @@ view currentPath =
                     -- , headerLink currentPath "barn" "Låven"
                     [ headerLink currentPath "facilities" "Muligheter"
                     , headerLink currentPath "gallery" "Galleri"
-                    , headerLink currentPath "about" "Om oss"
+                    , headerLink currentPath "about" "Om gården"
                     , headerLink currentPath "contact" "Kontakt"
                     ]
                 ]
