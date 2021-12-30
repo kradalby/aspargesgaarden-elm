@@ -79,7 +79,7 @@ view maybeUrl sharedModel static =
                 , Tw.flex
                 , Tw.flex_col
                 , Tw.justify_center
-                , Css.backgroundImage <| Css.url "/ikoner/forside.jpg"
+                , Css.backgroundImage <| Css.url "/bilder/forside.jpg"
                 , Css.backgroundRepeat Css.noRepeat
                 , Css.backgroundPosition Css.center
                 , Css.backgroundSize Css.cover

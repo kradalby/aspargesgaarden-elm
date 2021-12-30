@@ -1,5 +1,5 @@
 ---
-{ "title": "Kjøkken", "image": "bilder/muligheter.jpeg" }
+{ "title": "Kjøkken", "image": "muligheter/kjokken.jpg" }
 ---
 
 # Kjøkken
