@@ -119,7 +119,7 @@ view tableOfContents page model toMsg pageView =
                     , Tw.flex
                     , Tw.flex_col
                     , Tw.h_screen
-                    , Tw.justify_between
+                    , Tw.justify_start
                     ]
                 ]
             |> Html.Styled.toUnstyled
