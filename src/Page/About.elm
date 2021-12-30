@@ -83,7 +83,7 @@ view maybeUrl sharedModel static =
             """
 Aspargesgården byr på sjarmerende og unike lokaler i landlige omgivelser, ved kysten i Vestfold.
 
-Vi byr på annerledes og stemningsfylte selskapslokaler, hvor vi ønsker velkommen til alle typer selskap; bryllup, konfirmasjoner, dåp, minnestunder, bursdager, firmasamlinger, kurs , konserter og konferanser.
+Vi byr på annerledes og stemningsfylte selskapslokaler, hvor låvebryllup er vår spesialitet. Vi ønsker velkommen til alle typer selskap; bryllup, konfirmasjoner, dåp, minnestunder, bursdager, firmasamlinger, kurs, konserter og konferanser.
 
 Låven og fjøset rommer det dere trenger av moderne teknisk utstyr, samt komfortable fasiliteter og fremkommelighet for alle! Vi har det du trenger til å dekke et vakkert festbord og skape den rette stemning!
 
@@ -95,7 +95,7 @@ Ta en nærmere kikk på [muligheter om hva vi kan tilby](/facilities) - og skull
 
 # Vertskapet
 
-I 2014 flyttet vi fra Sandefjord til idylliske Tjølling og Aspargesgården. Tidligere eiere dyrket asparges her, og gjorde om fjøset til selskapslokaler, derav navnet «Aspargesgården»
+I 2014 flyttet vi fra Sandefjord til idylliske Tjølling og Aspargesgården. Tidligere eiere dyrket asparges her, og gjorde om fjøset til selskapslokaler, derav navnet «Aspargesgården».
 
 Vi -  min mann Anders og jeg, trengte låven til kurs, møter og lager for vår salgsstyrke og Tupperware produkter.
 
@@ -105,7 +105,7 @@ Jeg har alltid hatt en drøm om å bo på gård, selv om jeg er en skikkelig «b
 
 Det er en utrolig glede og skape så mange fantastiske øyeblikk, muligheter og opplevelser.
 
-Vi ser frem til å ønske mange brudepar, selskap, og alle andre som har lyst til å gjøre noe morsomt her på gården velkommen!
+Vi ser frem til å ønske mange flere brudepar, selskap, og alle andre som har lyst til å gjøre noe morsomt her på gården velkommen!
 
 Alt godt, Kristine & Anders
         """
