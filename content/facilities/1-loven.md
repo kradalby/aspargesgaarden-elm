@@ -4,6 +4,6 @@
 
 # Låven
 
-På «høyloftet» har vi hyggelige, røffe lokaler med bøttevis av sjarm. Det er høyt under taket og et godt sted for å «løsne på snippen». Runde bord og gamle spisestuestoler til ca. 120 personer, men rikelig med plass til å sette inn mer slik at man kan bespise ca. 140 personer.
+Drømmer du om låvebryllup så er «høyloftet» perfekt med bøttevis av sjarm. Låven er fra 1906 og har en nydelig patina. Det er høyt under taket, og lyslenker skaper den rette stemningen. Runde bord og gamle spisestuestoler med plass til 120 personer, men kan gjøres intim ned til ca 45 personer. Om du liker det elegangt eller rustikt, så er begge deler mulig.
 
 Det er bar, scene, dansegulv, musikkanlegg / mikrofon, prosjektor og lerret, samt belysning som kan dempes etter behov. Toaletter i tilknytning ved låvebrua.
