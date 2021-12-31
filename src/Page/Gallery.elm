@@ -1,27 +1,24 @@
 module Page.Gallery exposing (Data, Model, Msg, page)
 
 import Browser.Events
-import Browser.Navigation
 import Css
+import Data.Photo exposing (Gallery, Photo, yamlFileToDataSourceGallery)
 import DataSource exposing (DataSource)
-import DataSource.File as File
-import Dict
 import Head
 import Head.Seo as Seo
 import Html.Styled exposing (..)
-import Html.Styled.Attributes exposing (alt, attribute, css, for, href, id, src, type_)
-import Html.Styled.Events exposing (onClick, onInput)
+import Html.Styled.Attributes exposing (css, src)
+import Html.Styled.Events exposing (onClick)
 import Json.Decode as Decode
 import List.Extra
-import Page exposing (Page, PageWithState, StaticPayload)
+import Page exposing (StaticPayload)
 import Pages.PageUrl exposing (PageUrl)
 import Pages.Url
 import Shared
 import Tailwind.Breakpoints as Bp
 import Tailwind.Utilities as Tw
 import View exposing (View)
-import View.Misc exposing (contact, container, headline, paragraph, viewIf)
-import Yaml.Decode as Y
+import View.Misc exposing (container, headline, imgWithPhotographer, photographerLink, viewIf)
 
 
 type Direction
@@ -61,6 +58,10 @@ type Msg
     | NextSlide
 
 
+type alias Data =
+    Gallery
+
+
 type alias RouteParams =
     {}
 
@@ -75,7 +76,7 @@ page =
             { view = view
             , init = \_ _ staticPayload -> ( { slide = 0, showSlide = False, gallery = staticPayload.data }, Cmd.none )
             , update =
-                \_ maybeNavigationKey sharedModel static msg model ->
+                \_ _ _ _ msg model ->
                     case msg of
                         OnKeyPress (Just direction) ->
                             case direction of
@@ -102,7 +103,7 @@ page =
                         _ ->
                             ( model, Cmd.none )
             , subscriptions =
-                \maybePageUrl routeParams path model ->
+                \_ _ _ _ ->
                     Browser.Events.onKeyDown keyDecoder |> Sub.map OnKeyPress
             }
 
@@ -139,107 +140,15 @@ previousSlideIndex slides current =
         previous
 
 
-type alias Photographer =
-    { name : String
-    , website : String
-    }
-
-
-type alias PhotoYAML =
-    { path : String
-    , photographer : String
-    , description : String
-    }
-
-
-type alias Photo =
-    { path : String
-    , photographer : Photographer
-    , description : String
-    }
-
-
-type alias GalleryYAML =
-    { photos : List PhotoYAML
-    }
-
-
-type alias Gallery =
-    { photos : List Photo
-    }
-
-
-type alias Data =
-    Gallery
-
-
-photographersDecoder : Y.Decoder (Dict.Dict String Photographer)
-photographersDecoder =
-    Y.field "photographers" (Y.dict photographerDecoder)
-
-
-photographerDecoder : Y.Decoder Photographer
-photographerDecoder =
-    Y.map2 Photographer
-        (Y.field "name" Y.string)
-        (Y.field "website" Y.string)
-
-
-photoDecoder : Y.Decoder PhotoYAML
-photoDecoder =
-    Y.map3 PhotoYAML
-        (Y.field "path" Y.string)
-        (Y.field "photographer" Y.string)
-        (Y.field "description" Y.string)
-
-
-yamlToPhoto : Dict.Dict String Photographer -> PhotoYAML -> Photo
-yamlToPhoto photographers photo =
-    { path = photo.path
-    , photographer = Dict.get photo.photographer photographers |> Maybe.withDefault { name = "Ukjent", website = "" }
-    , description = photo.description
-    }
-
-
 data : DataSource Data
 data =
-    File.rawFile
-        "content/gallery.yaml"
-        |> DataSource.map
-            (\content ->
-                Y.fromString
-                    photographersDecoder
-                    content
-                    |> Result.withDefault Dict.empty
-            )
-        |> DataSource.andThen
-            (\photographers ->
-                File.rawFile
-                    "content/gallery.yaml"
-                    |> DataSource.map
-                        (\content ->
-                            Y.fromString
-                                (Y.map GalleryYAML
-                                    (Y.field "photos" (Y.list photoDecoder))
-                                )
-                                content
-                                |> Result.withDefault { photos = [] }
-                        )
-                    |> DataSource.map
-                        (\gallery ->
-                            let
-                                photos =
-                                    List.map (yamlToPhoto photographers) gallery.photos
-                            in
-                            { photos = photos }
-                        )
-            )
+    yamlFileToDataSourceGallery "content/gallery.yaml"
 
 
 head :
     StaticPayload Data RouteParams
     -> List Head.Tag
-head static =
+head _ =
     Seo.summary
         { canonicalUrlOverride = Nothing
         , siteName = "elm-pages"
@@ -262,7 +171,7 @@ view :
     -> Model
     -> StaticPayload Data RouteParams
     -> View Msg
-view maybeUrl sharedModel model static =
+view _ _ model static =
     View.html "Galleri"
         [ container
             [ viewIf model.showSlide (slideShow static.data model.slide)
@@ -285,47 +194,7 @@ view maybeUrl sharedModel model static =
 
 thumbnail : Int -> Photo -> Html Msg
 thumbnail index photo =
-    div []
-        [ div
-            [ css
-                [ Bp.lg
-                    [ Tw.w_108
-                    ]
-                , Bp.md
-                    [ Tw.w_80
-                    , Tw.mr_6
-                    , Tw.mb_6
-                    ]
-                , Tw.relative
-                ]
-            , onClick <| ToggleSlideShow index
-            ]
-            [ img
-                [ src
-                    photo.path
-                ]
-                []
-            , div
-                [ css
-                    [ Css.hover
-                        [ Tw.opacity_100
-                        ]
-                    , Tw.opacity_0
-                    , Tw.absolute
-                    , Tw.left_0
-                    , Tw.bottom_0
-                    , Tw.right_0
-                    , Tw.z_10
-                    , Tw.flex
-                    , Tw.justify_around
-                    , Tw.items_end
-                    , Tw.bg_brown
-                    , Tw.text_black
-                    ]
-                ]
-                [ photographerLink photo.photographer "av " ]
-            ]
-        ]
+    imgWithPhotographer photo.path photo.photographer (Just (ToggleSlideShow index))
 
 
 slideShow : Gallery -> Int -> Html Msg
@@ -471,13 +340,3 @@ nextArrow =
         , onClick NextSlide
         ]
         [ text "❯" ]
-
-
-photographerLink : Photographer -> String -> Html msg
-photographerLink photographer prefix =
-    case photographer.website of
-        "" ->
-            text <| prefix ++ " " ++ photographer.name
-
-        website ->
-            a [ href website ] [ text <| prefix ++ " " ++ photographer.name ]
