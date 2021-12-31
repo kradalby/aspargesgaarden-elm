@@ -1,8 +1,10 @@
-module View.Misc exposing (contact, container, headline, paragraph, viewIf)
+module View.Misc exposing (contact, container, headline, imgWithPhotographer, paragraph, photographerLink, viewIf)
 
 import Css
+import Data.Photo exposing (Photographer)
 import Html.Styled exposing (..)
 import Html.Styled.Attributes exposing (alt, css, href, src)
+import Html.Styled.Events exposing (onClick, onInput)
 import Tailwind.Breakpoints as Bp
 import Tailwind.Utilities as Tw
 import View
@@ -71,3 +73,66 @@ viewIf condition content =
 
     else
         text ""
+
+
+photographerLink : Photographer -> String -> Html msg
+photographerLink photographer prefix =
+    case photographer.website of
+        "" ->
+            text <| prefix ++ " " ++ photographer.name
+
+        website ->
+            a [ href website ] [ text <| prefix ++ " " ++ photographer.name ]
+
+
+imgWithPhotographer : String -> Photographer -> Maybe msg -> Html msg
+imgWithPhotographer photoPath photographer onClickAttr =
+    let
+        style =
+            css
+                [ Bp.lg
+                    [ Tw.w_108
+                    ]
+                , Bp.md
+                    [ Tw.w_80
+                    , Tw.mr_6
+                    , Tw.mb_6
+                    ]
+                , Tw.relative
+                ]
+    in
+    div []
+        [ div
+            (case onClickAttr of
+                Just message ->
+                    [ style, onClick message ]
+
+                Nothing ->
+                    [ style ]
+            )
+            [ img
+                [ src
+                    photoPath
+                ]
+                []
+            , div
+                [ css
+                    [ Css.hover
+                        [ Tw.opacity_100
+                        ]
+                    , Tw.opacity_0
+                    , Tw.absolute
+                    , Tw.left_0
+                    , Tw.bottom_0
+                    , Tw.right_0
+                    , Tw.z_10
+                    , Tw.flex
+                    , Tw.justify_around
+                    , Tw.items_end
+                    , Tw.bg_brown
+                    , Tw.text_black
+                    ]
+                ]
+                [ photographerLink photographer "av " ]
+            ]
+        ]
