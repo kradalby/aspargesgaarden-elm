@@ -1,9 +1,10 @@
 module View.Misc exposing (contact, container, headline, imgWithPhotographer, paragraph, photographerLink, viewIf)
 
 import Css
+import Css.Global
 import Data.Photo exposing (Photographer)
 import Html.Styled exposing (..)
-import Html.Styled.Attributes exposing (alt, css, href, rel, src, target)
+import Html.Styled.Attributes exposing (alt, class, css, href, rel, src, target)
 import Tailwind.Breakpoints as Bp
 import Tailwind.Utilities as Tw
 import View
@@ -95,6 +96,12 @@ imgWithPhotographer attr imgStyles photoPath photographer =
         style =
             css
                 [ Tw.relative
+                , Css.hover
+                    [ Css.Global.descendants
+                        [ Css.Global.selector ".photographercredit"
+                            [ Tw.opacity_100 ]
+                        ]
+                    ]
                 ]
     in
     div []
@@ -109,11 +116,9 @@ imgWithPhotographer attr imgStyles photoPath photographer =
                 ]
                 []
             , div
-                [ css
-                    [ Css.hover
-                        [ Tw.opacity_100
-                        ]
-                    , Tw.opacity_0
+                [ class "photographercredit"
+                , css
+                    [ Tw.opacity_0
                     , Tw.absolute
                     , Tw.left_0
                     , Tw.bottom_0
