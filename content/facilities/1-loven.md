@@ -3,8 +3,12 @@
   "title": "Låven",
   "photo":
     {
-      "path": "bilder/muligheter.jpeg",
-      "photographer": { "name": "Sophia Karlsen Edwards", "website": "" },
+      "path": "muligheter/loven.jpg",
+      "photographer":
+        {
+          "name": "Marianne Ous",
+          "website": "https://www.instagram.com/marianneous",
+        },
       "description": "",
     },
 }
