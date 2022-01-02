@@ -1,5 +1,13 @@
 ---
-{ "title": "Fjøset", "image": "bilder/muligheter.jpeg" }
+{
+  "title": "Fjøset",
+  "photo":
+    {
+      "path": "bilder/muligheter.jpeg",
+      "photographer": { "name": "Sophia Karlsen Edwards", "website": "" },
+      "description": "",
+    },
+}
 ---
 
 # Fjøset
