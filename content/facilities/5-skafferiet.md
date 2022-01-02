@@ -1,5 +1,6 @@
 ---
-{ "title": "«Skafferiet»", "image": "" 
+{
+  "title": "«Skafferiet»",
   "photo":
     {
       "path": "muligheter/skafferiet.jpg",
