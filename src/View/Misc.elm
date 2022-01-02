@@ -85,34 +85,23 @@ photographerLink photographer prefix =
             a [ href website ] [ text <| prefix ++ " " ++ photographer.name ]
 
 
-imgWithPhotographer : String -> Photographer -> Maybe msg -> Html msg
-imgWithPhotographer photoPath photographer onClickAttr =
+imgWithPhotographer : List (Attribute msg) -> List Css.Style -> String -> Photographer -> Html msg
+imgWithPhotographer attr imgStyles photoPath photographer =
     let
         style =
             css
-                [ Bp.lg
-                    [ Tw.w_108
-                    ]
-                , Bp.md
-                    [ Tw.w_80
-                    , Tw.mr_6
-                    , Tw.mb_6
-                    ]
-                , Tw.relative
+                [ Tw.relative
                 ]
     in
     div []
         [ div
-            (case onClickAttr of
-                Just message ->
-                    [ style, onClick message ]
-
-                Nothing ->
-                    [ style ]
+            (style
+                :: attr
             )
             [ img
                 [ src
                     photoPath
+                , css imgStyles
                 ]
                 []
             , div
