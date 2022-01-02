@@ -1,8 +1,9 @@
-module Data.Photo exposing (Gallery, Photo, Photographer, photoDecoder, photographerDecoder, photographersDecoder, yamlFileToDataSourceGallery, yamlToPhotographers)
+module Data.Photo exposing (Gallery, Photo, Photographer, photoDecoder, photoJSONDecoder, photographerDecoder, photographersDecoder, yamlFileToDataSourceGallery, yamlToPhotographers)
 
 import DataSource exposing (DataSource)
 import DataSource.File as File
 import Dict
+import OptimizedDecoder
 import Route exposing (Route(..))
 import Yaml.Decode as Y
 
@@ -55,6 +56,21 @@ photoDecoder =
         (Y.field "path" Y.string)
         (Y.field "photographer" Y.string)
         (Y.field "description" Y.string)
+
+
+photoJSONDecoder : OptimizedDecoder.Decoder Photo
+photoJSONDecoder =
+    OptimizedDecoder.map3 Photo
+        (OptimizedDecoder.field "path" OptimizedDecoder.string)
+        (OptimizedDecoder.field "photographer" photographerJSONDecoder)
+        (OptimizedDecoder.field "description" OptimizedDecoder.string)
+
+
+photographerJSONDecoder : OptimizedDecoder.Decoder Photographer
+photographerJSONDecoder =
+    OptimizedDecoder.map2 Photographer
+        (OptimizedDecoder.field "name" OptimizedDecoder.string)
+        (OptimizedDecoder.field "website" OptimizedDecoder.string)
 
 
 yamlToPhoto : Dict.Dict String Photographer -> PhotoYAML -> Photo

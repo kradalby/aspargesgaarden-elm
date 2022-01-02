@@ -1,5 +1,17 @@
 ---
-{ "title": "Kjøkken", "image": "muligheter/kjokken.jpg" }
+{
+  "title": "Kjøkken",
+  "photo":
+    {
+      "path": "muligheter/kjokken.jpg",
+      "photographer":
+        {
+          "name": "Aurora Hovland",
+          "website": "https://www.aurorahovland.com",
+        },
+      "description": "",
+    },
+}
 ---
 
 # Kjøkken

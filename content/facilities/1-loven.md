@@ -1,5 +1,13 @@
 ---
-{ "title": "Låven", "image": "bilder/muligheter.jpeg" }
+{
+  "title": "Låven",
+  "photo":
+    {
+      "path": "bilder/muligheter.jpeg",
+      "photographer": { "name": "Sophia Karlsen Edwards", "website": "" },
+      "description": "",
+    },
+}
 ---
 
 # Låven

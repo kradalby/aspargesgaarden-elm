@@ -1,5 +1,17 @@
 ---
-{ "title": "Engelsk lysthus og uteområder", "image": "muligheter/lysthus.jpg" }
+{
+  "title": "Engelsk lysthus og uteområder",
+  "photo":
+    {
+      "path": "muligheter/lysthus.jpg",
+      "photographer":
+        {
+          "name": "Aurora Hovland",
+          "website": "https://www.aurorahovland.com",
+        },
+      "description": "",
+    },
+}
 ---
 
 # Engelsk lysthus og uteområder

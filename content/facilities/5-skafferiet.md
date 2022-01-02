@@ -1,5 +1,16 @@
 ---
-{ "title": "«Skafferiet»", "image": "muligheter/skafferiet.jpg" }
+{ "title": "«Skafferiet»", "image": "" 
+  "photo":
+    {
+      "path": "muligheter/skafferiet.jpg",
+      "photographer":
+        {
+          "name": "Aurora Hovland",
+          "website": "https://www.aurorahovland.com",
+        },
+      "description": "",
+    },
+}
 ---
 
 # «Skafferiet»

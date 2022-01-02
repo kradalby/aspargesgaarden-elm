@@ -2,6 +2,7 @@ module Page.Facilities exposing (Data, Model, Msg, page)
 
 -- import MarkdownCodec
 
+import Data.Photo exposing (Photo, photoJSONDecoder)
 import DataSource exposing (DataSource)
 import DataSource.Glob as Glob
 import Head
@@ -44,7 +45,7 @@ page =
 
 type alias Metadata =
     { title : String
-    , image : String -- TODO: Path type?
+    , photo : Photo
     }
 
 
@@ -88,7 +89,7 @@ frontmatterDecoder : OptimizedDecoder.Decoder Metadata
 frontmatterDecoder =
     OptimizedDecoder.map2 Metadata
         (OptimizedDecoder.field "title" OptimizedDecoder.string)
-        (OptimizedDecoder.field "image" OptimizedDecoder.string)
+        (OptimizedDecoder.field "photo" photoJSONDecoder)
 
 
 head :
@@ -167,7 +168,7 @@ section index sect =
                                 else
                                     [ Tw.float_right ]
                                )
-                    , src sect.metadata.image
+                    , src sect.metadata.photo.path
                     ]
                     []
                 ]
