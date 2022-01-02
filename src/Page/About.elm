@@ -99,7 +99,7 @@ I 2014 flyttet vi fra Sandefjord til idylliske Tjølling og Aspargesgården. Tid
 
 Vi -  min mann Anders og jeg, trengte låven til kurs, møter og lager for vår salgsstyrke og Tupperware produkter.
 
-Vi har tre voksne barn, og lille Angel vår søte Bichon Havanais.
+Vi har tre voksne barn, og lille Angel, vår søte Bichon Havanais.
 
 Jeg har alltid hatt en drøm om å bo på gård, selv om jeg er en skikkelig «byjente». Elsker gamle hus, historie, interiør, hage og å gjøre det vakkert rundt meg. Anders er «handyman» som restaurerer og bygger, og sammen utvikler vi gården kontinuerlig.
 
