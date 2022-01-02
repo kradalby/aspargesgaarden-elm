@@ -3,8 +3,8 @@
   "title": "Fjøset",
   "photo":
     {
-      "path": "bilder/muligheter.jpeg",
-      "photographer": { "name": "Sophia Karlsen Edwards", "website": "" },
+      "path": "muligheter/fjoset.jpg",
+      "photographer": { "name": "Hanne Gulliksen", "website": "" },
       "description": "",
     },
 }
