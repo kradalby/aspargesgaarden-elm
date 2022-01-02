@@ -194,7 +194,20 @@ view _ _ model static =
 
 thumbnail : Int -> Photo -> Html Msg
 thumbnail index photo =
-    imgWithPhotographer photo.path photo.photographer (Just (ToggleSlideShow index))
+    div
+        [ css
+            [ Bp.lg
+                [ Tw.w_108
+                ]
+            , Bp.md
+                [ Tw.w_80
+                , Tw.mr_6
+                , Tw.mb_6
+                ]
+            ]
+        ]
+        [ imgWithPhotographer [ onClick (ToggleSlideShow index) ] [] photo.path photo.photographer
+        ]
 
 
 slideShow : Gallery -> Int -> Html Msg

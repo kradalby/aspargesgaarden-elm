@@ -19,7 +19,7 @@ import Tailwind.Breakpoints as Bp
 import Tailwind.Utilities as Tw
 import TailwindMarkdownRenderer
 import View exposing (View)
-import View.Misc exposing (container, headline)
+import View.Misc exposing (container, headline, imgWithPhotographer)
 
 
 type alias Model =
@@ -148,7 +148,7 @@ section index sect =
                     , Tw.w_full
                     ]
                 ]
-                [ img
+                [ div
                     [ css <|
                         [ Bp.lg
                             [ Tw.h_auto
@@ -156,10 +156,7 @@ section index sect =
                             ]
                         , Bp.md
                             [ Tw.h_auto
-                            , Tw.w_full
                             ]
-                        , Tw.object_cover
-                        , Tw.h_48
                         , Tw.w_full
                         ]
                             ++ (if isEven index then
@@ -168,9 +165,18 @@ section index sect =
                                 else
                                     [ Tw.float_right ]
                                )
-                    , src sect.metadata.photo.path
                     ]
-                    []
+                    [ imgWithPhotographer []
+                        [ Bp.md
+                            [ Tw.h_auto
+                            ]
+                        , Tw.object_cover
+                        , Tw.h_48
+                        , Tw.w_full
+                        ]
+                        sect.metadata.photo.path
+                        sect.metadata.photo.photographer
+                    ]
                 ]
             , div
                 [ css <|
