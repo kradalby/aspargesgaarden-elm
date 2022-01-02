@@ -3,8 +3,7 @@ module View.Misc exposing (contact, container, headline, imgWithPhotographer, pa
 import Css
 import Data.Photo exposing (Photographer)
 import Html.Styled exposing (..)
-import Html.Styled.Attributes exposing (alt, css, href, src)
-import Html.Styled.Events exposing (onClick, onInput)
+import Html.Styled.Attributes exposing (alt, css, href, rel, src, target)
 import Tailwind.Breakpoints as Bp
 import Tailwind.Utilities as Tw
 import View
@@ -82,7 +81,12 @@ photographerLink photographer prefix =
             text <| prefix ++ " " ++ photographer.name
 
         website ->
-            a [ href website ] [ text <| prefix ++ " " ++ photographer.name ]
+            a
+                [ href website
+                , target "_blank"
+                , rel "noopener noreferrer"
+                ]
+                [ text <| prefix ++ " " ++ photographer.name ]
 
 
 imgWithPhotographer : List (Attribute msg) -> List Css.Style -> String -> Photographer -> Html msg
