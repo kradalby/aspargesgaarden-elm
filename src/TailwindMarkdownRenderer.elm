@@ -6,7 +6,6 @@ import Html.Styled.Attributes as Attr exposing (css)
 import Markdown.Block as Block
 import Markdown.Html
 import Markdown.Renderer
-import Oembed
 import SyntaxHighlight
 import Tailwind.Utilities as Tw
 
@@ -102,14 +101,7 @@ renderer =
                 )
     , html =
         Markdown.Html.oneOf
-            [ Markdown.Html.tag "oembed"
-                (\url _ ->
-                    Oembed.view [] Nothing url
-                        |> Maybe.map Html.fromUnstyled
-                        |> Maybe.withDefault (Html.div [] [])
-                )
-                |> Markdown.Html.withAttribute "url"
-            ]
+            []
     , codeBlock = codeBlock
 
     --\{ body, language } ->
