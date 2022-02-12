@@ -6,16 +6,16 @@
     "build": "elm-pages build"
   },
   "devDependencies": {
-    "@tailwindcss/typography": "0.4.0",
+    "@tailwindcss/typography": "0.5.1",
     "elm-optimize-level-2": "^0.2.3",
     "elm-pages": "2.1.11",
     "elm-review": "^2.7.0",
     "elm-tailwind-modules": "^0.3.2",
     "elm-tooling": "^1.7.0",
-    "postcss": "^8.4.5",
-    "tailwindcss": "^2.0.2"
+    "postcss": "^8.4.6",
+    "tailwindcss": "^3.0.22"
   },
   "dependencies": {
-    "elm-json": "^0.2.10"
+    "elm-json": "^0.2.12"
   }
 }
