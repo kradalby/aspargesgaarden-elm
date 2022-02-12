@@ -32,7 +32,15 @@ jobs:
         run: fdfind . node_modules/ -x dos2unix {}
 
       - name: Build with elm-pages
-        run: yarn build
+        uses: nick-invision/retry@v2
+        with:
+          timeout_minutes: 10
+          # Allow the build to retry, elm has an issue were
+          # it fails to build because "constraints are too wide"
+          # but it isnt correct.
+          max_attempts: 3
+          retry_on: error
+          command: yarn build
 
       - name: Deploy to Github Pages
         uses: peaceiris/actions-gh-pages@v3
