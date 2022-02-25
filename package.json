@@ -6,7 +6,7 @@
     "build": "elm-pages build"
   },
   "devDependencies": {
-    "@tailwindcss/typography": "0.5.1",
+    "@tailwindcss/typography": "0.5.2",
     "elm-optimize-level-2": "^0.2.3",
     "elm-pages": "2.1.11",
     "elm-review": "^2.7.0",
