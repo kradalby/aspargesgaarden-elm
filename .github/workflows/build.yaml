@@ -16,7 +16,7 @@ jobs:
       - name: Install dos2unix, fd
         run: sudo apt-get install -y dos2unix fd-find
 
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
 
       - name: Use Node.js 16
         uses: actions/setup-node@v2
