@@ -35,6 +35,7 @@
               pkg-config
               libpng
               imagemagick
+              fd
             ] ++
             (with elmPackages;
             [
