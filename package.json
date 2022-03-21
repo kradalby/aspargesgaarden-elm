@@ -16,6 +16,7 @@
     "tailwindcss": "^3.0.23"
   },
   "dependencies": {
+    "@funboxteam/optimizt": "^3.1.0",
     "elm-json": "^0.2.12"
   }
 }

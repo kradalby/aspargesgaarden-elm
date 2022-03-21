@@ -23,6 +23,7 @@
           };
           buildDeps = with pkgs; [
             nodejs
+            yarn
             # elmPackages.elm
             # nodePackages.parcel
             git
@@ -30,6 +31,11 @@
           ];
           devDeps = with pkgs;
             buildDeps ++
+            [
+              pkg-config
+              libpng
+              imagemagick
+            ] ++
             (with elmPackages;
             [
               elm
