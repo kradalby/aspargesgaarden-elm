@@ -101,10 +101,10 @@ head _ =
         { canonicalUrlOverride = Nothing
         , siteName = "Aspargesgården"
         , image =
-            { url = [ "ressurser", "logo.png" ] |> Path.join |> Pages.Url.fromPath
-            , alt = "Aspargesgården logo"
-            , dimensions = Nothing
-            , mimeType = Just "image/png"
+            { url = [ "ressurser", "twitter_2048w_resize.jpeg" ] |> Path.join |> Pages.Url.fromPath
+            , alt = "Aspargesgården"
+            , dimensions = Just { width = 2048, height = 1024 }
+            , mimeType = Just "image/jpeg"
             }
         , description = ""
         , locale = Just "nb_NO"
