@@ -1,16 +1,14 @@
 module Page.About exposing (Data, Model, Msg, page)
 
-import Css
 import DataSource exposing (DataSource)
 import Head
 import Head.Seo as Seo
 import Html.Styled exposing (..)
-import Html.Styled.Attributes exposing (alt, attribute, css, for, href, id, src, type_)
-import List exposing (tail)
+import Html.Styled.Attributes exposing (alt, css, src)
+import List
 import Markdown.Parser
 import Markdown.Renderer
-import MarkdownCodec
-import Page exposing (Page, PageWithState, StaticPayload)
+import Page exposing (Page, StaticPayload)
 import Pages.PageUrl exposing (PageUrl)
 import Pages.Url
 import Shared
@@ -19,7 +17,7 @@ import Tailwind.Breakpoints as Bp
 import Tailwind.Utilities as Tw
 import TailwindMarkdownRenderer
 import View exposing (View)
-import View.Misc exposing (contact, container, headline, paragraph)
+import View.Misc exposing (contact, container, headline)
 
 
 type alias Model =
@@ -55,7 +53,7 @@ data =
 head :
     StaticPayload Data RouteParams
     -> List Head.Tag
-head static =
+head _ =
     Seo.summary
         { canonicalUrlOverride = Nothing
         , siteName = "elm-pages"
@@ -77,7 +75,7 @@ view :
     -> Shared.Model
     -> StaticPayload Data RouteParams
     -> View Msg
-view maybeUrl sharedModel static =
+view _ _ _ =
     let
         markdown =
             """
@@ -90,7 +88,6 @@ Låven og fjøset rommer det dere trenger av moderne teknisk utstyr, samt komfor
 Her hos oss kan du velge om du vil gjøre litt- mye- eller ingenting selv!
 
 Ta en nærmere kikk på [muligheter om hva vi kan tilby](/facilities) - og skulle du ha spesielle ønsker; ikke nøl med å ta kontakt! La oss skape den perfekte rammen for ditt arrangement!
-
 
 
 # Vertskapet

@@ -1,10 +1,20 @@
-module View.Misc exposing (contact, container, headline, imgWithPhotographer, paragraph, photographerLink, viewIf)
+module View.Misc exposing
+    ( contact
+    , container
+    , headline
+    , imgWithPhotographer
+    , paragraph
+    , photographerLink
+    , responsiveImg
+    , viewIf
+    )
 
 import Css
 import Css.Global
 import Data.Photo exposing (Photographer)
 import Html.Styled exposing (..)
-import Html.Styled.Attributes exposing (alt, class, css, href, rel, src, target)
+import Html.Styled.Attributes exposing (alt, attribute, class, css, href, rel, src, target, type_)
+import String.Format
 import Tailwind.Breakpoints as Bp
 import Tailwind.Utilities as Tw
 import View
@@ -109,12 +119,10 @@ imgWithPhotographer attr imgStyles photoPath photographer =
             (style
                 :: attr
             )
-            [ img
-                [ src
-                    photoPath
-                , css imgStyles
+            [ responsiveImg
+                [ css imgStyles
                 ]
-                []
+                photoPath
             , div
                 [ class "photographercredit"
                 , css
@@ -134,3 +142,61 @@ imgWithPhotographer attr imgStyles photoPath photographer =
                 [ photographerLink photographer "av " ]
             ]
         ]
+
+
+imgSizes : List Int
+imgSizes =
+    [ 2048, 1536, 1280, 1024, 768, 640, 320 ]
+
+
+imgTypes : List String
+imgTypes =
+    -- Order matters, the browser will try the first listed
+    -- meaning that we will try to load them in order of "optimal".
+    [ "avif", "webp", "jpeg" ]
+
+
+responsiveSrcSet : String -> List Int -> String
+responsiveSrcSet pathTemplate sizes =
+    List.map
+        (\size ->
+            "{{ path }} {{ size }}w"
+                |> String.Format.namedValue "path" (String.Format.namedValue "size" (String.fromInt size) pathTemplate)
+                |> String.Format.namedValue "size" (String.fromInt size)
+        )
+        sizes
+        |> List.append
+            -- TODO: Verify that we want the biggest image?
+            [ String.Format.namedValue "size" "2048" pathTemplate
+            ]
+        |> String.join ", "
+
+
+responsiveSource : String -> String -> Html msg
+responsiveSource imageType basePath =
+    let
+        pathTemplate =
+            "{{ basePath }}_{{ size }}w_resize.{{ extension }}"
+                |> String.Format.namedValue "basePath" basePath
+                |> String.Format.namedValue "extension" imageType
+
+        mimeType =
+            String.Format.namedValue "type" imageType "image/{{ type }}"
+
+        sources =
+            responsiveSrcSet pathTemplate imgSizes
+    in
+    source [ attribute "srcset" sources, type_ mimeType ] []
+
+
+responsiveImg : List (Html.Styled.Attribute msg) -> String -> Html msg
+responsiveImg attrs basePath =
+    let
+        sources =
+            List.map (\imageType -> responsiveSource imageType basePath) imgTypes
+
+        fallback =
+            -- img (src (basePath ++ ".jpeg") :: attrs) []
+            img attrs []
+    in
+    node "picture" attrs (sources ++ [ fallback ])
