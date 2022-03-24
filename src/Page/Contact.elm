@@ -123,7 +123,7 @@ infoBullet : String -> String -> Html msg
 infoBullet icon content =
     let
         imgSource =
-            "/ikoner/{{ icon }}.svg" |> String.Format.namedValue "icon" icon
+            "/ressurser/{{ icon }}.svg" |> String.Format.namedValue "icon" icon
     in
     div [ css [ Bp.md [ Tw.pl_0 ], Tw.p_2 ] ]
         [ img

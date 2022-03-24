@@ -173,6 +173,6 @@ eventTypeIcon : String -> Html msg
 eventTypeIcon eventType =
     let
         imgSource =
-            "/ikoner/{{ eventType }}.svg" |> String.Format.namedValue "eventType" eventType
+            "/ressurser/{{ eventType }}.svg" |> String.Format.namedValue "eventType" eventType
     in
     img [ src imgSource, alt eventType ] []
