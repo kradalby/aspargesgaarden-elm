@@ -3,7 +3,7 @@
   "title": "Engelsk lysthus og uteområder",
   "photo":
     {
-      "path": "muligheter/lysthus.jpg",
+      "path": "muligheter/lysthus",
       "photographer":
         {
           "name": "Aurora Hovland",

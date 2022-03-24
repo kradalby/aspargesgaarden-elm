@@ -3,7 +3,7 @@
   "title": "Fjøset",
   "photo":
     {
-      "path": "muligheter/fjoset.jpg",
+      "path": "muligheter/fjoset",
       "photographer": { "name": "Hanne Gulliksen", "website": "" },
       "description": "",
     },

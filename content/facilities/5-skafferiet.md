@@ -3,7 +3,7 @@
   "title": "«Skafferiet»",
   "photo":
     {
-      "path": "muligheter/skafferiet.jpg",
+      "path": "muligheter/skafferiet",
       "photographer":
         {
           "name": "Aurora Hovland",

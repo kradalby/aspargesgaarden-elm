@@ -3,7 +3,7 @@
   "title": "Låven",
   "photo":
     {
-      "path": "muligheter/loven.jpg",
+      "path": "muligheter/loven",
       "photographer":
         {
           "name": "Marianne Ous",
