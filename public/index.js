@@ -1,5 +1,7 @@
 /** @typedef {{load: (Promise<unknown>); flags: (unknown)}} ElmPagesInit */
 
+import "/imgsupport.js";
+
 /** @type ElmPagesInit */
 export default {
   load: async function (elmLoaded) {
