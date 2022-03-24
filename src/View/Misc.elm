@@ -160,7 +160,7 @@ responsiveSrcSet : String -> List Int -> String
 responsiveSrcSet pathTemplate sizes =
     List.map
         (\size ->
-            "{{ path }} {{ size }}w"
+            "/{{ path }} {{ size }}w"
                 |> String.Format.namedValue "path" (String.Format.namedValue "size" (String.fromInt size) pathTemplate)
                 |> String.Format.namedValue "size" (String.fromInt size)
         )
