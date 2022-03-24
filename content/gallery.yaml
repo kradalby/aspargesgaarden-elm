@@ -5,18 +5,18 @@ photographers:
     website: ""
 
 photos:
-  - path: galleri/sophia_fjoset2.jpg
+  - path: galleri/sophia_fjoset2
     photographer: sophia
     description: ""
-  - path: galleri/sophia_fjoset5.jpg
+  - path: galleri/sophia_fjoset5
     photographer: sophia
     description: ""
-  - path: galleri/sophia_lysthus1.jpg
+  - path: galleri/sophia_lysthus1
     photographer: sophia
     description: ""
-  - path: galleri/sophia_lysthus2.jpg
+  - path: galleri/sophia_lysthus2
     photographer: sophia
     description: ""
-  - path: galleri/sophia_lysthus3.jpg
+  - path: galleri/sophia_lysthus3
     photographer: sophia
     description: ""

@@ -3,7 +3,7 @@
   "title": "Kjøkken",
   "photo":
     {
-      "path": "muligheter/kjokken.jpg",
+      "path": "muligheter/kjokken",
       "photographer":
         {
           "name": "Aurora Hovland",
