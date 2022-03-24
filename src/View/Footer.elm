@@ -16,8 +16,8 @@ view =
             ]
         ]
         [ div []
-            [ contactPoint "https://facebook.com/aspargesgaarden" "/ikoner/fb.png" "Facebook"
-            , contactPoint "https://instagram.com/aspargesgaarden" "/ikoner/insta.png" "Instagram"
+            [ contactPoint "https://facebook.com/aspargesgaarden" "/ressurser/fb.png" "Facebook"
+            , contactPoint "https://instagram.com/aspargesgaarden" "/ressurser/insta.png" "Instagram"
             ]
         , node "script"
             [ src "https://umami.kradalby.no/umami.js"

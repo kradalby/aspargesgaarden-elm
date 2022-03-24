@@ -14,6 +14,7 @@ import OptimizedDecoder
 import Page exposing (Page, StaticPayload)
 import Pages.PageUrl exposing (PageUrl)
 import Pages.Url
+import Path
 import Shared
 import Tailwind.Breakpoints as Bp
 import Tailwind.Utilities as Tw
@@ -96,18 +97,18 @@ head :
     StaticPayload Data RouteParams
     -> List Head.Tag
 head _ =
-    Seo.summary
+    Seo.summaryLarge
         { canonicalUrlOverride = Nothing
-        , siteName = "elm-pages"
+        , siteName = "Aspargesgården"
         , image =
-            { url = Pages.Url.external "TODO"
-            , alt = "elm-pages logo"
+            { url = [ "ressurser", "logo.svg" ] |> Path.join |> Pages.Url.fromPath
+            , alt = "Aspargesgården logo"
             , dimensions = Nothing
-            , mimeType = Nothing
+            , mimeType = Just "image/svg+xml"
             }
-        , description = "TODO"
-        , locale = Nothing
-        , title = "TODO title" -- metadata.title -- TODO
+        , description = ""
+        , locale = Just "nb_NO"
+        , title = "Aspargesgården | Muligheter"
         }
         |> Seo.website
 

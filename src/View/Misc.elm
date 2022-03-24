@@ -31,7 +31,7 @@ contact =
             ]
         ]
         [ a [ href "/contact" ]
-            [ img [ src "/ikoner/takontakt.png", alt "Ta kontakt" ] []
+            [ img [ src "/ressurser/takontakt.png", alt "Ta kontakt" ] []
             ]
         ]
 
