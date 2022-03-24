@@ -14,7 +14,7 @@ import Shared
 import Tailwind.Breakpoints as Bp
 import Tailwind.Utilities as Tw
 import View exposing (View)
-import View.Misc exposing (contact)
+import View.Misc exposing (contact, responsiveBackgroundImage)
 
 
 type alias Model =
@@ -74,25 +74,16 @@ view :
     -> View Msg
 view _ _ _ =
     let
-        avif =
-            Css.Global.selector ".avif .welcome-page"
-                [ Css.backgroundImage <| Css.url "/bilder/forside_2048w_resize.avif"
-                ]
+        className =
+            "welcome-page"
 
-        webp =
-            Css.Global.selector ".webp.notavif .welcome-page"
-                [ Css.backgroundImage <| Css.url "/bilder/forside_2048w_resize.webp"
-                ]
-
-        jpeg =
-            Css.Global.selector ".notwebp.notavif .welcome-page"
-                [ Css.backgroundImage <| Css.url "/bilder/forside_2048w_resize.jpeg"
-                ]
+        backgroundImage =
+            responsiveBackgroundImage "bilder/forside" className
     in
     View.html "Velkommen"
-        [ Css.Global.global [ avif, webp, jpeg ]
+        [ Css.Global.global backgroundImage
         , div
-            [ class "welcome-page"
+            [ class className
             , css
                 [ Tw.h_screen
                 , Tw.flex
