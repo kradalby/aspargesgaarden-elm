@@ -18,7 +18,7 @@ import Shared
 import Tailwind.Breakpoints as Bp
 import Tailwind.Utilities as Tw
 import View exposing (View)
-import View.Misc exposing (container, headline, imgWithPhotographer, photographerLink, viewIf)
+import View.Misc exposing (container, headline, imgWithPhotographer, photographerLink, responsiveImg, viewIf)
 
 
 type Direction
@@ -270,7 +270,7 @@ slideShow gallery index =
                             , Tw.static
                             ]
                         ]
-                        [ img [ src photo.path ] []
+                        [ responsiveImg [] photo.path
                         , div
                             [ css
                                 [ Tw.text_right

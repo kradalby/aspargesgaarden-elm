@@ -1,11 +1,12 @@
 module Page.Index exposing (Data, Model, Msg, page)
 
 import Css
+import Css.Global
 import DataSource exposing (DataSource)
 import Head
 import Head.Seo as Seo
 import Html.Styled exposing (..)
-import Html.Styled.Attributes exposing (alt, attribute, css, for, href, id, src, type_)
+import Html.Styled.Attributes exposing (class, css)
 import Page exposing (Page, StaticPayload)
 import Pages.PageUrl exposing (PageUrl)
 import Pages.Url
@@ -45,7 +46,7 @@ data =
 head :
     StaticPayload Data RouteParams
     -> List Head.Tag
-head static =
+head _ =
     Seo.summary
         { canonicalUrlOverride = Nothing
         , siteName = "elm-pages"
@@ -71,15 +72,34 @@ view :
     -> Shared.Model
     -> StaticPayload Data RouteParams
     -> View Msg
-view maybeUrl sharedModel static =
+view _ _ _ =
+    let
+        avif =
+            Css.Global.selector ".avif .welcome-page"
+                [ Css.backgroundImage <| Css.url "/bilder/forside_2048w_resize.avif"
+                ]
+
+        webp =
+            Css.Global.selector ".webp.notavif .welcome-page"
+                [ Css.backgroundImage <| Css.url "/bilder/forside_2048w_resize.webp"
+                ]
+
+        jpeg =
+            Css.Global.selector ".notwebp.notavif .welcome-page"
+                [ Css.backgroundImage <| Css.url "/bilder/forside_2048w_resize.jpeg"
+                ]
+    in
     View.html "Velkommen"
-        [ div
-            [ css
+        [ Css.Global.global [ avif, webp, jpeg ]
+        , div
+            [ class "welcome-page"
+            , css
                 [ Tw.h_screen
                 , Tw.flex
                 , Tw.flex_col
                 , Tw.justify_center
-                , Css.backgroundImage <| Css.url "/bilder/forside.jpg"
+
+                -- , Css.backgroundImage <| Css.url "/bilder/forside_2048w_resize.jpeg"
                 , Css.backgroundRepeat Css.noRepeat
                 , Css.backgroundPosition Css.center
                 , Css.backgroundSize Css.cover
