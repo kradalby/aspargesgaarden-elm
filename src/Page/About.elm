@@ -57,7 +57,7 @@ head :
 head _ =
     Seo.summaryLarge
         { commonSeo
-            | title = "Aspargesgården | Om Gården"
+            | title = "Aspargesgården | Om gården"
         }
         |> Seo.website
 
@@ -111,7 +111,7 @@ Alt godt, Kristine & Anders
                 |> Result.andThen (\ast -> Markdown.Renderer.render TailwindMarkdownRenderer.renderer ast)
                 |> Result.withDefault [ text "Kunne ikke laste innhold..." ]
     in
-    View.html "Om oss"
+    View.html "Om gården"
         [ container
             [ div [] [ headline "Om gården" ]
             , div
