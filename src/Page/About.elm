@@ -12,6 +12,7 @@ import Page exposing (Page, StaticPayload)
 import Pages.PageUrl exposing (PageUrl)
 import Pages.Url
 import Shared
+import Site exposing (commonSeo)
 import String.Format
 import Tailwind.Breakpoints as Bp
 import Tailwind.Utilities as Tw
@@ -54,18 +55,9 @@ head :
     StaticPayload Data RouteParams
     -> List Head.Tag
 head _ =
-    Seo.summary
-        { canonicalUrlOverride = Nothing
-        , siteName = "elm-pages"
-        , image =
-            { url = Pages.Url.external "TODO"
-            , alt = "elm-pages logo"
-            , dimensions = Nothing
-            , mimeType = Nothing
-            }
-        , description = "TODO"
-        , locale = Nothing
-        , title = "TODO title" -- metadata.title -- TODO
+    Seo.summaryLarge
+        { commonSeo
+            | title = "Aspargesgården | Om Oss"
         }
         |> Seo.website
 

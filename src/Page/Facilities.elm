@@ -16,6 +16,7 @@ import Pages.PageUrl exposing (PageUrl)
 import Pages.Url
 import Path
 import Shared
+import Site exposing (commonSeo)
 import Tailwind.Breakpoints as Bp
 import Tailwind.Utilities as Tw
 import TailwindMarkdownRenderer
@@ -98,17 +99,8 @@ head :
     -> List Head.Tag
 head _ =
     Seo.summaryLarge
-        { canonicalUrlOverride = Nothing
-        , siteName = "Aspargesgården"
-        , image =
-            { url = [ "ressurser", "twitter_2048w_resize.jpeg" ] |> Path.join |> Pages.Url.fromPath
-            , alt = "Aspargesgården"
-            , dimensions = Just { width = 2048, height = 1024 }
-            , mimeType = Just "image/jpeg"
-            }
-        , description = ""
-        , locale = Just "nb_NO"
-        , title = "Aspargesgården | Muligheter"
+        { commonSeo
+            | title = "Aspargesgården | Muligheter"
         }
         |> Seo.website
 
