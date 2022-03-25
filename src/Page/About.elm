@@ -57,7 +57,7 @@ head :
 head _ =
     Seo.summaryLarge
         { commonSeo
-            | title = "Aspargesgården | Om Oss"
+            | title = "Aspargesgården | Om Gården"
         }
         |> Seo.website
 
