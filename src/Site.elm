@@ -1,7 +1,8 @@
-module Site exposing (config)
+module Site exposing (commonSeo, config)
 
 import DataSource
 import Head
+import Head.Seo as Seo
 import LanguageTag exposing (LanguageTag, emptySubtags)
 import LanguageTag.Country as Country
 import LanguageTag.Language
@@ -103,3 +104,26 @@ manifest static =
                     }
             )
         |> Manifest.withShortName "Aspargesgården"
+
+
+commonSeo :
+    { canonicalUrlOverride : Maybe String
+    , siteName : String
+    , image : Seo.Image
+    , description : String
+    , title : String
+    , locale : Maybe String
+    }
+commonSeo =
+    { canonicalUrlOverride = Nothing
+    , siteName = "Aspargesgården"
+    , image =
+        { url = [ "ressurser", "twitter_2048w_resize.jpeg" ] |> Path.join |> Pages.Url.fromPath
+        , alt = "Aspargesgården"
+        , dimensions = Just { width = 2048, height = 1024 }
+        , mimeType = Just "image/jpeg"
+        }
+    , description = "Aspargesgården byr på sjarmerende og unike lokaler i landlige omgivelser, ved kysten i Vestfold."
+    , locale = Just "nb_NO"
+    , title = "Aspargesgården | "
+    }
