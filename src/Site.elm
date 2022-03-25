@@ -26,6 +26,39 @@ config =
     }
 
 
+iconSizes : List ( Int, Int )
+iconSizes =
+    [ ( 16, 16 )
+    , ( 24, 24 )
+    , ( 32, 32 )
+    , ( 48, 48 )
+    , ( 64, 64 )
+    , ( 72, 72 )
+    , ( 80, 80 )
+    , ( 96, 96 )
+    , ( 128, 128 )
+    , ( 256, 256 )
+    ]
+
+
+iconSvgSizes : List ( Int, Int )
+iconSvgSizes =
+    iconSizes
+        ++ [ ( 512, 512 )
+           , ( 1024, 1024 )
+           ]
+
+
+iconSvgUrl : Pages.Url.Url
+iconSvgUrl =
+    [ "ressurser", "favicon.svg" ] |> Path.join |> Pages.Url.fromPath
+
+
+iconUrl : Pages.Url.Url
+iconUrl =
+    [ "ressurser", "favicon.ico" ] |> Path.join |> Pages.Url.fromPath
+
+
 data : DataSource.DataSource Data
 data =
     DataSource.succeed ()
@@ -34,6 +67,10 @@ data =
 head : Data -> List Head.Tag
 head static =
     [ Head.sitemapLink "/sitemap.xml"
+    , Head.icon iconSvgSizes (MimeType.OtherImage "svg+xml") iconSvgUrl
+    , Head.icon iconSizes (MimeType.OtherImage "x-icon") iconUrl
+    , Head.appleTouchIcon (Just 180) iconSvgUrl
+    , Head.appleTouchIcon (Just 192) iconSvgUrl
     ]
 
 
@@ -44,16 +81,16 @@ manifest static =
         , description = "Sjarmerende, rustikk 1900-talls gård ved kysten i Vestfold"
         , startUrl = Route.Index |> Route.toPath
         , icons =
-            [ { src = [ "ressurser", "favicon.svg" ] |> Path.join |> Pages.Url.fromPath
+            [ { src = iconSvgUrl
               , sizes =
-                    [ ( 72, 72 )
-                    , ( 96, 96 )
-                    , ( 128, 128 )
-                    , ( 256, 256 )
-                    , ( 512, 512 )
-                    , ( 1024, 1024 )
-                    ]
+                    iconSvgSizes
               , mimeType = Just (MimeType.OtherImage "svg+xml")
+              , purposes = []
+              }
+            , { src = iconUrl
+              , sizes =
+                    iconSizes
+              , mimeType = Just (MimeType.OtherImage "x-icon")
               , purposes = []
               }
             ]
