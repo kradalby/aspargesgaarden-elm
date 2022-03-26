@@ -118,7 +118,7 @@ commonSeo =
     { canonicalUrlOverride = Nothing
     , siteName = "Aspargesgården"
     , image =
-        { url = [ "ressurser", "twitter_2048w_resize.jpeg" ] |> Path.join |> Pages.Url.fromPath
+        { url = [ "ressurser", "twitter2_2048w_resize.jpeg" ] |> Path.join |> Pages.Url.fromPath
         , alt = "Aspargesgården"
         , dimensions = Just { width = 2048, height = 1024 }
         , mimeType = Just "image/jpeg"
