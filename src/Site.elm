@@ -21,7 +21,7 @@ type alias Data =
 config : SiteConfig Data
 config =
     { data = data
-    , canonicalUrl = "https://beta.aspargesgaarden.no"
+    , canonicalUrl = "https://aspargesgaarden.no"
     , manifest = manifest
     , head = head
     }
