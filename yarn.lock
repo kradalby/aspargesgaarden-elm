@@ -23,10 +23,10 @@
     chalk "^2.0.0"
     js-tokens "^4.0.0"
 
-"@funboxteam/optimizt@^3.1.0":
-  version "3.1.0"
-  resolved "https://registry.npmjs.org/@funboxteam/optimizt/-/optimizt-3.1.0.tgz"
-  integrity sha512-j4R7br1da4+qCp3f9snwM2RBadObiNf1LMWaB0iY3Vzbb5RnwcGaURnp7xWSabrn9NWZXLJZM4bQa1CdlDW7QQ==
+"@funboxteam/optimizt@^3.1.2":
+  version "3.1.2"
+  resolved "https://registry.yarnpkg.com/@funboxteam/optimizt/-/optimizt-3.1.2.tgz#132c2bb70284fd98f5947b54426437cd39a3f1fc"
+  integrity sha512-bUYlXuIon2rrnP4i70WxPrpIG3V+y3ypoi2AlDE6yPFL5ESzKTIqtiUTuIBGLdZJNdoEYRXcIEG8yK0QxJ1afw==
   dependencies:
     cli-progress "^3.10.0"
     commander "^8.3.0"
