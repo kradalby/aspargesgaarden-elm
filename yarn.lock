@@ -1354,10 +1354,10 @@ elm-json@^0.2.12:
   dependencies:
     binwrap "^0.2.3"
 
-elm-optimize-level-2@^0.3.4:
-  version "0.3.4"
-  resolved "https://registry.yarnpkg.com/elm-optimize-level-2/-/elm-optimize-level-2-0.3.4.tgz#5c0c997a9f424d016229087ee92fed6da0365f60"
-  integrity sha512-DKhH6o+SNo3m8y9qAM932/gLMK0YmNSJevHdBYkaDWfKiw+vlo4Wtfskb8CI8ZAzWrAOcDNiLCsEbSsbPHk2Vg==
+elm-optimize-level-2@^0.3.5:
+  version "0.3.5"
+  resolved "https://registry.yarnpkg.com/elm-optimize-level-2/-/elm-optimize-level-2-0.3.5.tgz#a0ac9b825d9ff68be50ed1b819780f88693a872a"
+  integrity sha512-t1xl8zR9UBspdmEMuLBE/qTLP+Ew3L4PzKLhSY/PsO21HU3jZ1ULmKxDtZmJPVG4ciqsY1JSl/GFbaSdQ1sX9Q==
   dependencies:
     "@types/jest" "^27.0.3"
     chalk "^4.1.0"
