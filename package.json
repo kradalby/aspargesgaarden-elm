@@ -11,7 +11,7 @@
     "elm-pages": "2.1.11",
     "elm-review": "^2.7.2",
     "elm-tailwind-modules": "^0.3.2",
-    "elm-tooling": "^1.7.0",
+    "elm-tooling": "^1.8.0",
     "postcss": "^8.4.14",
     "tailwindcss": "^3.0.23"
   },
