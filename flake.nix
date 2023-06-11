@@ -66,14 +66,11 @@
 
           dontBuild = true;
 
-          # Error: EROFS: read-only file system
-          # https://github.com/MarcoDaniels/website/blob/9691c0de2e86536c057a4a7bf636f1aae117c0b4/default.nix#L10
           installPhase = ''
-            # export out=/tmp/asparges
             mkdir -p $out
             cp -r $src/* $out/.
             cd $out
-            elm-pages build --debug
+            elm-pages build
           '';
         };
       };
