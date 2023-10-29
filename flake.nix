@@ -17,46 +17,52 @@
   in
     {
       overlay = _: prev: let
-        pkgs = nixpkgs.legacyPackages.${prev.system};
-      in rec {
-        yarnPkgs = pkgs.yarn2nix-moretea.mkYarnPackage {
-          name = "yarnPkgs";
-          version = aspargesgaardenVersion;
-          src = pkgs.nix-gitignore.gitignoreSource [] ./.;
-          publishBinsFor = [
-            "elm-review"
-            "elm-pages"
-            "elm-json"
-            "elm-optimize-level-2"
-          ];
+        pkgs = import nixpkgs {
+          config = {allowUnfree = true;};
+          inherit (prev) system;
         };
+      in rec {
+        # yarnPkgs = pkgs.yarn2nix-moretea.mkYarnPackage {
+        #   name = "yarnPkgs";
+        #   version = aspargesgaardenVersion;
+        #   src =
+        #     pkgs.nix-gitignore.gitignoreSource [
+        #       "Makefile"
+        #       "flake.*"
+        #       "app/"
+        #       "plugins/"
+        #       "public/"
+        #       "gen/"
+        #       "grafikk/"
+        #     ]
+        #     ./.;
+        #   publishBinsFor = [
+        #     "elm-review"
+        #     "elm-pages"
+        #     "elm-optimize-level-2"
+        #   ];
+        # };
 
         aspargesgaarden = pkgs.stdenv.mkDerivation {
           name = "aspargesgaarden";
-          src = pkgs.nix-gitignore.gitignoreSource ["Makefile"] ./.;
+          src = pkgs.nix-gitignore.gitignoreSource ["Makefile" "flake.*"] ./.;
 
           buildInputs = with pkgs; [
-            yarnPkgs
+            # yarnPkgs
 
-            elmPackages.elm
-            yarn
-            nodejs
-            nodePackages.sass
-            nodePackages.parcel
+            elmPackages.elm-pages
+            # elmPackages.elm
+            elmPackages.lamdera
           ];
 
           postUnpack = ''
             export HOME="$TMP"
           '';
 
-          patchPhase = ''
-            rm -rf elm-stuff
-            ln -sf ${yarnPkgs}/node_modules .
-          '';
-
-          shellHook = ''
-            ln -fs ${yarnPkgs}/node_modules .
-          '';
+          # patchPhase = ''
+          #   rm -rf elm-stuff
+          #   ln -sf ${yarnPkgs}/node_modules .
+          # '';
 
           configurePhase = pkgs.elmPackages.fetchElmDeps {
             elmVersion = "0.19.1";
@@ -70,6 +76,7 @@
             mkdir -p $out
             cp -r $src/* $out/.
             cd $out
+
             elm-pages build
           '';
         };
@@ -83,7 +90,7 @@
         inherit system;
       };
       buildDeps = with pkgs; [
-        yarnPkgs
+        # yarnPkgs
 
         nodejs
         yarn
@@ -103,8 +110,8 @@
           elm-format
           elm-json
           elm-analyse
+          elm-pages
           elm2nix
-          # lamdera
         ]);
     in {
       # `nix develop`
