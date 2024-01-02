@@ -146,15 +146,14 @@ Alt godt, Kristine & Anders
                   <|
                     List.map eventTypeIcon
                         [ "bryllup"
+                        , "minnestund"
+                        , "daap"
+                        , "julebord"
                         , "bursdag"
+                        , "konferanse"
                         , "feiring"
                         , "nyttaar"
-                        , "julebord"
-                        , "daap"
-                        , "konfirmasjon"
                         , "vitnemaal"
-                        , "konferanse"
-                        , "minnestund"
                         ]
                 ]
             ]
