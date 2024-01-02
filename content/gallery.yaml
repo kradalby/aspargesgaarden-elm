@@ -3,8 +3,149 @@ photographers:
   sophia:
     name: Sophia Karlsen Edwards
     website: ""
+  lucky:
+    name: Lucky Thirteen
+    website: "https://luckythirteen.no/"
 
 photos:
+  - path: galleri/luckythirteen_md-60
+    photographer: lucky
+    description: ""
+  - path: galleri/luckythirteen_md-67
+    photographer: lucky
+    description: ""
+  - path: galleri/luckythirteen_md-69
+    photographer: lucky
+    description: ""
+  - path: galleri/luckythirteen_md-84
+    photographer: lucky
+    description: "Blomster fra @bondenshage"
+  - path: galleri/luckythirteen_md-91
+    photographer: lucky
+    description: ""
+  - path: galleri/luckythirteen_md-100
+    photographer: lucky
+    description: ""
+  - path: galleri/luckythirteen_md-141
+    photographer: lucky
+    description: ""
+  - path: galleri/luckythirteen_md-132
+    photographer: lucky
+    description: "Blomster fra @bondenshage"
+  - path: galleri/luckythirteen_md-143
+    photographer: lucky
+    description: "Blomster fra @bondenshage"
+  - path: galleri/luckythirteen_md-179
+    photographer: lucky
+    description: ""
+  - path: galleri/luckythirteen_md-192
+    photographer: lucky
+    description: "Blomster fra @bondenshage"
+  - path: galleri/luckythirteen_md-194
+    photographer: lucky
+    description: ""
+  - path: galleri/luckythirteen_md-196
+    photographer: lucky
+    description: ""
+  - path: galleri/luckythirteen_md-197
+    photographer: lucky
+    description: ""
+  - path: galleri/luckythirteen_md-198
+    photographer: lucky
+    description: ""
+  - path: galleri/luckythirteen_md-200
+    photographer: lucky
+    description: ""
+  - path: galleri/luckythirteen_md-206
+    photographer: lucky
+    description: ""
+  - path: galleri/luckythirteen_md-236
+    photographer: lucky
+    description: ""
+  - path: galleri/luckythirteen_md-251
+    photographer: lucky
+    description: "Kokk Patrick Castelano"
+  - path: galleri/luckythirteen_md-419
+    photographer: lucky
+    description: "Kokk Patrick Castelano"
+  - path: galleri/luckythirteen_mk-104
+    photographer: lucky
+    description: "Sandar Kirke, Sandefjord"
+  - path: galleri/luckythirteen_mk-181
+    photographer: lucky
+    description: ""
+  - path: galleri/luckythirteen_mk-271
+    photographer: lucky
+    description: ""
+  - path: galleri/luckythirteen_mk-250
+    photographer: lucky
+    description: "Blomster fra @ruby_elise"
+  - path: galleri/luckythirteen_mk-272
+    photographer: lucky
+    description: ""
+  - path: galleri/luckythirteen_mk-274
+    photographer: lucky
+    description: ""
+  - path: galleri/luckythirteen_mk-289
+    photographer: lucky
+    description: ""
+  - path: galleri/luckythirteen_mk-299
+    photographer: lucky
+    description: "Blomster fra @ruby_elise"
+  - path: galleri/luckythirteen_mk-300
+    photographer: lucky
+    description: ""
+  - path: galleri/luckythirteen_mk-304
+    photographer: lucky
+    description: "Ballonger fra @dluxevent.no"
+  - path: galleri/luckythirteen_mk-310
+    photographer: lucky
+    description: "Blomster fra @ruby_elise"
+  - path: galleri/luckythirteen_mk-311
+    photographer: lucky
+    description: ""
+  - path: galleri/luckythirteen_mk-317
+    photographer: lucky
+    description: ""
+  - path: galleri/luckythirteen_mk-318
+    photographer: lucky
+    description: ""
+  - path: galleri/luckythirteen_mk-320
+    photographer: lucky
+    description: ""
+  - path: galleri/luckythirteen_mk-363
+    photographer: lucky
+    description: ""
+  - path: galleri/luckythirteen_mk-486
+    photographer: lucky
+    description: "Blomster fra @ruby_elise"
+  - path: galleri/luckythirteen_mk-498
+    photographer: lucky
+    description: ""
+  - path: galleri/luckythirteen_mk-508
+    photographer: lucky
+    description: ""
+  - path: galleri/luckythirteen_mk-550
+    photographer: lucky
+    description: "Kokk Patrick Castelano"
+  - path: galleri/luckythirteen_mk-558
+    photographer: lucky
+    description: ""
+  - path: galleri/luckythirteen_mk-564
+    photographer: lucky
+    description: ""
+  - path: galleri/luckythirteen_mk-581
+    photographer: lucky
+    description: ""
+  - path: galleri/luckythirteen_mk-609
+    photographer: lucky
+    description: ""
+  - path: galleri/luckythirteen_mk-637
+    photographer: lucky
+    description: ""
+  - path: galleri/luckythirteen_mk-639
+    photographer: lucky
+    description: ""
   - path: galleri/sophia_fjoset2
     photographer: sophia
     description: ""
