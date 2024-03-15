@@ -108,6 +108,7 @@ view currentPath =
                     -- , headerLink currentPath "stable" "Fjøset"
                     -- , headerLink currentPath "barn" "Låven"
                     [ headerLink currentPath "facilities" "Muligheter"
+                    , headerLink currentPath "events" "Arrangementer"
                     , headerLink currentPath "gallery" "Galleri"
                     , headerLink currentPath "about" "Om gården"
                     , headerLink currentPath "contact" "Kontakt"
