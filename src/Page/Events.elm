@@ -166,7 +166,7 @@ section index sect =
                             [ Tw.h_auto
                             ]
                         , Tw.object_cover
-                        , Tw.h_48
+                        , Tw.h_1over2
                         , Tw.w_full
                         ]
                         sect.metadata.photo.path
