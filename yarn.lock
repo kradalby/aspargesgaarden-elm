@@ -2,7 +2,7 @@
 # yarn lockfile v1
 
 
-"@funboxteam/optimizt@^5.0.1":
+"@funboxteam/optimizt@^5.0.2":
   version "5.0.2"
   resolved "https://registry.yarnpkg.com/@funboxteam/optimizt/-/optimizt-5.0.2.tgz#86999ffc8adc3d8e731088acd7ed8bb5691b2572"
   integrity sha512-GUllf8ezmSgb9Kb7j1hLGhpclfAwwWgOFtLrxH+GAIfn3JlIoFkgMlo7po46oVhfCMxAX3RRivHraTCg9sQUpg==
