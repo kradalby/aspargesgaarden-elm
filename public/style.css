@@ -1,5 +1,12 @@
 @import url("https://use.typekit.net/ueo0bvh.css");
 
+@font-face {
+    font-family: "Cardillac";
+    src: url("ressurser/Hoftype-Cardillac.otf") format("opentype");
+    font-weight: normal;
+    font-style: normal;
+}
+
 #menu-toggle:checked + #menu {
-  display: block;
+    display: block;
 }

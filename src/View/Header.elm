@@ -35,7 +35,7 @@ view currentPath =
             [ a [ href "/" ]
                 [ img
                     [ css [ Tw.h_28 ]
-                    , src "/ressurser/logo.svg"
+                    , src "/ressurser/Aspargesgaarden_HOVEDLOGO_bredde_DempetSort.png"
                     , alt "Aspargesgården"
                     ]
                     []
