@@ -1,6 +1,10 @@
 module.exports = {
-  darkMode: false, // or 'media' or 'class'
-  variants: [],
+  safelist: [
+    {
+      // Include everything, Elm is doing our tree-shaking
+      pattern: /.*/,
+    },
+  ],
   theme: {
     minHeight: {
       "1/2": "50%",
@@ -14,6 +18,38 @@ module.exports = {
           "link-active": "#e0c3bc",
           DEFAULT: "#b7a8a2",
           text: "#757471",
+        },
+        sort: {
+          DEFAULT: "#211f1e",
+          text: "#211f1e",
+        },
+        "lys-eukalyptus": {
+          DEFAULT: "#b4c0bd",
+          text: "#b4c0bd",
+        },
+        "mork-eukalyptus": {
+          DEFAULT: "#4a5348",
+          text: "#4a5348",
+        },
+        mose: {
+          DEFAULT: "#647048",
+          text: "#647048",
+        },
+        asparges: {
+          DEFAULT: "#8f9873",
+          text: "#8f9873",
+        },
+        kalk: {
+          DEFAULT: "#cac3b5",
+          text: "#cac3b5",
+        },
+        tre: {
+          DEFAULT: "#9f856b",
+          text: "#9f856b",
+        },
+        rust: {
+          DEFAULT: "#835f40",
+          text: "#835f40",
         },
       },
       width: {
@@ -67,6 +103,5 @@ module.exports = {
       },
     },
   },
-  variants: {},
   plugins: [require("@tailwindcss/typography")],
 };

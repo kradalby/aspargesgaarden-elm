@@ -35,7 +35,7 @@ view currentPath =
             [ a [ href "/" ]
                 [ img
                     [ css [ Tw.h_28 ]
-                    , src "/ressurser/logo.svg"
+                    , src "/ressurser/Aspargesgaarden_HOVEDLOGO_bredde_DempetSort.png"
                     , alt "Aspargesgården"
                     ]
                     []
@@ -137,11 +137,13 @@ headerLink currentPagePath linkTo name =
             [ href ("/" ++ linkTo)
             , attribute "elm-pages:prefetch" "true"
             , css <|
-                [ Tw.font_medium
-                , Tw.text_xl
-                , Css.fontFamilies [ "rift-soft", "sans-serif" ]
+                [ Tw.font_bold
+                , Tw.text_sm
+                , Tw.text_sort
+                , Tw.uppercase
+                , Css.fontFamilies [ "Avenir", "sans-serif" ]
                 , Css.hover
-                    [ Tw.text_brown_link_active
+                    [ Tw.text_mork_eukalyptus
                     ]
                 ]
                     ++ (if isCurrentPath then

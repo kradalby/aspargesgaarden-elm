@@ -51,14 +51,15 @@ headline content =
             , Bp.lg [ Tw.pt_12 ]
             , Bp.md
                 [ Tw.text_left
-                , Tw.text_8xl
+                , Tw.text_6xl
                 ]
             , Tw.text_center
             , Tw.pt_10
-            , Tw.text_6xl
+            , Tw.text_4xl
             , Tw.py_6
-            , Css.fontFamilies [ "luxus-brut", "cursive" ]
-            , Tw.text_brown
+            , Tw.font_medium
+            , Css.fontFamilies [ "Cardillac", "cursive" ]
+            , Tw.text_tre
             ]
         ]
         [ text content ]

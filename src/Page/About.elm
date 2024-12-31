@@ -126,7 +126,7 @@ Alt godt, Kristine & Anders
                         [ Bp.md [ Tw.w_1over2, Tw.px_0 ]
                         , Tw.w_full
                         , Tw.px_5
-                        , Tw.text_brown_text
+                        , Tw.text_sort
                         ]
                     ]
                   <|

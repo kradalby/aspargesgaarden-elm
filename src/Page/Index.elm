@@ -89,27 +89,27 @@ view _ _ _ =
                 , Css.backgroundAttachment Css.fixed
                 ]
             ]
-            [ div
-                [ css
-                    [ Bp.lg [ Tw.text_4xl ]
-                    , Tw.text_center
-                    , Tw.text_white
-                    , Tw.text_3xl
-                    , Css.fontFamilies [ "rift-soft", "sans-serif" ]
-                    ]
-                ]
-                [ text "Velkommen til" ]
-            , div
-                [ css
-                    [ Bp.lg [ Tw.text_8xl ]
-                    , Tw.text_center
-                    , Tw.text_white
-                    , Tw.text_5xl
-                    , Tw.py_6
-                    , Css.fontFamilies [ "luxus-brut", "cursive" ]
-                    ]
-                ]
-                [ text "Aspargesgården" ]
-            , contact
+            [-- div
+             --     [ css
+             --         [ Bp.lg [ Tw.text_4xl ]
+             --         , Tw.text_center
+             --         , Tw.text_white
+             --         , Tw.text_3xl
+             --         , Css.fontFamilies [ "rift-soft", "sans-serif" ]
+             --         ]
+             --     ]
+             --     [ text "Velkommen til" ]
+             -- , div
+             --     [ css
+             --         [ Bp.lg [ Tw.text_8xl ]
+             --         , Tw.text_center
+             --         , Tw.text_white
+             --         , Tw.text_5xl
+             --         , Tw.py_6
+             --         , Css.fontFamilies [ "Cardillac", "cursive" ]
+             --         ]
+             --     ]
+             --     [ text "Aspargesgården" ]
+             -- , contact
             ]
         ]

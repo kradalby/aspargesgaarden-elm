@@ -13,7 +13,7 @@ import Tailwind.Utilities as Tw
 renderer : Markdown.Renderer.Renderer (Html.Html msg)
 renderer =
     { heading = heading
-    , paragraph = Html.p [ css [ Tw.pb_3, Tw.text_brown_text ] ]
+    , paragraph = Html.p [ css [ Tw.pb_3, Tw.text_sort, Css.fontFamilies [ "Avenir", "sans-serif" ] ] ]
     , thematicBreak = Html.hr [] []
     , text = Html.text
     , strong = \content -> Html.strong [ css [ Tw.font_bold ] ] content
@@ -203,12 +203,12 @@ heading { level, rawText, children } =
             Html.h1
                 [ css
                     [ Tw.text_6xl
-                    , Tw.font_bold
+                    -- , Tw.font_bold
                     , Tw.tracking_tight
                     , Tw.mt_2
                     , Tw.mb_4
-                    , Css.fontFamilies [ "luxus-brut", "cursive" ]
-                    , Tw.text_brown
+                    , Css.fontFamilies [ "Cardillac", "cursive" ]
+                    , Tw.text_tre
                     ]
                 ]
                 children
