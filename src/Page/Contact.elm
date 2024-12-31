@@ -131,9 +131,10 @@ infoBullet icon content =
         , p
             [ css
                 [ Tw.inline_block
-                , Tw.text_brown
+                , Tw.text_sort
                 , Tw.text_lg
-                , Css.fontFamilies [ "rift-soft", "sans-serif" ]
+                , Tw.font_bold
+                , Css.fontFamilies [ "Avenir", "sans-serif" ]
                 ]
             ]
             [ text content ]

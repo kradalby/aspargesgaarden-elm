@@ -57,7 +57,7 @@ headline content =
             , Tw.pt_10
             , Tw.text_4xl
             , Tw.py_6
-            , Tw.font_bold
+            , Tw.font_medium
             , Css.fontFamilies [ "Cardillac", "cursive" ]
             , Tw.text_tre
             ]

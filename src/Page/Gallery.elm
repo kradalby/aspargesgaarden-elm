@@ -286,7 +286,7 @@ arrowDivStyle =
     [ Tw.w_14
     , Tw.h_14
     , Tw.text_4xl
-    , Tw.text_brown_text
+    , Tw.text_sort
     , Tw.rounded_full
     , Tw.bg_white
     , Tw.absolute
