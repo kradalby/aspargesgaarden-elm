@@ -1,7 +1,7 @@
 ---
 {
   "title": "Hageglede",
-  "public": true,
+  "public": false,
   "photo":
     {
       "path": "arrangementer/ingunnhage",
