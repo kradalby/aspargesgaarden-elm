@@ -1,7 +1,7 @@
 ---
 {
   "title": "Afternoon tea - ladies and gentlemen",
-  "public": true,
+  "public": false,
   "photo":
     {
       "path": "arrangementer/2025-03-22-afternoon",
