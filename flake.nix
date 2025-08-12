@@ -70,6 +70,22 @@
             mkdir -p $out
             cp -r $src/* $out/.
             cd $out
+            
+            # Make plugins directory writable so we can generate CurrentDate.elm
+            chmod +w plugins
+            
+            # Generate CurrentDate.elm with the actual build date
+            BUILD_DATE=$(date -u +"%Y-%m-%d")
+            cat > plugins/CurrentDate.elm <<EOF
+            module CurrentDate exposing (currentDate)
+
+            import DataSource exposing (DataSource)
+
+            currentDate : DataSource String
+            currentDate =
+                DataSource.succeed "$BUILD_DATE"
+            EOF
+            
             elm-pages build
           '';
         };
