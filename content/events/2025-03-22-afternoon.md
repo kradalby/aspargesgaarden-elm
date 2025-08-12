@@ -1,7 +1,9 @@
 ---
 {
   "title": "Afternoon tea - ladies and gentlemen",
-  "public": false,
+  "eventDate": "2025-03-22",
+  "eventTime": "16:00",
+  "publishedFrom": "2025-01-01",
   "photo":
     {
       "path": "arrangementer/2025-03-22-afternoon",
@@ -10,10 +12,6 @@
     },
 }
 ---
-
-# Afternoon tea - ladies and gentlemen
-
-Dato: 22. Mars 2025 kl 16.00 på Aspargesgården
 
 Aspargesgården feirer våren med herlig musikk fra duoen **A singing affair**, et artig kåsert om «do&don’ts» på fest og hjemmelaget tapas.
 

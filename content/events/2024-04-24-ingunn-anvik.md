@@ -1,7 +1,9 @@
 ---
 {
   "title": "Hageglede",
-  "public": false,
+  "eventDate": "2024-04-24",
+  "eventTime": "19:00",
+  "publishedFrom": "2024-03-01",
   "photo":
     {
       "path": "arrangementer/ingunnhage",
@@ -10,10 +12,6 @@
     },
 }
 ---
-
-# Hageglede
-
-**Dato**: Onsdag 24. April 2024 Kl 19:00
 
 Vi gleder oss til en uforglemmelig opplevelse med [**Ingunn Anvik** i @ingunnshage](https://www.instagram.com/ingunnshage) en lidenskapelig hageekspert, som inspirerer til å skape varierte hagerom og soner.
 

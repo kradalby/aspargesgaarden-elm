@@ -1,7 +1,9 @@
 ---
 {
   "title": "O sole mio med Didrik Solli-Tangen",
-  "public": true,
+  "eventDate": "2025-06-04",
+  "eventTime": "17:00",
+  "publishedFrom": "2025-01-01",
   "photo":
     {
       "path": "arrangementer/2025-06-04-didrik-solli",
@@ -10,10 +12,6 @@
     },
 }
 ---
-
-# O sole mio med Didrik Solli-Tangen
-
-Dato: 04. Juni 2025 kl 17.00 på Aspargesgården
 
 **Didrik Solli-Tangen** er en talentfull sanger som har gjort seg bemerket både nasjonalt og internasjonalt. Med en solid utdannelse fra Barrat Due musikkinstitutt i Oslo, har han utviklet en imponerende karriere innen musikk.
 
