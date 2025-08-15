@@ -71,8 +71,8 @@
             cp -r $src/* $out/.
             cd $out
             
-            # Make plugins directory writable so we can generate CurrentDate.elm
-            chmod +w plugins
+            # Make plugins directory and its contents writable so we can generate CurrentDate.elm
+            chmod -R +w plugins
             
             # Generate CurrentDate.elm with the actual build date
             BUILD_DATE=$(date -u +"%Y-%m-%d")
