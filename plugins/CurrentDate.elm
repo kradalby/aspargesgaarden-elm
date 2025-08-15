@@ -6,4 +6,4 @@ import DataSource exposing (DataSource)
 -- For local development, we use a fixed date
 currentDate : DataSource String
 currentDate =
-    DataSource.succeed "2025-01-13"
+    DataSource.succeed "2025-08-31"

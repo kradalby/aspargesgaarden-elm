@@ -1,11 +1,11 @@
 ---
 {
   "title": "Julemarked på Aspargesgården",
-  "eventDate": "2025-12-06",
-  "eventTime": "10:00",
-  "eventEndDate": "2025-12-07",
-  "eventEndTime": "18:00",
-  "publishedFrom": "2025-10-01",
+  "eventDate": "2025-11-15",
+  "eventTime": "12:00",
+  "eventEndDate": "2025-11-16",
+  "eventEndTime": "16:00",
+  "publishedFrom": "2025-01-01",
   "photo":
     {
       "path": "arrangementer/julemarked",
@@ -15,15 +15,16 @@
 }
 ---
 
-Velkommen til vårt årlige julemarked på Aspargesgården! 
+Velkommen til Julemarked på Aspargesgården!
 
-To dager fylt med julestemning, håndverk, lokale delikatesser og hygge for hele familien. Opplev den magiske julestemningen i våre historiske bygninger og områder.
+Bli med oss 15. & 16. november, kl. 12-16, når vi sammen med Sandefjord Soroptimistklubb skaper herlig julestemning!
 
-**Høydepunkter:**
-- Over 30 utstillere med håndverk og lokale produkter
-- Julegløgg og pepperkaker
-- Aktiviteter for barna
-- Julemusikk og underholdning
-- Lokal mat og drikke
+**Mer enn 30 dyktige gründere** tilbyr flott brukskunst og kortreiste delikatesser. Nyt hjemmebakst i kafeen vår og opplev julepyntet gård med koselig bålfat ute. 
 
-Vi gleder oss til å se deg!
+På søndag ca. kl. 13 synger Tjølling Kirkes barnekor BiTs julesanger.
+
+Inntektene går til Sandefjord Soroptimistklubb som støtter kvinner og barn lokalt og i Moldova.
+
+[Les mer om julemarkedet og praktisk informasjon her](/christmas)
+
+Ta med familie og venner - vi lover en helg fylt med glede, dufter og stemning!
