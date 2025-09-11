@@ -17,14 +17,16 @@
 
 Velkommen til Julemarked på Aspargesgården!
 
-Bli med oss 15. & 16. november, kl. 12-16, når vi sammen med Sandefjord Soroptimistklubb skaper herlig julestemning!
+Bli med oss på en herlig helg den 15. & 16. November, fra kl. 12 til 16, når vi forvandler Aspargesgården og skaper herlig jul. Sammen med Sandefjord Soroptimistklubb har vi gleden av å presentere et marked fylt med kreativitet og julestemning!
 
-**Mer enn 30 dyktige gründere** tilbyr flott brukskunst og kortreiste delikatesser. Nyt hjemmebakst i kafeen vår og opplev julepyntet gård med koselig bålfat ute. 
+Her vil du finne mer enn 30 dyktige gründere som tilbyr en rekke flotte brukskunst og kortreiste delikatesser. Her finner du den ekstra fine gaven, hjemmelagde spiselige gaver til deg selv eller noen du er glad i.
 
-På søndag ca. kl. 13 synger Tjølling Kirkes barnekor BiTs julesanger.
+Ta deg tid til å nyte den nydelige kafeen vår, hvor hjemmebakst garantert vil smake.
 
-Inntektene går til Sandefjord Soroptimistklubb som støtter kvinner og barn lokalt og i Moldova.
+Gården vil være julepyntet, og vi har bålfat ute for å skape en koselig atmosfære. Inntekten fra tombolaen, klubbens egen bod, og kafeteriaen vil gå til Sandefjord Soroptimistklubb, som jobber for å støtte kvinner og barn i vårt nærmiljø og i Moldova.
+
+På søndagen, ca ved 13-tiden vil Tjølling Kirkes barnekor BiTs synge julesanger for oss.
+
+Vi er utrolig takknemlig for at Aspargesgården kan være en vakker ramme for slike arrangementer og opplevelser. Ta med familie og venner, og bli med oss for å komme i førjuls stemning! Vi lover en helg fylt med glede, dufter og stemning. Velkommen!
 
 [Les mer om julemarkedet og praktisk informasjon her](/christmas)
-
-Ta med familie og venner - vi lover en helg fylt med glede, dufter og stemning!

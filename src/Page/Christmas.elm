@@ -76,38 +76,38 @@ view _ _ _ =
                     , Tw.py_8
                     ]
                 ]
-                [ h2 
-                    [ css 
+                [ h2
+                    [ css
                         [ Tw.text_4xl
                         , Tw.mb_6
                         , Tw.text_tre
                         , Css.fontFamilies [ "Cardillac", "cursive" ]
-                        ] 
-                    ] 
+                        ]
+                    ]
                     [ text "Velkommen til Julemarked på Aspargesgården!" ]
-                , p 
-                    [ css 
+                , p
+                    [ css
                         [ Tw.pb_3
                         , Tw.text_sort
                         , Css.fontFamilies [ "Avenir", "sans-serif" ]
-                        ] 
-                    ] 
+                        ]
+                    ]
                     [ text "Bli med oss på en herlig helg den 15. & 16. November, fra kl. 12 til 16, når vi forvandler Aspargesgården og skaper herlig jul. Sammen med Sandefjord Soroptimistklubb har vi gleden av å presentere et marked fylt med kreativitet og julestemning!" ]
-                , p 
-                    [ css 
+                , p
+                    [ css
                         [ Tw.pb_3
                         , Tw.text_sort
                         , Css.fontFamilies [ "Avenir", "sans-serif" ]
-                        ] 
-                    ] 
+                        ]
+                    ]
                     [ text "Her vil du finne mer enn 30 dyktige gründere som tilbyr en rekke flotte brukskunst og kortreiste delikatesser. Her finner du den ekstra fine gaven, hjemmelagde spiselige gaver til deg selv eller noen du er glad i." ]
-                , p 
-                    [ css 
+                , p
+                    [ css
                         [ Tw.pb_3
                         , Tw.text_sort
                         , Css.fontFamilies [ "Avenir", "sans-serif" ]
-                        ] 
-                    ] 
+                        ]
+                    ]
                     [ text "Ta deg tid til å nyte den nydelige kafeen vår, hvor hjemmebakst garantert vil smake." ]
                 , div
                     [ css [ Tw.my_8 ] ]
@@ -150,13 +150,13 @@ view _ _ _ =
                         , li [] [ text "Tjølling Kirkes barnekor BiTs synger julesanger søndag ca. kl. 13" ]
                         , li [] [ text "Den ekstra fine gaven eller hjemmelagde spiselige gaver" ]
                         ]
-                    , p 
-                        [ css 
+                    , p
+                        [ css
                             [ Tw.mt_4
                             , Tw.text_sort
                             , Css.fontFamilies [ "Avenir", "sans-serif" ]
-                            ] 
-                        ] 
+                            ]
+                        ]
                         [ text "Gården vil være julepyntet, og vi har bålfat ute for å skape en koselig atmosfære." ]
                     ]
                 , div
@@ -178,12 +178,12 @@ view _ _ _ =
                         [ text "Vi er utrolig takknemlig for at Aspargesgården kan være en vakker ramme for slike arrangementer og opplevelser." ]
                     ]
                 , div
-                    [ css 
+                    [ css
                         [ Tw.bg_brown
                         , Tw.bg_opacity_20
                         , Tw.p_6
                         , Tw.my_8
-                        ] 
+                        ]
                     ]
                     [ p
                         [ css [ Tw.text_lg, Tw.font_bold, Tw.mb_2, Css.fontFamilies [ "Avenir", "sans-serif" ] ] ]
