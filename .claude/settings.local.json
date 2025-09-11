@@ -1,0 +1,18 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(nix develop:*)",
+      "Bash(test:*)",
+      "Bash(nix build:*)",
+      "Bash(cat:*)",
+      "Bash(grep:*)",
+      "Bash(nix log:*)",
+      "Bash(rm:*)",
+      "Bash(pkill:*)",
+      "Bash(elm-format:*)",
+      "Bash(mv:*)",
+      "WebFetch(domain:developer.mozilla.org)"
+    ],
+    "deny": []
+  }
+}
