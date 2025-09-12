@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+  <html lang="en">
+  <head>
+    <link rel="stylesheet" href="/style.css">
+    
+    <link rel="preload" href="/elm.js" as="script">
+    <link rel="modulepreload" href="/index.js">
+    
+    <script defer="defer" src="/elm.js" type="text/javascript"></script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <script type="module">
+import userInit from"/index.js";
+let prefetchedPages=[window.location.pathname],initialLocationHash=document.location.hash.replace(/^#/,"");function loadContentAndInitializeApp(){let a=window.location.pathname.replace(/(w)$/,"$1/");a.endsWith("/")||(a+="/");const b=Elm.TemplateModulesBeta.init({flags:{secrets:null,baseUrl:document.baseURI,isPrerendering:!1,isDevServer:!1,isElmDebugMode:!1,contentJson:JSON.parse(document.getElementById("__ELM_PAGES_DATA__").innerHTML),userFlags:userInit.flags()}});return b.ports.toJsPort.subscribe(()=>{loadNamedAnchor()}),b}function loadNamedAnchor(){if(""!==initialLocationHash){const a=document.querySelector(`[name=${initialLocationHash}]`);a&&a.scrollIntoView()}}function prefetchIfNeeded(a){if(a.host===window.location.host&&!prefetchedPages.includes(a.pathname)){prefetchedPages.push(a.pathname),console.log("Preloading...",a.pathname);const b=document.createElement("link");b.setAttribute("as","fetch"),b.setAttribute("rel","prefetch"),b.setAttribute("href",origin+a.pathname+"/content.json"),document.head.appendChild(b)}}const appPromise=new Promise(function(a){document.addEventListener("DOMContentLoaded",()=>{a(loadContentAndInitializeApp())})});userInit.load(appPromise),"function"==typeof connect&&connect(function(a){appPromise.then(b=>{b.ports.fromJsPort.send({contentJson:a})})});const trigger_prefetch=b=>{const c=find_anchor(b.target);c&&c.href&&c.hasAttribute("elm-pages:prefetch")&&prefetchIfNeeded(c)};let mousemove_timeout;const handle_mousemove=a=>{clearTimeout(mousemove_timeout),mousemove_timeout=setTimeout(()=>{trigger_prefetch(a)},20)};addEventListener("touchstart",trigger_prefetch),addEventListener("mousemove",handle_mousemove);function find_anchor(a){for(;a&&"A"!==a.nodeName.toUpperCase();)a=a.parentNode;return a}
+    </script>
+    <title>Aspargesgården | Julemarked</title>
+    <meta name="generator" content="elm-pages v2.1.12">
+    <link rel="manifest" href="/manifest.json">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="theme-color" content="#ffffff">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+        <link rel="canonical" href="https://aspargesgaarden.no/christmas" />    <meta name="description" content="Velkommen til Julemarked på Aspargesgården! Bli med oss 15. &amp; 16. november for en helg fylt med kreativitet og julestemning." />    <meta property="og:image" content="https://aspargesgaarden.no/ressurser/twitter2_2048w_resize.jpeg" />    <meta property="og:image:secure_url" content="https://aspargesgaarden.no/ressurser/twitter2_2048w_resize.jpeg" />    <meta property="og:image:alt" content="Aspargesgården" />    <meta property="og:image:width" content="2048" />    <meta property="og:image:height" content="1024" />    <meta property="og:title" content="Aspargesgården | Julemarked 15. &amp; 16. november" />    <meta property="og:url" content="https://aspargesgaarden.no/christmas" />    <meta property="og:description" content="Velkommen til Julemarked på Aspargesgården! Bli med oss 15. &amp; 16. november for en helg fylt med kreativitet og julestemning." />    <meta property="og:site_name" content="Aspargesgården" />    <meta property="og:locale" content="nb_NO" />    <meta property="twitter:card" content="summary_large_image" />    <meta property="twitter:title" content="Aspargesgården | Julemarked 15. &amp; 16. november" />    <meta property="twitter:description" content="Velkommen til Julemarked på Aspargesgården! Bli med oss 15. &amp; 16. november for en helg fylt med kreativitet og julestemning." />    <meta property="twitter:image" content="https://aspargesgaarden.no/ressurser/twitter2_2048w_resize.jpeg" />    <meta property="twitter:image:alt" content="Aspargesgården" />    <meta property="og:type" content="website" />    <link rel="sitemap" type="application/xml" href="/sitemap.xml" />    <link rel="icon" sizes="16x16 24x24 32x32 48x48 64x64 72x72 80x80 96x96 128x128 256x256 512x512 1024x1024" type="image/svg+xml" href="https://aspargesgaarden.no/ressurser/favicon.svg" />    <link rel="icon" sizes="16x16 24x24 32x32 48x48 64x64 72x72 80x80 96x96 128x128 256x256" type="image/x-icon" href="https://aspargesgaarden.no/ressurser/favicon.ico" />    <link rel="apple-touch-icon" sizes="180x180" href="https://aspargesgaarden.no/ressurser/favicon.svg" />    <link rel="apple-touch-icon" sizes="192x192" href="https://aspargesgaarden.no/ressurser/favicon.svg" />
+    <script id="__ELM_PAGES_DATA__" type="application/json">{"staticData":{},"is404":false,"path":"christmas"}</script>
+    </head>
+    <body>
+      <div data-url="" display="none"></div>
+      <div class="_df536b11"><span class="elm-css-style-wrapper" style="display: none;"><style>
+._43a44f2a{--tw-bg-opacity:1;background-color:rgb(183 168 162 / var(--tw-bg-opacity));--tw-bg-opacity:0.2;padding:1.5rem;margin-top:2rem;margin-bottom:2rem;}
+._4c6d3662{--tw-text-opacity:1;color:rgb(33 31 30 / var(--tw-text-opacity));font-family:Avenir, sans-serif;}
+._df536b11{-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;display:flex;flex-direction:column;height:100vh;justify-content:flex-start;}
+._b95ba256{align-items:center;justify-content:space-between;font-size:1rem;line-height:1.5rem;--tw-text-opacity:1;color:rgb(156 141 135 / var(--tw-text-opacity));}
+@media (min-width: 1024px){._b95ba256{display:flex;}}
+._af286a7f{cursor:pointer;display:block;}
+@media (min-width: 1024px){._af286a7f{display:none;}}
+._e9b23d7a{display:flex;flex-direction:column;}
+@media (min-width: 768px){._e9b23d7a{padding-left:6rem;padding-right:6rem;}}
+._2b0329ae{display:flex;flex-wrap:wrap;align-items:center;padding-left:1rem;padding-right:1rem;padding-top:0px;padding-bottom:0px;border-bottom-width:1px;--tw-border-opacity:1;border-color:rgb(182 167 161 / var(--tw-border-opacity));}
+@media (min-width: 1024px){._2b0329ae{padding-left:4rem;padding-right:4rem;padding-top:0.5rem;padding-bottom:0.5rem;}}
+._d0e11a93{display:flex;flex:1 1 0%;justify-content:space-between;align-items:center;}
+._eec9b766{display:inline-block;width:3.5rem;height:3.5rem;padding:0.5rem;transform:translate(var(--tw-translate-x), var(--tw-translate-y)) rotate(var(--tw-rotate)) skewX(var(--tw-skew-x)) skewY(var(--tw-skew-y)) scaleX(var(--tw-scale-x)) scaleY(var(--tw-scale-y));transition-property:color, background-color, border-color, text-decoration-color, fill, stroke, opacity, box-shadow, transform, filter, backdrop-filter;transition-timing-function:cubic-bezier(0.4, 0, 0.2, 1);transition-duration:150ms;transition-duration:200ms;transition-timing-function:cubic-bezier(0.4, 0, 0.2, 1);}
+._eec9b766:hover{--tw-scale-x:1.25;--tw-scale-y:1.25;transform:translate(var(--tw-translate-x), var(--tw-translate-y)) rotate(var(--tw-rotate)) skewX(var(--tw-skew-x)) skewY(var(--tw-skew-y)) scaleX(var(--tw-scale-x)) scaleY(var(--tw-scale-y));}
+._a8a56925{display:none;width:100%;}
+@media (min-width: 1024px){._a8a56925{display:flex;align-items:center;display:none;width:auto;}}
+._37318054{display:none;width:100%;}
+@media (min-width: 1024px){._37318054{display:flex;align-items:center;width:auto;}}
+._56dbac05{fill:currentColor;--tw-text-opacity:1;color:rgb(156 141 135 / var(--tw-text-opacity));}
+._64030146{font-size:1.125rem;line-height:1.75rem;font-weight:700;margin-bottom:0.5rem;font-family:Avenir, sans-serif;}
+._261e0b01{font-size:1.875rem;line-height:2.25rem;margin-bottom:1rem;--tw-text-opacity:1;color:rgb(159 133 107 / var(--tw-text-opacity));font-family:Cardillac, cursive;}
+._3097b6d2{font-size:2.25rem;line-height:2.5rem;margin-bottom:1.5rem;--tw-text-opacity:1;color:rgb(159 133 107 / var(--tw-text-opacity));font-family:Cardillac, cursive;}
+._268b22c5{font-weight:700;font-size:0.875rem;line-height:1.25rem;--tw-text-opacity:1;color:rgb(33 31 30 / var(--tw-text-opacity));text-transform:uppercase;font-family:Avenir, sans-serif;}
+._268b22c5:hover{--tw-text-opacity:1;color:rgb(74 83 72 / var(--tw-text-opacity));}
+._9209a561{font-weight:700;font-size:0.875rem;line-height:1.25rem;--tw-text-opacity:1;color:rgb(33 31 30 / var(--tw-text-opacity));text-transform:uppercase;font-family:Avenir, sans-serif;}
+._9209a561:hover{--tw-text-opacity:1;color:rgb(74 83 72 / var(--tw-text-opacity));}
+._9209a561:hover{--tw-text-opacity:1;color:rgb(156 141 135 / var(--tw-text-opacity));}
+._cef8a337{font-weight:700;}
+._bb5b9174{height:7rem;}
+._8e2db7be{list-style-type:disc;list-style-position:inside;font-family:Avenir, sans-serif;}
+._8e2db7be > :not([hidden]) ~ :not([hidden]){--tw-space-y-reverse:0;margin-top:calc(0.5rem * calc(1 - var(--tw-space-y-reverse)));margin-bottom:calc(0.5rem * var(--tw-space-y-reverse));}
+._c5da0820{margin-top:1rem;--tw-text-opacity:1;color:rgb(33 31 30 / var(--tw-text-opacity));font-family:Avenir, sans-serif;}
+._be51da73{margin-top:2rem;margin-bottom:2rem;}
+._7d83177f{max-width:56rem;margin-left:auto;margin-right:auto;padding-top:2rem;padding-bottom:2rem;}
+._19859e8b{padding-bottom:0.75rem;--tw-text-opacity:1;color:rgb(33 31 30 / var(--tw-text-opacity));font-family:Avenir, sans-serif;}
+._65789f28{padding-top:0.75rem;padding-bottom:0.75rem;padding-left:0px;padding-right:0px;display:block;}
+@media (min-width: 1024px){._65789f28{padding:1rem;padding-left:1.5rem;padding-right:1.5rem;}}
+._8ccc0fd9{text-align:center;padding-top:2.5rem;font-size:2.25rem;line-height:2.5rem;padding-top:1.5rem;padding-bottom:1.5rem;font-weight:500;font-family:Cardillac, cursive;--tw-text-opacity:1;color:rgb(159 133 107 / var(--tw-text-opacity));}
+@media (min-width: 768px){._8ccc0fd9{text-align:left;font-size:3.75rem;line-height:1;}}
+@media (min-width: 1024px){._8ccc0fd9{padding-top:3rem;}}
+@media (min-width: 1280px){._8ccc0fd9{padding-top:3rem;}}
+._b4b2301a{width:100%;text-align:center;padding:1rem;}</style></span><span class="elm-css-style-wrapper" style="display: none;"><style>*,
+::before,
+::after{box-sizing:border-box;border-width:0;border-style:solid;border-color:#e5e7eb;}
+::before,
+::after{--tw-content:'';}
+html{line-height:1.5;-webkit-text-size-adjust:100%;-moz-tab-size:4;tab-size:4;font-family:ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";}
+body{margin:0;line-height:inherit;}
+hr{height:0;color:inherit;border-top-width:1px;}
+abbr:where([title]){text-decoration:underline dotted;}
+h1,
+h2,
+h3,
+h4,
+h5,
+h6{font-size:inherit;font-weight:inherit;}
+a{color:inherit;text-decoration:inherit;}
+b,
+strong{font-weight:bolder;}
+code,
+kbd,
+samp,
+pre{font-family:ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;font-size:1em;}
+small{font-size:80%;}
+sub,
+sup{font-size:75%;line-height:0;position:relative;vertical-align:baseline;}
+sub{bottom:-0.25em;}
+sup{top:-0.5em;}
+table{text-indent:0;border-color:inherit;border-collapse:collapse;}
+button,
+input,
+optgroup,
+select,
+textarea{font-family:inherit;font-size:100%;line-height:inherit;color:inherit;margin:0;padding:0;}
+button,
+select{text-transform:none;}
+button,
+[type='button'],
+[type='reset'],
+[type='submit']{-webkit-appearance:button;background-color:transparent;background-image:none;}
+:-moz-focusring{outline:auto;}
+:-moz-ui-invalid{box-shadow:none;}
+progress{vertical-align:baseline;}
+::-webkit-inner-spin-button,
+::-webkit-outer-spin-button{height:auto;}
+[type='search']{-webkit-appearance:textfield;outline-offset:-2px;}
+::-webkit-search-decoration{-webkit-appearance:none;}
+::-webkit-file-upload-button{-webkit-appearance:button;font:inherit;}
+summary{display:list-item;}
+blockquote,
+dl,
+dd,
+h1,
+h2,
+h3,
+h4,
+h5,
+h6,
+hr,
+figure,
+p,
+pre{margin:0;}
+fieldset{margin:0;padding:0;}
+legend{padding:0;}
+ol,
+ul,
+menu{list-style:none;margin:0;padding:0;}
+textarea{resize:vertical;}
+input::placeholder,
+textarea::placeholder{opacity:1;color:#9ca3af;}
+button,
+[role="button"]{cursor:pointer;}
+:disabled{cursor:default;}
+img,
+svg,
+video,
+canvas,
+audio,
+iframe,
+embed,
+object{display:block;vertical-align:middle;}
+img,
+video{max-width:100%;height:auto;}
+[hidden]{display:none;}
+*, ::before, ::after{--tw-translate-x:0;--tw-translate-y:0;--tw-rotate:0;--tw-skew-x:0;--tw-skew-y:0;--tw-scale-x:1;--tw-scale-y:1;--tw-pan-x: ;--tw-pan-y: ;--tw-pinch-zoom: ;--tw-scroll-snap-strictness:proximity;--tw-ordinal: ;--tw-slashed-zero: ;--tw-numeric-figure: ;--tw-numeric-spacing: ;--tw-numeric-fraction: ;--tw-ring-inset: ;--tw-ring-offset-width:0px;--tw-ring-offset-color:#fff;--tw-ring-color:rgb(59 130 246 / 0.5);--tw-ring-offset-shadow:0 0 #0000;--tw-ring-shadow:0 0 #0000;--tw-shadow:0 0 #0000;--tw-shadow-colored:0 0 #0000;--tw-blur: ;--tw-brightness: ;--tw-contrast: ;--tw-grayscale: ;--tw-hue-rotate: ;--tw-invert: ;--tw-saturate: ;--tw-sepia: ;--tw-drop-shadow: ;--tw-backdrop-blur: ;--tw-backdrop-brightness: ;--tw-backdrop-contrast: ;--tw-backdrop-grayscale: ;--tw-backdrop-hue-rotate: ;--tw-backdrop-invert: ;--tw-backdrop-opacity: ;--tw-backdrop-saturate: ;--tw-backdrop-sepia: ;}</style></span><header class="_2b0329ae"><div class="_d0e11a93"><a href="/"><img class="_bb5b9174" alt="Aspargesgården" src="/ressurser/Aspargesgaarden_HOVEDLOGO_bredde_DempetSort.png"></a></div><label class="_af286a7f" for="menu-toggle"><svg class="_56dbac05" height="20" viewBox="0 0 20 20" width="20"><title>menu</title><path d="M0 3h20v2H0V3zm0 6h20v2H0V9zm0 6h20v2H0v-2z"></path></svg></label><input class="_a8a56925" id="menu-toggle" type="checkbox"><div class="_37318054" id="menu"><nav><ul class="_b95ba256" id="menu"><li class="_65789f28"><a class="_268b22c5" elm-pages:prefetch="true" href="/facilities">Muligheter</a></li><li class="_65789f28"><a class="_268b22c5" elm-pages:prefetch="true" href="/events">Arrangementer</a></li><li class="_65789f28"><a class="_9209a561" elm-pages:prefetch="true" href="/christmas">Julemarked</a></li><li class="_65789f28"><a class="_268b22c5" elm-pages:prefetch="true" href="/gallery">Galleri</a></li><li class="_65789f28"><a class="_268b22c5" elm-pages:prefetch="true" href="/about">Om gården</a></li><li class="_65789f28"><a class="_268b22c5" elm-pages:prefetch="true" href="/contact">Kontakt</a></li></ul></nav></div></header><div class="_e9b23d7a"><div><h1 class="_8ccc0fd9">Julemarked</h1></div></div><div class="_e9b23d7a"><div class="_7d83177f"><h2 class="_3097b6d2">Velkommen til Julemarked på Aspargesgården!</h2><p class="_19859e8b">Bli med oss på en herlig helg den 15. &amp; 16. November, fra kl. 12 til 16, når vi forvandler Aspargesgården og skaper herlig jul. Sammen med Sandefjord Soroptimistklubb har vi gleden av å presentere et marked fylt med kreativitet og julestemning!</p><p class="_19859e8b">Her vil du finne mer enn 30 dyktige gründere som tilbyr en rekke flotte brukskunst og kortreiste delikatesser. Her finner du den ekstra fine gaven, hjemmelagde spiselige gaver til deg selv eller noen du er glad i.</p><p class="_19859e8b">Ta deg tid til å nyte den nydelige kafeen vår, hvor hjemmebakst garantert vil smake.</p><div class="_be51da73"><h3 class="_261e0b01">Når og hvor</h3><p class="_19859e8b"><strong class="_cef8a337">Dato: </strong>15. - 16. november 2025</p><p class="_19859e8b"><strong class="_cef8a337">Åpningstider: </strong>Lørdag og søndag kl. 12:00 - 16:00</p></div><div class="_be51da73"><h3 class="_261e0b01">Høydepunkter</h3><ul class="_8e2db7be"><li>Mer enn 30 dyktige gründere med brukskunst og kortreiste delikatesser</li><li>Nydelig kafe med hjemmebakst</li><li>Julepyntet gård med koselig bålfat ute</li><li>Tjølling Kirkes barnekor BiTs synger julesanger søndag ca. kl. 13</li><li>Den ekstra fine gaven eller hjemmelagde spiselige gaver</li></ul><p class="_c5da0820">Gården vil være julepyntet, og vi har bålfat ute for å skape en koselig atmosfære.</p></div><div class="_be51da73"><h3 class="_261e0b01">Veldedighet</h3><p class="_19859e8b">Inntekten fra tombolaen, klubbens egen bod, og kafeteriaen vil gå til Sandefjord Soroptimistklubb, som jobber for å støtte kvinner og barn i vårt nærmiljø og i Moldova.</p><p class="_19859e8b">Vi er utrolig takknemlig for at Aspargesgården kan være en vakker ramme for slike arrangementer og opplevelser.</p></div><div class="_43a44f2a"><p class="_64030146">Velkommen!</p><p class="_4c6d3662">Ta med familie og venner, og bli med oss for å komme i førjuls stemning! Vi lover en helg fylt med glede, dufter og stemning. Velkommen!</p></div></div></div><footer class="_b4b2301a"><div><a class="_eec9b766" href="https://facebook.com/aspargesgaarden" rel="noopener noreferrer" target="_blank"><img alt="Facebook" src="/ressurser/fb.png"></a><a class="_eec9b766" href="https://instagram.com/aspargesgaarden" rel="noopener noreferrer" target="_blank"><img alt="Instagram" src="/ressurser/insta.png"></a></div><p async="" data-website-id="168bd9f6-fec6-40dc-95b5-b0e4082c7a98" defer="" src="https://umami.kradalby.no/umami.js"></p></footer></div>
+    </body>
+  </html>
+  
