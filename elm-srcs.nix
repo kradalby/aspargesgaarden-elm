@@ -1,13 +1,13 @@
 {
 
       "MartinSStewart/elm-serialize" = {
-        sha256 = "1nz2f8y7w6s6w8vnb591ri0kibr9n4p93n4sbwz0vvxljp3zah67";
-        version = "1.3.0";
+        sha256 = "0zmlha3fjq2d4gbpchmsyndg8d27ywsx00vnw4vsz58ylc0k7zvy";
+        version = "1.3.1";
       };
 
       "MaybeJustJames/yaml" = {
-        sha256 = "1505z4nw199lbnggy93b6xn1w1y0ncqfz6drwrvmpp51xjca5zls";
-        version = "2.1.3";
+        sha256 = "1g2s7xn19marzfgp3nkl3a2navhv795m8p7jdjrl8yz0jcgbz7zm";
+        version = "2.1.5";
       };
 
       "danyx23/elm-mimetype" = {
@@ -66,8 +66,8 @@
       };
 
       "pablohirafuji/elm-syntax-highlight" = {
-        sha256 = "1bs1xhj1ncd98j4fb06rnhspgy4q1wfz1c85rc51lri0cgkwdabg";
-        version = "3.4.1";
+        sha256 = "0k5j6i9zpy4acrrjj1jsn5bprkrsiigvbd9hq8zp8l7dpr2d9fzz";
+        version = "3.7.1";
       };
 
       "rtfeldman/elm-css" = {
