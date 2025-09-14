@@ -95,12 +95,12 @@
               cp -r "$INPUT_DIR"/* "$OUTPUT_DIR"/
           fi
 
-          # Function to check if file needs processing
-          needs_processing() {
+          # Function to check if resize files need processing
+          needs_resize_processing() {
               local source_file="$1"
               local base_name="''${source_file%.*}"
 
-              # Check if source file is newer than any of the generated files
+              # Check if source file is newer than any of the generated resize files
               for width in "''${WIDTHS[@]}"; do
                   local resize_file="''${base_name}_''${width}w_resize.jpeg"
                   if [ ! -f "$resize_file" ] || [ "$source_file" -nt "$resize_file" ]; then
@@ -108,48 +108,44 @@
                   fi
               done
 
-              # Check WebP and AVIF versions
+              return 1  # no processing needed
+          }
+
+          # Function to check if any JPEG file needs WebP/AVIF conversion
+          needs_conversion() {
+              local jpeg_file="$1"
+              local base_name="''${jpeg_file%.*}"
               local webp_file="''${base_name}.webp"
               local avif_file="''${base_name}.avif"
 
               if [ ! -f "$webp_file" ] || [ ! -f "$avif_file" ] || \
-                 [ "$source_file" -nt "$webp_file" ] || [ "$source_file" -nt "$avif_file" ]; then
-                  return 0  # needs processing
+                 [ "$jpeg_file" -nt "$webp_file" ] || [ "$jpeg_file" -nt "$avif_file" ]; then
+                  return 0  # needs conversion
               fi
 
-              return 1  # no processing needed
+              return 1  # no conversion needed
           }
 
           # Resize images for different viewport widths
           echo "Checking which images need resizing..."
-          images_to_process=()
-          images_to_convert=()
+          images_to_resize=()
 
           while IFS= read -r -d $'\0' img; do
-              if needs_processing "$img"; then
-                  images_to_process+=("$img")
-                  images_to_convert+=("$img")
+              if needs_resize_processing "$img"; then
+                  images_to_resize+=("$img")
                   if [ "$VERBOSE" = true ]; then
-                      echo "Will process: $img"
+                      echo "Will resize: $img"
                   fi
               else
                   if [ "$VERBOSE" = true ]; then
-                      echo "Skipping (up to date): $img"
-                  fi
-                  # Still need to check if WebP/AVIF need updating
-                  base_name="''${img%.*}"
-                  webp_file="''${base_name}.webp"
-                  avif_file="''${base_name}.avif"
-                  if [ ! -f "$webp_file" ] || [ ! -f "$avif_file" ] || \
-                     [ "$img" -nt "$webp_file" ] || [ "$img" -nt "$avif_file" ]; then
-                      images_to_convert+=("$img")
+                      echo "Skipping resize (up to date): $img"
                   fi
               fi
           done < <(${pkgs.fd}/bin/fd -e jpeg -e jpg . "$OUTPUT_DIR"/ -0)
 
-          if [ ''${#images_to_process[@]} -gt 0 ]; then
-              echo "Resizing ''${#images_to_process[@]} images..."
-              for img in "''${images_to_process[@]}"; do
+          if [ ''${#images_to_resize[@]} -gt 0 ]; then
+              echo "Resizing ''${#images_to_resize[@]} images..."
+              for img in "''${images_to_resize[@]}"; do
                   base_name="''${img%.*}"
                   for width in "''${WIDTHS[@]}"; do
                       resize_file="''${base_name}_''${width}w_resize.jpeg"
@@ -165,7 +161,23 @@
               echo "All resize versions are up to date"
           fi
 
-          # Convert to WebP and AVIF only for images that need it
+          # Now check ALL JPEG files (original + resized) for WebP/AVIF conversion
+          echo "Checking which images need WebP/AVIF conversion..."
+          images_to_convert=()
+
+          while IFS= read -r -d $'\0' jpeg_file; do
+              if needs_conversion "$jpeg_file"; then
+                  images_to_convert+=("$jpeg_file")
+                  if [ "$VERBOSE" = true ]; then
+                      echo "Will convert: $jpeg_file"
+                  fi
+              else
+                  if [ "$VERBOSE" = true ]; then
+                      echo "Skipping conversion (up to date): $jpeg_file"
+                  fi
+              fi
+          done < <(${pkgs.fd}/bin/fd -e jpeg -e jpg . "$OUTPUT_DIR"/ -0)
+
           if [ ''${#images_to_convert[@]} -gt 0 ]; then
               echo "Converting ''${#images_to_convert[@]} images to WebP and AVIF..."
               export HOME=''${HOME:-$TMPDIR}
@@ -175,19 +187,12 @@
                   export LD_LIBRARY_PATH="''${VIPS_LIB_PATH}:''${LD_LIBRARY_PATH:-}"
               fi
 
-              # Process each image individually to avoid re-converting existing files
-              for img in "''${images_to_convert[@]}"; do
-                  base_name="''${img%.*}"
-                  webp_file="''${base_name}.webp"
-                  avif_file="''${base_name}.avif"
-
-                  if [ ! -f "$webp_file" ] || [ ! -f "$avif_file" ] || \
-                     [ "$img" -nt "$webp_file" ] || [ "$img" -nt "$avif_file" ]; then
-                      if [ "$VERBOSE" = true ]; then
-                          echo "Converting $img to WebP and AVIF"
-                      fi
-                      ${yarnPkgs}/bin/optimizt --avif --webp "$img"
+              # Process each image individually
+              for jpeg_file in "''${images_to_convert[@]}"; do
+                  if [ "$VERBOSE" = true ]; then
+                      echo "Converting $jpeg_file to WebP and AVIF"
                   fi
+                  ${yarnPkgs}/bin/optimizt --avif --webp "$jpeg_file"
               done
           else
               echo "All WebP and AVIF versions are up to date"
