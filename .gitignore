@@ -6,3 +6,8 @@ functions/render/elm-pages-cli.js
 result
 
 .direnv/
+
+# Generated images from process-images script
+*_*w_resize.jpeg
+*.webp
+*.avif
