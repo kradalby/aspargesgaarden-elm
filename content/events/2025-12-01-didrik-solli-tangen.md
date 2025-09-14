@@ -25,5 +25,5 @@ Hvorfor ikke gjøre konserten til en del av juleavslutningen med kolleger eller 
 
 Velkommen!
 
-**Billettpris:** 695,-
+**Billettpris:** 695,-\
 **Billetter:** [fabnite.com](https://fabnite.com/no/events/julekonsert-pa-aspargesgarden-med-didrik-solli-tangen-konsert)
