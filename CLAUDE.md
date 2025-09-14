@@ -24,6 +24,13 @@ elm-format src/ --yes
 
 # Generate Tailwind CSS Elm modules
 yarn elm-tailwind-modules --tailwind-config tailwind.config.js --dir ./src
+
+# Process images (resize and optimize) - incremental processing
+yarn process-images
+# With verbose output to see what's being processed/skipped
+yarn process-images -- -v
+# or directly:
+process-images -v
 ```
 
 ### Using Yarn (requires Node.js)
@@ -36,11 +43,17 @@ yarn start
 
 # Build production site
 yarn build
+
+# Process images
+yarn process-images
 ```
 
 ### Image Processing
 ```bash
-# Resize and optimize images (requires imagemagick and optimizt)
+# Resize and optimize images using the new script
+./process-images.sh
+
+# With custom options(requires imagemagick and optimizt)
 ./resize_images.sh
 ```
 
@@ -69,13 +82,14 @@ The Nix flake (`flake.nix`) provides:
 - Elm 0.19.1 environment
 - Node.js and Yarn for dependencies
 - elm-pages CLI and build tools
-- Image processing utilities (imagemagick, optimizt)
+- Custom `process-images` script package with imagemagick and optimizt
 
 The build process:
 1. Fetches Elm dependencies via `elm-srcs.nix` and `registry.dat`
 2. Links node_modules from Yarn packages
-3. Runs `elm-pages build` to generate static site
-4. Outputs to `dist/` directory
+3. Processes images using the `processImagesScript` package
+4. Runs `elm-pages build` to generate static site
+5. Outputs to `dist/` directory
 
 ## Key Patterns
 
@@ -90,7 +104,10 @@ Pages in `src/Page/` follow the elm-pages 2 pattern:
 The site uses responsive image optimization:
 - Multiple sizes (320w to 2048w) for different viewport widths
 - Modern formats (WebP, AVIF) with JPEG fallbacks
-- Generated via `resize_images.sh` script
+- Generated via `process-images` script (available as Nix package)
+- Incremental processing: only recreates images when source files are newer
+- Resized images are automatically excluded from git via `.gitignore`
+- Use `-v` flag for verbose output to see which images are processed/skipped
 
 ### Styling
 - Tailwind utilities generated as Elm modules in `src/Tailwind/`

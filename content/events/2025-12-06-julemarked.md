@@ -17,7 +17,7 @@
 
 Velkommen til Julemarked på Aspargesgården!
 
-Bli med oss på en herlig helg den 15. & 16. November, fra kl. 12 til 16, når vi forvandler Aspargesgården og skaper herlig jul. Sammen med Sandefjord Soroptimistklubb har vi gleden av å presentere et marked fylt med kreativitet og julestemning!
+Bli med oss på en deilig helt den 15. & 16. November, fra kl. 12 til 16, når vi forvandler Aspargesgården og skaper herlig jul. Sammen med Sandefjord Soroptimistklubb har vi gleden av å presentere et marked fylt med kreativitet og julestemning!
 
 Her vil du finne mer enn 30 dyktige gründere som tilbyr en rekke flotte brukskunst og kortreiste delikatesser. Her finner du den ekstra fine gaven, hjemmelagde spiselige gaver til deg selv eller noen du er glad i.
 

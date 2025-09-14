@@ -92,7 +92,7 @@ view _ _ _ =
                         , Css.fontFamilies [ "Avenir", "sans-serif" ]
                         ]
                     ]
-                    [ text "Bli med oss på en herlig helg den 15. & 16. November, fra kl. 12 til 16, når vi forvandler Aspargesgården og skaper herlig jul. Sammen med Sandefjord Soroptimistklubb har vi gleden av å presentere et marked fylt med kreativitet og julestemning!" ]
+                    [ text "Bli med oss på en deilig helt den 15. & 16. November, fra kl. 12 til 16, når vi forvandler Aspargesgården og skaper herlig jul. Sammen med Sandefjord Soroptimistklubb har vi gleden av å presentere et marked fylt med kreativitet og julestemning!" ]
                 , p
                     [ css
                         [ Tw.pb_3
