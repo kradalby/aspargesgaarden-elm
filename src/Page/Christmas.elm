@@ -14,7 +14,7 @@ import Site exposing (commonSeo)
 import Tailwind.Breakpoints as Bp
 import Tailwind.Utilities as Tw
 import View exposing (View)
-import View.Misc exposing (container, headline)
+import View.Misc exposing (container, headline, responsiveImg)
 
 
 type alias Model =
@@ -190,6 +190,50 @@ view _ _ _ =
                         [ text "Velkommen!" ]
                     , p [ css [ Tw.text_sort, Css.fontFamilies [ "Avenir", "sans-serif" ] ] ]
                         [ text "Ta med familie og venner, og bli med oss for å komme i førjuls stemning! Vi lover en helg fylt med glede, dufter og stemning. Velkommen!" ]
+                    ]
+                , div
+                    [ css [ Tw.my_12 ] ]
+                    [ div
+                        [ css
+                            [ Tw.grid
+                            , Tw.grid_cols_2
+                            , Tw.gap_4
+                            , Bp.md [ Tw.gap_6 ]
+                            ]
+                        ]
+                        [ responsiveImg
+                            [ css
+                                [ Tw.w_full
+                                , Tw.h_auto
+                                , Tw.rounded_lg
+                                ]
+                            ]
+                            "arrangementer/julemarked1"
+                        , responsiveImg
+                            [ css
+                                [ Tw.w_full
+                                , Tw.h_auto
+                                , Tw.rounded_lg
+                                ]
+                            ]
+                            "arrangementer/julemarked3"
+                        , responsiveImg
+                            [ css
+                                [ Tw.w_full
+                                , Tw.h_auto
+                                , Tw.rounded_lg
+                                ]
+                            ]
+                            "arrangementer/julemarked2"
+                        , responsiveImg
+                            [ css
+                                [ Tw.w_full
+                                , Tw.h_auto
+                                , Tw.rounded_lg
+                                ]
+                            ]
+                            "arrangementer/julemarked4"
+                        ]
                     ]
                 ]
             ]

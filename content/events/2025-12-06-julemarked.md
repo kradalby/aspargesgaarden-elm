@@ -8,7 +8,7 @@
   "publishedFrom": "2025-01-01",
   "photo":
     {
-      "path": "arrangementer/julemarked",
+      "path": "arrangementer/2025-11-15-julemarked",
       "photographer": { "name": "", "website": "" },
       "description": "",
     },
