@@ -14,7 +14,7 @@
     "elm-tailwind-modules": "0.5.0",
     "elm-tooling": "^1.16.0",
     "postcss": "^8.5.6",
-    "tailwindcss": "^3.4.17"
+    "tailwindcss": "^4.1.13"
   },
   "dependencies": {
     "@343dev/optimizt": "^7.0.2",
