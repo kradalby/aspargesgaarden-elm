@@ -3,8 +3,8 @@
   "version": "1.0.0",
   "scripts": {
     "postinstall": "elm-tooling install",
-    "start": "elm-pages dev",
-    "build": "elm-pages build"
+    "start": "rm -rf .elm-pages elm-stuff && elm-pages dev",
+    "build": "rm -rf .elm-pages elm-stuff && elm-pages build"
   },
   "devDependencies": {
     "@tailwindcss/typography": "0.5.16",
