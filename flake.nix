@@ -74,10 +74,10 @@
               exit 1
           fi
 
-          # Check for required tools
-          for tool in convert fd optimizt; do
-              if ! command -v $tool &> /dev/null; then
-                  echo "Error: $tool is not installed or not in PATH"
+          # Verify Nix store tool paths exist
+          for tool in "${pkgs.imagemagick}/bin/convert" "${pkgs.fd}/bin/fd" "${yarnPkgs}/bin/optimizt"; do
+              if [ ! -x "$tool" ]; then
+                  echo "Error: $tool does not exist or is not executable"
                   exit 1
               fi
           done
@@ -111,19 +111,24 @@
               return 1  # no processing needed
           }
 
-          # Function to check if any JPEG file needs WebP/AVIF conversion
-          needs_conversion() {
+          # Function to determine which conversion formats are needed
+          # Returns space-separated flags for optimizt (e.g. "--webp --avif" or "--webp")
+          needed_conversion_flags() {
               local jpeg_file="$1"
               local base_name="''${jpeg_file%.*}"
-              local webp_file="''${base_name}.webp"
-              local avif_file="''${base_name}.avif"
+              local flags=""
 
-              if [ ! -f "$webp_file" ] || [ ! -f "$avif_file" ] || \
-                 [ "$jpeg_file" -nt "$webp_file" ] || [ "$jpeg_file" -nt "$avif_file" ]; then
-                  return 0  # needs conversion
+              local webp_file="''${base_name}.webp"
+              if [ ! -f "$webp_file" ] || [ "$jpeg_file" -nt "$webp_file" ]; then
+                  flags="--webp"
               fi
 
-              return 1  # no conversion needed
+              local avif_file="''${base_name}.avif"
+              if [ ! -f "$avif_file" ] || [ "$jpeg_file" -nt "$avif_file" ]; then
+                  flags="$flags --avif"
+              fi
+
+              echo "$flags"
           }
 
           # Resize images for different viewport widths
@@ -163,39 +168,34 @@
 
           # Now check ALL JPEG files (original + resized) for WebP/AVIF conversion
           echo "Checking which images need WebP/AVIF conversion..."
-          images_to_convert=()
 
+          # Set library path early so optimizt can find vips
+          export HOME=''${HOME:-$TMPDIR}
+          if [ -n "''${VIPS_LIB_PATH:-}" ]; then
+              export LD_LIBRARY_PATH="''${VIPS_LIB_PATH}:''${LD_LIBRARY_PATH:-}"
+              export DYLD_LIBRARY_PATH="''${VIPS_LIB_PATH}:''${DYLD_LIBRARY_PATH:-}"
+          fi
+
+          convert_count=0
           while IFS= read -r -d $'\0' jpeg_file; do
-              if needs_conversion "$jpeg_file"; then
-                  images_to_convert+=("$jpeg_file")
+              flags=$(needed_conversion_flags "$jpeg_file")
+              if [ -n "$flags" ]; then
+                  convert_count=$((convert_count + 1))
                   if [ "$VERBOSE" = true ]; then
-                      echo "Will convert: $jpeg_file"
+                      echo "Converting $jpeg_file ($flags)"
                   fi
+                  ${yarnPkgs}/bin/optimizt $flags "$jpeg_file"
               else
                   if [ "$VERBOSE" = true ]; then
                       echo "Skipping conversion (up to date): $jpeg_file"
                   fi
               fi
-          done < <(${pkgs.fd}/bin/fd -e jpeg -e jpg . "$OUTPUT_DIR"/ -0)
+          done < <(${pkgs.fd}/bin/fd --no-ignore -e jpeg -e jpg . "$OUTPUT_DIR"/ -0)
 
-          if [ ''${#images_to_convert[@]} -gt 0 ]; then
-              echo "Converting ''${#images_to_convert[@]} images to WebP and AVIF..."
-              export HOME=''${HOME:-$TMPDIR}
-
-              # Set LD_LIBRARY_PATH if vips is available in Nix environment
-              if [ -n "''${VIPS_LIB_PATH:-}" ]; then
-                  export LD_LIBRARY_PATH="''${VIPS_LIB_PATH}:''${LD_LIBRARY_PATH:-}"
-              fi
-
-              # Process each image individually
-              for jpeg_file in "''${images_to_convert[@]}"; do
-                  if [ "$VERBOSE" = true ]; then
-                      echo "Converting $jpeg_file to WebP and AVIF"
-                  fi
-                  ${yarnPkgs}/bin/optimizt --avif --webp "$jpeg_file"
-              done
-          else
+          if [ "$convert_count" -eq 0 ]; then
               echo "All WebP and AVIF versions are up to date"
+          else
+              echo "Converted $convert_count images"
           fi
 
           echo "Image processing complete"
@@ -313,7 +313,7 @@
           '';
 
           shellHook = ''
-            ln -fs ${yarnPkgs}/node_modules .
+          ln -fs ${yarnPkgs}/node_modules .
           '';
 
           configurePhase = pkgs.elmPackages.fetchElmDeps {
@@ -374,6 +374,8 @@
         ++ [
           pkg-config
           libpng
+          vips
+          glib
           processImagesScript
         ]
         ++ (with elmPackages; [
@@ -385,7 +387,13 @@
         ]);
     in {
       # `nix develop`
-      devShell = pkgs.mkShell {buildInputs = devDeps;};
+      devShell = pkgs.mkShell {
+        buildInputs = devDeps;
+        shellHook = ''
+          export VIPS_LIB_PATH="${pkgs.vips}/lib:${pkgs.glib}/lib"
+          ln -fs ${pkgs.yarnPkgs}/node_modules .
+        '';
+      };
       packages = with pkgs; {
         inherit aspargesgaarden processedImages processImagesScript;
       };
