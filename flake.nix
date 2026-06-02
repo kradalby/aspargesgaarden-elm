@@ -16,8 +16,8 @@
       else "dev";
   in
     {
-      overlay = _: prev: let
-        pkgs = nixpkgs.legacyPackages.${prev.system};
+      overlays.default = _: prev: let
+        pkgs = nixpkgs.legacyPackages.${prev.stdenv.hostPlatform.system};
       in rec {
         processImagesScript = pkgs.writeShellScriptBin "process-images" ''
           set -euo pipefail
@@ -201,7 +201,18 @@
           echo "Image processing complete"
         '';
 
-        yarnPkgs = pkgs.yarn2nix-moretea.mkYarnPackage {
+        # Offline dependency mirror — fixed-output, only refetches when
+        # yarn.lock changes, so it caches independently of the node_modules build.
+        yarnOfflineCache = pkgs.fetchYarnDeps {
+          yarnLock = ./yarn.lock;
+          hash = "sha256-FN2sCxXNy1EoHMjCDOD1pCQrlpV3Nxfvld/ranP26x0=";
+        };
+
+        # node_modules + published CLIs, built from the offline mirror with the
+        # modern yarn-v1 hooks (yarn2nix/mkYarnPackage was removed from nixpkgs).
+        # sharp (via @343dev/optimizt) ships prebuilt @img/* binaries, so no
+        # native build / system vips is required here.
+        yarnPkgs = pkgs.stdenv.mkDerivation {
           name = "yarnPkgs";
           version = aspargesgaardenVersion;
           # Only include yarn-related files to avoid unnecessary rebuilds
@@ -216,26 +227,32 @@
               || baseName == "elm-tooling.json"
               || baseName == ".yarnrc";
           };
-          publishBinsFor = [
-            "elm-review"
-            "elm-pages"
-            "elm-json"
-            "elm-optimize-level-2"
-            "@343dev/optimizt"
+
+          inherit yarnOfflineCache;
+
+          nativeBuildInputs = with pkgs; [
+            yarnConfigHook # populates ./node_modules from yarnOfflineCache
+            nodejs
+            makeWrapper
           ];
 
-          # Add vips dependencies for sharp to build properly
-          buildInputs = with pkgs; [
-            vips
-            glib
-            pkg-config
-            python3
-          ];
+          # We only need node_modules (incl. devDeps) + the CLIs; no JS build,
+          # no production prune — so we skip yarnBuildHook / yarnInstallHook.
+          dontBuild = true;
 
-          # Set environment for sharp to use system vips
-          preBuild = ''
-            export PKG_CONFIG_PATH="${pkgs.vips.dev}/lib/pkgconfig:${pkgs.glib.dev}/lib/pkgconfig"
-            export SHARP_FORCE_GLOBAL_LIBVIPS=1
+          installPhase = ''
+            runHook preInstall
+
+            mkdir -p $out
+            cp -R node_modules $out/node_modules
+
+            mkdir -p $out/bin
+            for b in elm-review elm-pages elm-json elm-optimize-level-2 optimizt; do
+              target=$(readlink -f "$out/node_modules/.bin/$b")
+              makeWrapper ${pkgs.nodejs}/bin/node "$out/bin/$b" --add-flags "$target"
+            done
+
+            runHook postInstall
           '';
         };
 
@@ -299,8 +316,6 @@
             elmPackages.elm
             yarn
             nodejs
-            nodePackages.sass
-            nodePackages.parcel
           ];
 
           postUnpack = ''
@@ -357,7 +372,7 @@
     // flake-utils.lib.eachDefaultSystem
     (system: let
       pkgs = import nixpkgs {
-        overlays = [self.overlay];
+        overlays = [self.overlays.default];
         config = {allowUnfree = true;};
         inherit system;
       };
@@ -387,7 +402,7 @@
         ]);
     in {
       # `nix develop`
-      devShell = pkgs.mkShell {
+      devShells.default = pkgs.mkShell {
         buildInputs = devDeps;
         shellHook = ''
           export VIPS_LIB_PATH="${pkgs.vips}/lib:${pkgs.glib}/lib"
@@ -395,8 +410,8 @@
         '';
       };
       packages = with pkgs; {
+        default = aspargesgaarden;
         inherit aspargesgaarden processedImages processImagesScript;
       };
-      defaultPackage = pkgs.aspargesgaarden;
     });
 }
