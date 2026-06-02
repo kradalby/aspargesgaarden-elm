@@ -2,13 +2,13 @@ module Page.Events exposing (Data, Model, Msg, page)
 
 -- import MarkdownCodec
 
+import Css
 import CurrentDate
 import Data.Photo exposing (Photo, photoJSONDecoder)
 import DataSource exposing (DataSource)
 import DataSource.Glob as Glob
 import Head
 import Head.Seo as Seo
-import Css
 import Html.Styled exposing (..)
 import Html.Styled.Attributes exposing (css, src)
 import MarkdownCodec
@@ -199,16 +199,18 @@ view _ _ static =
 section : Int -> Section -> Html Msg
 section index sect =
     let
-        dateTimeDisplay = formatEventDateTime sect.metadata
-        
+        dateTimeDisplay =
+            formatEventDateTime sect.metadata
+
         contentWithDateTime =
             [ headline sect.metadata.title
-            , p [ css [ Tw.pb_3, Tw.text_sort, Css.fontFamilies [ "Avenir", "sans-serif" ] ] ] 
+            , p [ css [ Tw.pb_3, Tw.text_sort, Css.fontFamilies [ "Avenir", "sans-serif" ] ] ]
                 [ strong [ css [ Tw.font_bold ] ] [ text "Dato: " ]
-                , text dateTimeDisplay 
+                , text dateTimeDisplay
                 ]
-            ] ++ sect.content
-        
+            ]
+                ++ sect.content
+
         elements =
             [ div
                 [ css <|
