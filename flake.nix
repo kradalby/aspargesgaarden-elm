@@ -2,11 +2,17 @@
   inputs = {
     nixpkgs.url = "nixpkgs/nixpkgs-unstable";
     flake-utils.url = "github:numtide/flake-utils";
+
+    # Image toolchain (imagemagick, fd, optimizt via yarnPkgs) is pinned to a
+    # fixed rev so routine `nix flake update nixpkgs` does not reprocess every
+    # image. Bump deliberately with `nix flake update nixpkgs-img`.
+    nixpkgs-img.url = "github:NixOS/nixpkgs/4df1b885d76a54e1aa1a318f8d16fd6005b6401f";
   };
 
   outputs = {
     self,
     nixpkgs,
+    nixpkgs-img,
     flake-utils,
     ...
   }: let
@@ -18,6 +24,8 @@
     {
       overlays.default = _: prev: let
         pkgs = nixpkgs.legacyPackages.${prev.stdenv.hostPlatform.system};
+        # Pinned toolchain for the expensive image pipeline (see input note).
+        imgPkgs = nixpkgs-img.legacyPackages.${prev.stdenv.hostPlatform.system};
       in rec {
         processImagesScript = pkgs.writeShellScriptBin "process-images" ''
           set -euo pipefail
@@ -75,7 +83,7 @@
           fi
 
           # Verify Nix store tool paths exist
-          for tool in "${pkgs.imagemagick}/bin/convert" "${pkgs.fd}/bin/fd" "${yarnPkgs}/bin/optimizt"; do
+          for tool in "${imgPkgs.imagemagick}/bin/convert" "${imgPkgs.fd}/bin/fd" "${yarnPkgs}/bin/optimizt"; do
               if [ ! -x "$tool" ]; then
                   echo "Error: $tool does not exist or is not executable"
                   exit 1
@@ -146,7 +154,7 @@
                       echo "Skipping resize (up to date): $img"
                   fi
               fi
-          done < <(${pkgs.fd}/bin/fd -e jpeg -e jpg . "$OUTPUT_DIR"/ -0)
+          done < <(${imgPkgs.fd}/bin/fd -e jpeg -e jpg . "$OUTPUT_DIR"/ -0)
 
           if [ ''${#images_to_resize[@]} -gt 0 ]; then
               echo "Resizing ''${#images_to_resize[@]} images..."
@@ -158,7 +166,7 @@
                           if [ "$VERBOSE" = true ]; then
                               echo "Creating ''${width}w version of $img"
                           fi
-                          ${pkgs.imagemagick}/bin/convert "$img" -resize "''${width}x>" "$resize_file"
+                          ${imgPkgs.imagemagick}/bin/convert "$img" -resize "''${width}x>" "$resize_file"
                       fi
                   done
               done
@@ -190,7 +198,7 @@
                       echo "Skipping conversion (up to date): $jpeg_file"
                   fi
               fi
-          done < <(${pkgs.fd}/bin/fd --no-ignore -e jpeg -e jpg . "$OUTPUT_DIR"/ -0)
+          done < <(${imgPkgs.fd}/bin/fd --no-ignore -e jpeg -e jpg . "$OUTPUT_DIR"/ -0)
 
           if [ "$convert_count" -eq 0 ]; then
               echo "All WebP and AVIF versions are up to date"
@@ -203,7 +211,7 @@
 
         # Offline dependency mirror — fixed-output, only refetches when
         # yarn.lock changes, so it caches independently of the node_modules build.
-        yarnOfflineCache = pkgs.fetchYarnDeps {
+        yarnOfflineCache = imgPkgs.fetchYarnDeps {
           yarnLock = ./yarn.lock;
           hash = "sha256-FN2sCxXNy1EoHMjCDOD1pCQrlpV3Nxfvld/ranP26x0=";
         };
@@ -212,7 +220,7 @@
         # modern yarn-v1 hooks (yarn2nix/mkYarnPackage was removed from nixpkgs).
         # sharp (via @343dev/optimizt) ships prebuilt @img/* binaries, so no
         # native build / system vips is required here.
-        yarnPkgs = pkgs.stdenv.mkDerivation {
+        yarnPkgs = imgPkgs.stdenv.mkDerivation {
           name = "yarnPkgs";
           version = aspargesgaardenVersion;
           # Only include yarn-related files to avoid unnecessary rebuilds
@@ -230,7 +238,7 @@
 
           inherit yarnOfflineCache;
 
-          nativeBuildInputs = with pkgs; [
+          nativeBuildInputs = with imgPkgs; [
             yarnConfigHook # populates ./node_modules from yarnOfflineCache
             nodejs
             makeWrapper
@@ -249,7 +257,7 @@
             mkdir -p $out/bin
             for b in elm-review elm-pages elm-json elm-optimize-level-2 optimizt; do
               target=$(readlink -f "$out/node_modules/.bin/$b")
-              makeWrapper ${pkgs.nodejs}/bin/node "$out/bin/$b" --add-flags "$target"
+              makeWrapper ${imgPkgs.nodejs}/bin/node "$out/bin/$b" --add-flags "$target"
             done
 
             runHook postInstall
@@ -257,7 +265,7 @@
         };
 
         # Separate derivation for processed images
-        processedImages = pkgs.stdenv.mkDerivation {
+        processedImages = imgPkgs.stdenv.mkDerivation {
           name = "aspargesgaarden-images";
           version = aspargesgaardenVersion;
 
@@ -277,18 +285,18 @@
               isPublicJpeg || isPublicDir;
           };
 
-          buildInputs = with pkgs; [
+          buildInputs = [
             processImagesScript
             yarnPkgs
-            imagemagick
-            fd
-            pkg-config
-            python3
+            imgPkgs.imagemagick
+            imgPkgs.fd
+            imgPkgs.pkg-config
+            imgPkgs.python3
           ];
 
-          nativeBuildInputs = with pkgs; [
-            pkg-config
-            python3
+          nativeBuildInputs = [
+            imgPkgs.pkg-config
+            imgPkgs.python3
           ];
 
           dontBuild = true;
@@ -299,7 +307,7 @@
 
             # Set environment variables for the script
             export HOME=$TMPDIR
-            export VIPS_LIB_PATH="${pkgs.vips}/lib:${pkgs.glib}/lib"
+            export VIPS_LIB_PATH="${imgPkgs.vips}/lib:${imgPkgs.glib}/lib"
 
             # Run the image processing script
             process-images -i $out/public -o $out/public
