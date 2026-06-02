@@ -203,6 +203,7 @@ heading { level, rawText, children } =
             Html.h1
                 [ css
                     [ Tw.text_6xl
+
                     -- , Tw.font_bold
                     , Tw.tracking_tight
                     , Tw.mt_2
