@@ -26,6 +26,26 @@
         pkgs = nixpkgs.legacyPackages.${prev.stdenv.hostPlatform.system};
         # Pinned toolchain for the expensive image pipeline (see input note).
         imgPkgs = nixpkgs-img.legacyPackages.${prev.stdenv.hostPlatform.system};
+
+        # node_modules depends only on the dependency graph, not on the dev
+        # scripts in package.json. Feed yarnPkgs a normalised, deps-only
+        # package.json built with builtins.toFile (content-addressed: same
+        # content -> same store path). Editing the `scripts` field then leaves
+        # yarnPkgs — and therefore processedImages — untouched, so changing a
+        # dev script never reprocesses every image.
+        depsPackageJson = let
+          p = builtins.fromJSON (builtins.readFile ./package.json);
+        in
+          builtins.toFile "package.json" (builtins.toJSON ({
+              inherit (p) name version dependencies devDependencies;
+            }
+            // pkgs.lib.optionalAttrs (p ? optionalDependencies) {inherit (p) optionalDependencies;}
+            // pkgs.lib.optionalAttrs (p ? resolutions) {inherit (p) resolutions;}));
+        yarnSrc = imgPkgs.runCommand "yarn-src" {} ''
+          mkdir -p $out
+          cp ${depsPackageJson} $out/package.json
+          cp ${./yarn.lock} $out/yarn.lock
+        '';
       in rec {
         processImagesScript = pkgs.writeShellScriptBin "process-images" ''
           set -euo pipefail
@@ -223,18 +243,9 @@
         yarnPkgs = imgPkgs.stdenv.mkDerivation {
           name = "yarnPkgs";
           version = aspargesgaardenVersion;
-          # Only include yarn-related files to avoid unnecessary rebuilds
-          src = pkgs.lib.cleanSourceWith {
-            src = ./.;
-            filter = path: type: let
-              baseName = baseNameOf path;
-            in
-              baseName
-              == "package.json"
-              || baseName == "yarn.lock"
-              || baseName == "elm-tooling.json"
-              || baseName == ".yarnrc";
-          };
+          # Deps-only source (see depsPackageJson) so dev-script edits don't
+          # rebuild node_modules or reprocess images.
+          src = yarnSrc;
 
           inherit yarnOfflineCache;
 
