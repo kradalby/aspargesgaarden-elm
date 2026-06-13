@@ -9,7 +9,7 @@
   "devDependencies": {
     "@tailwindcss/typography": "0.5.19",
     "elm-optimize-level-2": "^0.4.0",
-    "elm-pages": "2.1.12",
+    "elm-pages": "3.5.1",
     "elm-review": "^2.13.5",
     "elm-tailwind-modules": "0.5.0",
     "elm-tooling": "^1.17.0",
