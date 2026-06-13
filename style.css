@@ -1,8 +1,8 @@
 @font-face {
-    font-family: "Cardillac";
-    src: url("ressurser/fonts/Hoftype-Cardillac.otf") format("opentype");
-    font-weight: normal;
-    font-style: normal;
+  font-family: "Cardillac";
+  src: url("ressurser/fonts/Hoftype-Cardillac.otf") format("opentype");
+  font-weight: normal;
+  font-style: normal;
 }
 
 /* @font-face {
@@ -20,47 +20,47 @@
 } */
 
 @font-face {
-    font-family: "Avinir";
-    src: url("ressurser/fonts/AvenirLTStd-Medium.otf") format("opentype");
-    font-weight: normal;
-    font-style: normal;
+  font-family: "Avinir";
+  src: url("ressurser/fonts/AvenirLTStd-Medium.otf") format("opentype");
+  font-weight: normal;
+  font-style: normal;
 }
 
 @font-face {
-    font-family: "Avinir";
-    src: url("ressurser/fonts/AvenirLTStd-Heavy.otf") format("opentype");
-    font-weight: bold;
-    font-style: normal;
+  font-family: "Avinir";
+  src: url("ressurser/fonts/AvenirLTStd-Heavy.otf") format("opentype");
+  font-weight: bold;
+  font-style: normal;
 }
 
 @font-face {
-    font-family: "Avinir";
-    src: url("ressurser/fonts/AvenirLTStd-Light.otf") format("opentype");
-    font-weight: lighter;
-    font-style: normal;
+  font-family: "Avinir";
+  src: url("ressurser/fonts/AvenirLTStd-Light.otf") format("opentype");
+  font-weight: lighter;
+  font-style: normal;
 }
 
 @font-face {
-    font-family: "Avinir";
-    src: url("ressurser/fonts/AvenirLTStd-MediumOblique.otf") format("opentype");
-    font-weight: normal;
-    font-style: italic;
+  font-family: "Avinir";
+  src: url("ressurser/fonts/AvenirLTStd-MediumOblique.otf") format("opentype");
+  font-weight: normal;
+  font-style: italic;
 }
 
 @font-face {
-    font-family: "Avinir";
-    src: url("ressurser/fonts/AvenirLTStd-HeavyOblique.otf") format("opentype");
-    font-weight: bold;
-    font-style: italic;
+  font-family: "Avinir";
+  src: url("ressurser/fonts/AvenirLTStd-HeavyOblique.otf") format("opentype");
+  font-weight: bold;
+  font-style: italic;
 }
 
 @font-face {
-    font-family: "Avinir";
-    src: url("ressurser/fonts/AvenirLTStd-LightOblique.otf") format("opentype");
-    font-weight: lighter;
-    font-style: italic;
+  font-family: "Avinir";
+  src: url("ressurser/fonts/AvenirLTStd-LightOblique.otf") format("opentype");
+  font-weight: lighter;
+  font-style: italic;
 }
 
 #menu-toggle:checked + #menu {
-    display: block;
+  display: block;
 }
