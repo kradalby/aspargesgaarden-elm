@@ -13,7 +13,7 @@
         if (
           document.implementation.hasFeature(
             "http://www.w3.org/TR/SVG11/feature#Image",
-            "1.1"
+            "1.1",
           )
         ) {
           document.documentElement.className += " svg";
@@ -62,5 +62,5 @@
   (window.sandboxApi &&
     window.sandboxApi.parentWindow &&
     window.sandboxApi.parentWindow.document) ||
-    document
+    document,
 );
