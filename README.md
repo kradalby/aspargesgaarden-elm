@@ -2,6 +2,15 @@
 
 Elm/elm-pages 2 static site for [aspargesgaarden.no](https://aspargesgaarden.no).
 
+## elm-pages version (pinned to v2)
+
+This site is intentionally pinned to **elm-pages 2** (`elm-pages@2.1.12` on npm,
+`dillonkearns/elm-pages@9.0.0` on the Elm side). Do **not** upgrade to elm-pages 3+:
+v3 is a ground-up rewrite (different routing, data-fetching and build model) that
+would require rewriting the site. Dependency sweeps must keep these two pins; only
+the surrounding tooling (Nix inputs, CI actions) and v2-compatible packages are
+bumped.
+
 ## Getting started
 
 Enter the Nix development shell (provides Elm, Node.js, Yarn, and all build tools):
