@@ -1,6 +1,6 @@
 {
   inputs = {
-    nixpkgs.url = "nixpkgs/nixpkgs-unstable";
+    nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
     flake-utils.url = "github:numtide/flake-utils";
 
     treefmt-nix.url = "github:numtide/treefmt-nix";
@@ -448,7 +448,6 @@
             ./flake.nix
             ./tailwind.config.js
             ./package.json
-            ./renovate.json
             ./public/style.css
             ./public/index.js
             ./public/imgsupport.js
@@ -470,6 +469,10 @@
         };
 
         formatter = treefmt.config.build.wrapper;
+
+        apps.process-images = flake-utils.lib.mkApp {
+          drv = pkgs.processImagesScript;
+        };
 
         checks = {
           build = self.packages.${system}.default;
