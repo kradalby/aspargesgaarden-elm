@@ -1,0 +1,38 @@
+# Generated artifacts and binary design sources: the elm2nix-generated
+# registry/elm-srcs, build output, and the grafikk .pxd design bundles are
+# not hand-edited, so the text fixers must leave them alone.
+exclude: |
+  (?x)^(
+    registry\.dat|
+    elm-srcs\.nix|
+    grafikk/.*|
+    dist/.*|
+    \.elm-pages/.*|
+    elm-stuff/.*
+  )$
+
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+      - id: check-json
+      - id: check-toml
+      - id: check-merge-conflict
+      - id: check-added-large-files
+        args: [--maxkb=1000]
+      - id: detect-private-key
+      - id: mixed-line-ending
+
+  # elm-format runs as a local hook so it comes from the flake's devShell
+  # (nixpkgs pin), keeping the tool version reproducible. `nix develop`
+  # (or direnv) must be active for it to resolve.
+  - repo: local
+    hooks:
+      - id: elm-format
+        name: elm-format
+        entry: elm-format --validate
+        language: system
+        files: \.elm$
