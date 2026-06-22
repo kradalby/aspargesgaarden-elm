@@ -4,8 +4,13 @@ dist/
 .elm-pages/
 functions/render/elm-pages-cli.js
 result
+result-*
 
 .direnv/
+.envrc.local
+
+# Local agent settings
+.claude/settings.local.json
 
 # Generated images from process-images script
 *_*w_resize.jpeg
