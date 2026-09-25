@@ -208,7 +208,12 @@
                 export DYLD_LIBRARY_PATH="''${VIPS_LIB_PATH}:''${DYLD_LIBRARY_PATH:-}"
             fi
 
+            # optimizt logs per-file failures (e.g. ENOSPC) with a ✖ yet exits 0,
+            # leaving outputs missing, empty or truncated; the up-to-date checks
+            # would then keep them forever. Drop a failed file's outputs so the
+            # next run redoes them, and refuse to finish.
             convert_count=0
+            broken=0
             while IFS= read -r -d $'\0' jpeg_file; do
                 flags=$(needed_conversion_flags "$jpeg_file")
                 if [ -n "$flags" ]; then
@@ -216,7 +221,13 @@
                     if [ "$VERBOSE" = true ]; then
                         echo "Converting $jpeg_file ($flags)"
                     fi
-                    ${yarnPkgs}/bin/optimizt $flags "$jpeg_file"
+                    out=$(${yarnPkgs}/bin/optimizt $flags "$jpeg_file" 2>&1)
+                    printf '%s\n' "$out"
+                    if [[ $out == *✖* ]]; then
+                        echo "Error: optimizt failed on $jpeg_file" >&2
+                        rm -f "''${jpeg_file%.*}.webp" "''${jpeg_file%.*}.avif"
+                        broken=1
+                    fi
                 else
                     if [ "$VERBOSE" = true ]; then
                         echo "Skipping conversion (up to date): $jpeg_file"
@@ -228,6 +239,20 @@
                 echo "All WebP and AVIF versions are up to date"
             else
                 echo "Converted $convert_count images"
+            fi
+
+            echo "Verifying outputs..."
+            while IFS= read -r -d $'\0' jpeg_file; do
+                base_name="''${jpeg_file%.*}"
+                for f in "$jpeg_file" "''${base_name}.webp" "''${base_name}.avif"; do
+                    if [ ! -s "$f" ]; then
+                        echo "Error: missing or empty: $f" >&2
+                        broken=1
+                    fi
+                done
+            done < <(${imgPkgs.fd}/bin/fd --no-ignore -e jpeg -e jpg . "$OUTPUT_DIR"/ -0)
+            if [ "$broken" -ne 0 ]; then
+                exit 1
             fi
 
             echo "Image processing complete"
