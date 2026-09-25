@@ -241,7 +241,7 @@
           # yarn.lock changes, so it caches independently of the node_modules build.
           yarnOfflineCache = imgPkgs.fetchYarnDeps {
             yarnLock = ./yarn.lock;
-            hash = "sha256-FN2sCxXNy1EoHMjCDOD1pCQrlpV3Nxfvld/ranP26x0=";
+            hash = "sha256-aMgh5k8VrvNZdx0iMRmBgo0tLOcsmYFTVfFECBsGaHY=";
           };
 
           # node_modules + published CLIs, built from the offline mirror with the
