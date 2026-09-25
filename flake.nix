@@ -7,9 +7,10 @@
     treefmt-nix.inputs.nixpkgs.follows = "nixpkgs";
 
     # Image toolchain (imagemagick, fd, optimizt via yarnPkgs) is pinned to a
-    # fixed rev so routine `nix flake update nixpkgs` does not reprocess every
-    # image. Bump deliberately with `nix flake update nixpkgs-img`.
-    nixpkgs-img.url = "github:NixOS/nixpkgs/4df1b885d76a54e1aa1a318f8d16fd6005b6401f";
+    # fixed rev so routine `nix flake update` does not reprocess every image.
+    # `nix flake update` never moves a rev-pinned URL: bump deliberately by
+    # editing the rev (ideally to nixpkgs' locked rev, to share store paths).
+    nixpkgs-img.url = "github:NixOS/nixpkgs/34ca302a9572963c02e385c056be37c85ff51b77";
   };
 
   outputs =
