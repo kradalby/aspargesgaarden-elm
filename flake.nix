@@ -470,8 +470,12 @@
 
         formatter = treefmt.config.build.wrapper;
 
-        apps.process-images = flake-utils.lib.mkApp {
-          drv = pkgs.processImagesScript;
+        # Plain attrset rather than flake-utils.lib.mkApp, which drops meta and
+        # makes `nix flake check` warn.
+        apps.process-images = {
+          type = "app";
+          program = pkgs.lib.getExe pkgs.processImagesScript;
+          meta.description = "Resize images and generate WebP/AVIF variants";
         };
 
         checks = {
