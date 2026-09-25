@@ -6,8 +6,9 @@
     treefmt-nix.url = "github:numtide/treefmt-nix";
     treefmt-nix.inputs.nixpkgs.follows = "nixpkgs";
 
-    # Image toolchain (imagemagick, fd, optimizt via yarnPkgs) is pinned to a
-    # fixed rev so routine `nix flake update` does not reprocess every image.
+    # Image pipeline (process-images, imagemagick, fd, optimizt via yarnPkgs)
+    # is pinned to a fixed rev so routine `nix flake update` does not reprocess
+    # every image. Keep it off `nixpkgs` and off the commit rev to hold that.
     # `nix flake update` never moves a rev-pinned URL: bump deliberately by
     # editing the rev (ideally to nixpkgs' locked rev, to share store paths).
     nixpkgs-img.url = "github:NixOS/nixpkgs/34ca302a9572963c02e385c056be37c85ff51b77";
@@ -21,12 +22,6 @@
     , treefmt-nix
     , ...
     }:
-    let
-      aspargesgaardenVersion =
-        if (self ? shortRev)
-        then self.shortRev
-        else "dev";
-    in
     {
       overlays.default = _: prev:
         let
@@ -56,7 +51,7 @@
           '';
         in
         rec {
-          processImagesScript = pkgs.writeShellScriptBin "process-images" ''
+          processImagesScript = imgPkgs.writeShellScriptBin "process-images" ''
             set -euo pipefail
 
             # Default values
@@ -251,7 +246,6 @@
           # native build / system vips is required here.
           yarnPkgs = imgPkgs.stdenv.mkDerivation {
             name = "yarnPkgs";
-            version = aspargesgaardenVersion;
             # Deps-only source (see depsPackageJson) so dev-script edits don't
             # rebuild node_modules or reprocess images.
             src = yarnSrc;
@@ -287,7 +281,6 @@
           # Separate derivation for processed images
           processedImages = imgPkgs.stdenv.mkDerivation {
             name = "aspargesgaarden-images";
-            version = aspargesgaardenVersion;
 
             # Only include JPEG files from public directory to avoid unnecessary rebuilds
             src = pkgs.lib.cleanSourceWith {
