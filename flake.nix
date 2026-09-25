@@ -237,7 +237,7 @@
           # yarn.lock changes, so it caches independently of the node_modules build.
           yarnOfflineCache = imgPkgs.fetchYarnDeps {
             yarnLock = ./yarn.lock;
-            hash = "sha256-aMgh5k8VrvNZdx0iMRmBgo0tLOcsmYFTVfFECBsGaHY=";
+            hash = "sha256-963wI54Rkq9+qKQzSdQAiUfboba7HGf29KhEnXKcnbA=";
           };
 
           # node_modules + published CLIs, built from the offline mirror with the
@@ -269,7 +269,7 @@
               cp -R node_modules $out/node_modules
 
               mkdir -p $out/bin
-              for b in elm-review elm-pages elm-json elm-optimize-level-2 optimizt; do
+              for b in elm-review elm-pages elm-optimize-level-2 optimizt; do
                 target=$(readlink -f "$out/node_modules/.bin/$b")
                 makeWrapper ${imgPkgs.nodejs}/bin/node "$out/bin/$b" --add-flags "$target"
               done
@@ -420,6 +420,7 @@
           ++ (with elmPackages; [
             elm
             elm-format
+            elm-json
             elm2nix
             # lamdera
           ]);
