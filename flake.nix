@@ -426,7 +426,6 @@
           ++ (with elmPackages; [
             elm
             elm-format
-            elm-analyse
             elm2nix
             # lamdera
           ]);
