@@ -79,7 +79,7 @@ yarn process-images
 
 ### Build System
 The Nix flake (`flake.nix`) provides:
-- Elm 0.19.1 environment
+- Elm 0.19.2 environment
 - Node.js and Yarn for dependencies
 - elm-pages CLI and build tools
 - Custom `process-images` script package with imagemagick and optimizt

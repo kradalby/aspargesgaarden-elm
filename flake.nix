@@ -360,7 +360,7 @@
             '';
 
             configurePhase = pkgs.elmPackages.fetchElmDeps {
-              elmVersion = "0.19.1";
+              elmVersion = "0.19.2";
               elmPackages = import ./elm-srcs.nix;
               registryDat = ./registry.dat;
             };
