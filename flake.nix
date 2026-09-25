@@ -112,7 +112,7 @@
             fi
 
             # Verify Nix store tool paths exist
-            for tool in "${imgPkgs.imagemagick}/bin/convert" "${imgPkgs.fd}/bin/fd" "${yarnPkgs}/bin/optimizt"; do
+            for tool in "${imgPkgs.imagemagick}/bin/magick" "${imgPkgs.fd}/bin/fd" "${yarnPkgs}/bin/optimizt"; do
                 if [ ! -x "$tool" ]; then
                     echo "Error: $tool does not exist or is not executable"
                     exit 1
@@ -195,7 +195,7 @@
                             if [ "$VERBOSE" = true ]; then
                                 echo "Creating ''${width}w version of $img"
                             fi
-                            ${imgPkgs.imagemagick}/bin/convert "$img" -resize "''${width}x>" "$resize_file"
+                            ${imgPkgs.imagemagick}/bin/magick "$img" -resize "''${width}x>" "$resize_file"
                         fi
                     done
                 done
