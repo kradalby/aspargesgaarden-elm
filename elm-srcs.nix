@@ -66,13 +66,13 @@
       };
 
       "pablohirafuji/elm-syntax-highlight" = {
-        sha256 = "0k5j6i9zpy4acrrjj1jsn5bprkrsiigvbd9hq8zp8l7dpr2d9fzz";
-        version = "3.7.1";
+        sha256 = "0yngvbrcn93q60mh5v4ypjr1hrmz7jcjllha851gw2bnzir8d8q4";
+        version = "3.8.0";
       };
 
       "rtfeldman/elm-css" = {
-        sha256 = "0mffazjks3wmsn0f0xs8gs6zg39ahipz0hqif2y7qphzjdq6h6yh";
-        version = "17.1.1";
+        sha256 = "1gwhgqwclc7clk1ns4qqzyn7b4wvcmccg9qavvb8m694qmwlkzjy";
+        version = "18.0.0";
       };
 
       "avh4/elm-color" = {

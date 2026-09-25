@@ -21,8 +21,8 @@
             "elm/url": "1.0.0",
             "elm-community/list-extra": "8.7.0",
             "jorgengranseth/elm-string-format": "1.0.1",
-            "pablohirafuji/elm-syntax-highlight": "3.7.1",
-            "rtfeldman/elm-css": "17.1.1"
+            "pablohirafuji/elm-syntax-highlight": "3.8.0",
+            "rtfeldman/elm-css": "18.0.0"
         },
         "indirect": {
             "avh4/elm-color": "1.0.0",
