@@ -47,6 +47,12 @@ process-images -v
 Images are resized to multiple widths (320-2048px) and converted to WebP and AVIF formats.
 Generated files (`*_*w_resize.jpeg`, `*.webp`, `*.avif`) are excluded from git.
 
+Nix builds the variants for each original JPEG separately. Adding or replacing a
+photo rebuilds only that photo's variants; unchanged photos reuse their existing
+Nix store outputs or the CI binary cache. A lightweight build collects the results
+into `processedImages`. Changes to the image processing script or its pinned
+toolchain rebuild the affected image outputs.
+
 ## Tailwind CSS
 
 Regenerate Tailwind CSS Elm modules after changing `tailwind.config.js`:
