@@ -109,7 +109,7 @@ view currentPath =
                     -- , headerLink currentPath "barn" "Låven"
                     [ headerLink currentPath "facilities" "Muligheter"
                     , headerLink currentPath "events" "Arrangementer"
-                    , headerLink currentPath "christmas" "Julemarked"
+                    , headerLink currentPath "christmas/2026" "Julemarked"
                     , headerLink currentPath "gallery" "Galleri"
                     , headerLink currentPath "about" "Om gården"
                     , headerLink currentPath "contact" "Kontakt"
@@ -124,7 +124,7 @@ headerLink currentPagePath linkTo name =
     let
         isCurrentPath : Bool
         isCurrentPath =
-            List.head (Path.toSegments currentPagePath) == Just linkTo
+            List.head (Path.toSegments currentPagePath) == List.head (String.split "/" linkTo)
     in
     li
         [ css

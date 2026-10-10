@@ -11,4 +11,4 @@ import DataSource exposing (DataSource)
 
 currentDate : DataSource String
 currentDate =
-    DataSource.succeed "2026-03-30"
+    DataSource.succeed "2026-10-10"
