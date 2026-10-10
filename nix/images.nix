@@ -39,5 +39,6 @@ let
 in
 pkgs.runCommand "aspargesgaarden-images" { passthru = { inherit imageVariants; }; } ''
   mkdir -p "$out/public"
-  ${lib.concatMapStringsSep "\n" (image: ''cp -r ${image}/public/. "$out/public/"'') (builtins.attrValues imageVariants)}
+  # Keep directories writable so images sharing a directory can merge.
+  ${lib.concatMapStringsSep "\n" (image: ''cp -r --no-preserve=mode ${image}/public/. "$out/public/"'') (builtins.attrValues imageVariants)}
 ''
