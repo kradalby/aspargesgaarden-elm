@@ -23,6 +23,8 @@ repos:
       - id: check-merge-conflict
       - id: check-added-large-files
         args: [--maxkb=1000]
+        # Full-resolution course photos feed the responsive image pipeline.
+        exclude: ^public/arrangementer/2026-takkebakstkurs-anita-saga-[12]\.jpeg$
       - id: detect-private-key
       - id: mixed-line-ending
 

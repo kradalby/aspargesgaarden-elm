@@ -176,10 +176,6 @@ responsiveSrcSet basePath imageType sizes =
                 |> String.Format.namedValue "size" (String.fromInt size)
         )
         sizes
-        |> List.append
-            -- TODO: Verify that we want the biggest image?
-            [ responsiveImageFile basePath 2048 imageType
-            ]
         |> String.join ", "
 
 

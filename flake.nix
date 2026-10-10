@@ -178,7 +178,7 @@
                         echo "Skipping resize (up to date): $img"
                     fi
                 fi
-            done < <(${imgPkgs.fd}/bin/fd -e jpeg -e jpg . "$OUTPUT_DIR"/ -0)
+            done < <(${imgPkgs.fd}/bin/fd -e jpeg -e jpg -E '*_*w_resize.jpeg' . "$OUTPUT_DIR"/ -0)
 
             if [ ''${#images_to_resize[@]} -gt 0 ]; then
                 echo "Resizing ''${#images_to_resize[@]} images..."
