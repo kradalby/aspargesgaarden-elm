@@ -7,9 +7,9 @@
   "eventEndTime": "16:00",
   "publishedFrom": "2026-10-10",
   "photo": {
-    "path": "arrangementer/2026-11-14-julemarked",
+    "path": "arrangementer/julemarked1",
     "photographer": { "name": "", "website": "" },
-    "description": "Julemarked på Aspargesgården 14.–15. november 2026 kl. 12–16"
+    "description": "Besøkende og tente bålfat på gårdsplassen under et tidligere julemarked på Aspargesgården"
   }
 }
 ---
