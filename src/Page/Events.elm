@@ -55,6 +55,7 @@ type alias Metadata =
     , eventEndDate : Maybe String
     , eventEndTime : Maybe String
     , publishedFrom : Maybe String
+    , eventDates : List String
     }
 
 
@@ -107,7 +108,7 @@ getCurrentDate =
 
 frontmatterDecoder : OptimizedDecoder.Decoder Metadata
 frontmatterDecoder =
-    OptimizedDecoder.map7 Metadata
+    OptimizedDecoder.map8 Metadata
         (OptimizedDecoder.field "title" OptimizedDecoder.string)
         (OptimizedDecoder.field "photo" photoJSONDecoder)
         (OptimizedDecoder.field "eventDate" OptimizedDecoder.string)
@@ -115,6 +116,9 @@ frontmatterDecoder =
         (OptimizedDecoder.maybe (OptimizedDecoder.field "eventEndDate" OptimizedDecoder.string))
         (OptimizedDecoder.maybe (OptimizedDecoder.field "eventEndTime" OptimizedDecoder.string))
         (OptimizedDecoder.maybe (OptimizedDecoder.field "publishedFrom" OptimizedDecoder.string))
+        (OptimizedDecoder.optionalField "eventDates" (OptimizedDecoder.list OptimizedDecoder.string)
+            |> OptimizedDecoder.map (Maybe.withDefault [])
+        )
 
 
 head :
@@ -141,11 +145,15 @@ view _ _ static =
         publishedEvents =
             static.data.sections
                 |> List.filter (\s -> isPublished currentDate s.metadata)
-                |> List.sortBy (\s -> s.metadata.eventDate)
+                |> List.sortBy
+                    (\s ->
+                        nextEventDate currentDate s.metadata
+                            |> Maybe.withDefault s.metadata.eventDate
+                    )
 
         ( upcomingEvents, pastEvents ) =
             publishedEvents
-                |> List.partition (\s -> s.metadata.eventDate >= currentDate)
+                |> List.partition (\s -> nextEventDate currentDate s.metadata /= Nothing)
 
         -- Sort past events in reverse chronological order (newest first)
         sortedPastEvents =
@@ -205,7 +213,15 @@ section index sect =
         contentWithDateTime =
             [ headline sect.metadata.title
             , p [ css [ Tw.pb_3, Tw.text_sort, Css.fontFamilies [ "Avenir", "sans-serif" ] ] ]
-                [ strong [ css [ Tw.font_bold ] ] [ text "Dato: " ]
+                [ strong [ css [ Tw.font_bold ] ]
+                    [ text
+                        (if List.length sect.metadata.eventDates > 1 then
+                            "Datoer: "
+
+                         else
+                            "Dato: "
+                        )
+                    ]
                 , text dateTimeDisplay
                 ]
             ]
@@ -265,6 +281,7 @@ section index sect =
                     , Tw.px_12
                     , Tw.py_8
                     , Tw.w_full
+                    , Tw.break_words
                     ]
                 ]
                 contentWithDateTime
@@ -305,6 +322,13 @@ isPublished currentDate metadata =
         Just publishDate ->
             -- Check if publishedFrom <= currentDate AND publishedFrom < eventDate
             (publishDate <= currentDate) && (publishDate < metadata.eventDate)
+
+
+nextEventDate : String -> Metadata -> Maybe String
+nextEventDate currentDate metadata =
+    (metadata.eventDate :: metadata.eventDates)
+        |> List.filter (\date -> date >= currentDate)
+        |> List.minimum
 
 
 formatEventDateTime : Metadata -> String
@@ -356,7 +380,21 @@ formatEventDateTime metadata =
                 Nothing ->
                     ""
     in
-    startDateFormatted ++ timeStr ++ endDateStr ++ " på Aspargesgården"
+    case metadata.eventDates of
+        [] ->
+            startDateFormatted ++ timeStr ++ endDateStr ++ " på Aspargesgården"
+
+        dates ->
+            (dates |> List.sort |> List.map formatDate |> String.join ", ")
+                ++ timeStr
+                ++ (case metadata.eventEndTime of
+                        Just endTime ->
+                            " - " ++ endTime
+
+                        Nothing ->
+                            ""
+                   )
+                ++ " på Aspargesgården"
 
 
 monthToNorwegian : String -> String

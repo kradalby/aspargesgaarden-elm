@@ -51,7 +51,15 @@ renderer =
                     Html.img [ Attr.src image.src, Attr.alt image.alt ] []
     , unorderedList =
         \items ->
-            Html.ul []
+            Html.ul
+                [ css
+                    [ Tw.list_disc
+                    , Tw.list_inside
+                    , Tw.space_y_2
+                    , Tw.pb_3
+                    , Css.fontFamilies [ "Avenir", "sans-serif" ]
+                    ]
+                ]
                 (items
                     |> List.map
                         (\item ->
