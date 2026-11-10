@@ -98,5 +98,4 @@ formatters:
         - github.com/kradalby/asparges
   exclusions:
     paths:
-      - gen/
       - testdata/

@@ -24,7 +24,7 @@ parser =
                 ]
 
 
-{-| Nothing for an address the app does not know; Main shows "not found".
+{-| Nothing for an address the app does not know; Admin shows "not found".
 -}
 fromUrl : Url -> Maybe Route
 fromUrl url =

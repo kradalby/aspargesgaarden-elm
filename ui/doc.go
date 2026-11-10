@@ -1,6 +1,6 @@
 // Package ui is the component kit of aspargesgaarden.no: elem-go components
-// that mirror the old Elm views (src/View/*.elm) class for class, so the site
-// keeps its look. Pages compose these instead of writing markup, and every
+// that mirror the old site's views class for class, so the site keeps its
+// look. Pages compose these instead of writing markup, and every
 // photo goes through Picture.
 //
 // A page:

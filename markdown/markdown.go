@@ -1,5 +1,5 @@
 // Package markdown renders CommonMark to elem-go nodes styled like the old
-// site's src/TailwindMarkdownRenderer.elm. It walks goldmark's AST instead of
+// site's Markdown. It walks goldmark's AST instead of
 // using its HTML renderer, so the output is ordinary elem nodes that escape
 // every value; raw HTML in the source is dropped.
 package markdown
@@ -32,7 +32,7 @@ func Render(src string) []elem.Node {
 }
 
 // RenderEvent is Render in the look of the old hand-made Christmas market
-// page (src/View/Event.elm), so an event written in Markdown reads as well:
+// page, so an event written in Markdown reads as well:
 // # is the introduction, ## a section, and a > quote a tinted callout box.
 func RenderEvent(src string) []elem.Node {
 	return renderer{src: []byte(src), event: true}.render()
@@ -110,8 +110,8 @@ func (r renderer) node(n ast.Node) []elem.Node {
 
 		return r.link(dest, one(elem.Text(string(n.Label(r.src)))))
 	case *ast.Image:
-		// No photo in the content uses Markdown image syntax, and a bare URL
-		// cannot meet ui.Picture's contract; keep the words, drop the picture.
+		// A bare URL cannot meet ui.Picture's contract; keep the words, drop
+		// the picture.
 		return r.children(n)
 	case *ast.HTMLBlock, *ast.RawHTML:
 		return nil

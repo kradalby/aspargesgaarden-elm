@@ -14,8 +14,8 @@ func render(src string) string {
 	return elem.Fragment(Render(src)...).Render()
 }
 
-// Every construct the site's Markdown uses today (About, facilities, event
-// bodies), plus the rest of CommonMark, so a change of styling shows up here.
+// Every construct the site's Markdown uses (About, facilities, event bodies),
+// plus the rest of CommonMark, so a change of styling shows up here.
 const specimen = `# Vertskapet
 
 Første avsnitt med **fet**, *kursiv* og ` + "`kode`" + `.
@@ -54,8 +54,7 @@ func TestSpecimen(t *testing.T) {
 	golden.HTML(t, "specimen", render(specimen))
 }
 
-// The parts of the old Christmas market page (src/View/Event.elm), written
-// as Markdown.
+// The parts of the old Christmas market page, written as Markdown.
 const eventSpecimen = `# Velkommen til Julemarked på Aspargesgården!
 
 Bli med oss på en herlig helg.

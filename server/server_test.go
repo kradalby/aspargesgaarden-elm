@@ -145,8 +145,8 @@ func withMarkets(t *testing.T) *fixture {
 	return f
 }
 
-// The plan's address table. Every row is here, so a redirect cannot be
-// dropped by accident.
+// The address table. Every row is here, so a redirect cannot be dropped by
+// accident.
 func TestAddresses(t *testing.T) {
 	f := withMarkets(t)
 
