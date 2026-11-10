@@ -202,6 +202,7 @@ to them.
   "status": "draft",
   "slug": "julemarked",
   "slugFrozen": false,
+  "slugFromTitle": true,
   "year": 2026,
   "path": "/arrangementer/2026/julemarked",
   "url": "https://aspargesgaarden.no/arrangementer/2026/julemarked",
@@ -229,7 +230,10 @@ to them.
 ```
 
 - `status`: `draft` or `published`. `slugFrozen` is `true` once the event has
-  ever been published (`site.Event.SlugFrozen`).
+  ever been published (`site.Event.SlugFrozen`). `slugFromTitle` is `true`
+  while the slug is made from the title and follows it (see
+  [EventInput](#eventinput)); `false` once someone chose it, by typing one
+  or by copying an event.
 - `year`/`path`/`url`: where the page is (or will be) on the public site.
   `year` is `0` while there is no start date, and `path`/`url` are `""` while
   there is no start date or no slug (no title yet). `url` is `path` on the
@@ -280,8 +284,13 @@ photos as references:
 
 - `updatedAt`: the value from the event as last loaded; ignored on create
   and preview (send `""`).
-- `slug`: `""` means "make it from the title" (`site.Revise`). Ignored by the
-  rules once `slugFrozen`; the app sends the frozen slug unchanged.
+- `slug`: until first publish, `""` means "make it from the title", and the
+  stored slug sent back unchanged while `slugFromTitle` keeps following the
+  title: a corrected title corrects the address. Any other slug is one the
+  user chose, and stays when the title changes until she empties the field.
+  A copy's slug counts as chosen, so next year's market keeps its address.
+  (`site.Apply`.) Ignored by the rules once `slugFrozen`; the app sends the
+  frozen slug unchanged.
 - Photo references carry the alt text and the photographer (`photographerId`,
   or `null` for none), because the form edits them with the rest of the
   event. Saving the event stores each referenced photo's `alt` and

@@ -79,7 +79,7 @@ func TestStoreEventRoundTrip(t *testing.T) {
 	want := in
 	want.ID = got.ID
 	want.Year = 2026
-	want.Slug = "takkebakstkurs-med-anita-saga"
+	want.Slug, want.SlugFromTitle = "takkebakstkurs-med-anita-saga", true
 	want.Status = Draft
 	want.ExtraDates = []Date{d("2026-11-28"), d("2026-11-29")}
 	want.CreatedAt = start.Truncate(time.Second).UTC()

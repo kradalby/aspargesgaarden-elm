@@ -395,4 +395,24 @@ func TestAdminEventPhotoConflict(t *testing.T) {
 	require.Equal(t, []problem{{Code: "bad_request", Field: "mainPhoto", PhotoID: main.ID}}, errorsOf(t, rec))
 }
 
+// The app sends the stored slug back with every save; while it is the
+// title's, a corrected title moves it, so a typo never becomes the address.
+func TestAdminDraftSlugFollowsTheTitle(t *testing.T) {
+	a := newAdmin(t, false)
+
+	form := map[string]any{"updatedAt": "", "slug": "", "title": "Julemarkd", "start": "2026-11-14"}
+	e := decode[eventJSON](t, a.do(t, "POST", "/admin/api/events", req{body: form}))
+	require.Equal(t, "julemarkd", e.Slug)
+	require.True(t, e.SlugFromTitle)
+
+	form["updatedAt"], form["slug"], form["title"] = e.UpdatedAt, e.Slug, "Julemarked"
+	e = decode[eventJSON](t, a.do(t, "PUT", "/admin/api/events/"+itoa(e.ID), req{body: form}))
+	require.Equal(t, "/arrangementer/2026/julemarked", e.Path)
+
+	form["updatedAt"], form["slug"] = e.UpdatedAt, "jul"
+	e = decode[eventJSON](t, a.do(t, "PUT", "/admin/api/events/"+itoa(e.ID), req{body: form}))
+	require.Equal(t, "jul", e.Slug)
+	require.False(t, e.SlugFromTitle, "one she typed is hers")
+}
+
 func itoa(id int64) string { return strconv.FormatInt(id, 10) }

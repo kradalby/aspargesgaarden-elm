@@ -307,6 +307,63 @@ func TestRevise(t *testing.T) {
 		require.EqualValues(t, 7, got.ID)
 	})
 
+	// A working title with a typo must not become the address at publish.
+	t.Run("draft slug follows the title until one is chosen", func(t *testing.T) {
+		prev, err := Revise(nil, Event{Title: "Julemarkd", Start: d("2026-11-14")})
+		require.NoError(t, err)
+		require.Equal(t, "julemarkd", prev.Slug)
+		require.True(t, prev.SlugFromTitle)
+
+		// The app sends the stored slug back with the corrected title.
+		next := prev
+		next.Title = "Julemarked"
+		fixed, err := Revise(&prev, next)
+		require.NoError(t, err)
+		require.Equal(t, "julemarked", fixed.Slug)
+		require.True(t, fixed.SlugFromTitle)
+
+		// One she types herself stays when the title changes.
+		next = fixed
+		next.Slug = "jul"
+		chosen, err := Revise(&fixed, next)
+		require.NoError(t, err)
+		require.Equal(t, "jul", chosen.Slug)
+		require.False(t, chosen.SlugFromTitle)
+
+		next = chosen
+		next.Title = "Julemarked på gården"
+		kept, err := Revise(&chosen, next)
+		require.NoError(t, err)
+		require.Equal(t, "jul", kept.Slug)
+
+		// Emptying the field gives the address back to the title.
+		next = kept
+		next.Slug = ""
+		back, err := Revise(&kept, next)
+		require.NoError(t, err)
+		require.Equal(t, "julemarked-pa-garden", back.Slug)
+		require.True(t, back.SlugFromTitle)
+	})
+
+	// "Lag kopi" keeps the slug on purpose: next year's market is
+	// /arrangementer/2027/julemarked whatever its title says.
+	t.Run("a copy's slug is chosen", func(t *testing.T) {
+		src, err := Revise(nil, Event{Title: "Julemarked", Start: d("2026-11-14")})
+		require.NoError(t, err)
+		require.True(t, src.SlugFromTitle)
+
+		cp, err := Revise(nil, src.Copy())
+		require.NoError(t, err)
+		require.False(t, cp.SlugFromTitle)
+
+		next := cp
+		next.Title, next.Start = "Julemarked 2027", d("2027-11-13")
+		got, err := Revise(&cp, next)
+		require.NoError(t, err)
+		require.Equal(t, "julemarked", got.Slug)
+		require.Equal(t, 2027, got.Year)
+	})
+
 	t.Run("published address is frozen", func(t *testing.T) {
 		prev := legacyEvents[11].event
 		prev.MainPhoto = &Photo{ID: 1, Alt: "Bålfat på tunet"}

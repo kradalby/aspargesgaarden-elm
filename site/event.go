@@ -24,9 +24,13 @@ type Event struct {
 	// Year and Slug form the address /arrangementer/{Year}/{Slug}. Until the
 	// first publish they follow the start date and the title; from then on
 	// they are frozen for good, so shared links keep working.
-	Year  int
-	Slug  string
-	Title string
+	Year int
+	Slug string
+	// SlugFromTitle is set while the slug is made from the title, and so
+	// follows it until first publish; unset once someone chose the slug,
+	// by typing it or by copying an event.
+	SlugFromTitle bool
+	Title         string
 	// Summary is the short text in the list; BodyMD the full Markdown text.
 	Summary   string
 	BodyMD    string
@@ -62,9 +66,9 @@ func (e Event) SlugFrozen() bool { return !e.PublishedAt.IsZero() }
 
 // Revise applies the save rules to next, the edited version of prev (nil for
 // a new event), and returns what is to be stored. Status and publish time only
-// change through Publish and Unpublish. Until first publish an empty slug is
-// made from the title and the year follows the start date; after it, both are
-// kept and an attempt to change the slug fails.
+// change through Publish and Unpublish. Until first publish the year follows
+// the start date, and the slug the title (see Apply); after it, both are kept
+// and an attempt to change the slug fails.
 func Revise(prev *Event, next Event) (Event, error) {
 	if prev != nil && prev.SlugFrozen() && next.Slug != "" && next.Slug != prev.Slug {
 		return Event{}, fieldErr(FieldSlug, fmt.Errorf("%w: %q is published", ErrSlugFrozen, prev.Slug))
@@ -81,6 +85,11 @@ func Revise(prev *Event, next Event) (Event, error) {
 
 // Apply is Revise without the rules: the event as it would be stored. The
 // admin previews drafts with it, which may break any rule while being typed.
+//
+// Before first publish the slug is made from the title when next has none,
+// and follows the title when it came from the title and next sends it back
+// unchanged (the editor did not touch it). Any other slug is one she chose,
+// and stays until she empties it.
 func Apply(prev *Event, next Event) Event {
 	if prev == nil {
 		next.Status, next.PublishedAt = Draft, time.Time{}
@@ -89,9 +98,11 @@ func Apply(prev *Event, next Event) Event {
 	}
 
 	if next.SlugFrozen() {
-		next.Slug, next.Year = prev.Slug, prev.Year
+		next.Slug, next.Year, next.SlugFromTitle = prev.Slug, prev.Year, prev.SlugFromTitle
 	} else {
-		if next.Slug == "" {
+		untouched := prev != nil && prev.SlugFromTitle && next.Slug == prev.Slug
+		next.SlugFromTitle = next.Slug == "" || untouched
+		if next.SlugFromTitle {
 			next.Slug = Slugify(next.Title)
 		}
 		next.Year = next.Start.Year
@@ -227,14 +238,14 @@ func (e Event) Unpublish() Event {
 
 // Copy is "Lag kopi": a new draft of a recurring event with the same text,
 // photos and menu setting, and no dates, since those are what changes. The
-// slug is kept so a copied julemarked stays "julemarked"; it can be edited
-// until the copy is published.
+// slug is kept, as one chosen, so a copied julemarked stays "julemarked"
+// whatever its title becomes; it can be edited until the copy is published.
 func (e Event) Copy() Event {
 	c := e
 	c.ID = 0
 	c.Year = 0
 	c.Start, c.End, c.ExtraDates = Date{}, Date{}, nil
-	c.Status, c.Cancelled = Draft, false
+	c.Status, c.Cancelled, c.SlugFromTitle = Draft, false, false
 	c.PublishedAt, c.CreatedAt, c.UpdatedAt = time.Time{}, time.Time{}, time.Time{}
 	if e.MainPhoto != nil {
 		p := *e.MainPhoto

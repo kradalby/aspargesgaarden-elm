@@ -37,40 +37,42 @@ func (s *Server) me(w http.ResponseWriter, r *http.Request) {
 }
 
 type eventJSON struct {
-	ID          int64       `json:"id"`
-	Status      string      `json:"status"`
-	Slug        string      `json:"slug"`
-	SlugFrozen  bool        `json:"slugFrozen"`
-	Year        int         `json:"year"`
-	Path        string      `json:"path"`
-	URL         string      `json:"url"`
-	DateText    string      `json:"dateText"`
-	IsOver      bool        `json:"isOver"`
-	Title       string      `json:"title"`
-	Summary     string      `json:"summary"`
-	Body        string      `json:"body"`
-	Start       string      `json:"start"`
-	StartTime   string      `json:"startTime"`
-	End         string      `json:"end"`
-	EndTime     string      `json:"endTime"`
-	ExtraDates  []string    `json:"extraDates"`
-	PriceText   string      `json:"priceText"`
-	TicketURL   string      `json:"ticketUrl"`
-	ShowInMenu  bool        `json:"showInMenu"`
-	MenuLabel   string      `json:"menuLabel"`
-	Cancelled   bool        `json:"cancelled"`
-	MainPhoto   *photoJSON  `json:"mainPhoto"`
-	ExtraPhotos []photoJSON `json:"extraPhotos"`
-	PublishedAt *string     `json:"publishedAt"`
-	CreatedAt   string      `json:"createdAt"`
-	UpdatedAt   string      `json:"updatedAt"`
+	ID         int64  `json:"id"`
+	Status     string `json:"status"`
+	Slug       string `json:"slug"`
+	SlugFrozen bool   `json:"slugFrozen"`
+	// SlugFromTitle says the slug follows the title until first publish.
+	SlugFromTitle bool        `json:"slugFromTitle"`
+	Year          int         `json:"year"`
+	Path          string      `json:"path"`
+	URL           string      `json:"url"`
+	DateText      string      `json:"dateText"`
+	IsOver        bool        `json:"isOver"`
+	Title         string      `json:"title"`
+	Summary       string      `json:"summary"`
+	Body          string      `json:"body"`
+	Start         string      `json:"start"`
+	StartTime     string      `json:"startTime"`
+	End           string      `json:"end"`
+	EndTime       string      `json:"endTime"`
+	ExtraDates    []string    `json:"extraDates"`
+	PriceText     string      `json:"priceText"`
+	TicketURL     string      `json:"ticketUrl"`
+	ShowInMenu    bool        `json:"showInMenu"`
+	MenuLabel     string      `json:"menuLabel"`
+	Cancelled     bool        `json:"cancelled"`
+	MainPhoto     *photoJSON  `json:"mainPhoto"`
+	ExtraPhotos   []photoJSON `json:"extraPhotos"`
+	PublishedAt   *string     `json:"publishedAt"`
+	CreatedAt     string      `json:"createdAt"`
+	UpdatedAt     string      `json:"updatedAt"`
 }
 
 func stamp(t time.Time) string { return t.UTC().Format(time.RFC3339) }
 
 func (s *Server) eventJSON(ctx context.Context, e site.Event) eventJSON {
 	out := eventJSON{
-		ID: e.ID, Status: string(e.Status), Slug: e.Slug, SlugFrozen: e.SlugFrozen(), Year: e.Year,
+		ID: e.ID, Status: string(e.Status), Slug: e.Slug, SlugFrozen: e.SlugFrozen(), SlugFromTitle: e.SlugFromTitle, Year: e.Year,
 		DateText: e.DateLine(), IsOver: !e.Start.IsZero() && e.IsOver(s.cfg.Now()),
 		Title: e.Title, Summary: e.Summary, Body: e.BodyMD,
 		Start: e.Start.String(), StartTime: e.StartTime, End: e.End.String(), EndTime: e.EndTime,
