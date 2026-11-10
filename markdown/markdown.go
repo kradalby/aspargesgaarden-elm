@@ -28,13 +28,24 @@ var parser = goldmark.New().Parser()
 // written (# is an <h2> that looks like the old <h1>): the page's own
 // headline is the only <h1>, and the text is written as if it stood alone.
 func Render(src string) []elem.Node {
-	b := []byte(src)
-	r := renderer{src: b}
-
-	return r.children(parser.Parse(text.NewReader(b)))
+	return renderer{src: []byte(src)}.render()
 }
 
-type renderer struct{ src []byte }
+// RenderEvent is Render in the look of the old hand-made Christmas market
+// page (src/View/Event.elm), so an event written in Markdown reads as well:
+// # is the introduction, ## a section, and a > quote a tinted callout box.
+func RenderEvent(src string) []elem.Node {
+	return renderer{src: []byte(src), event: true}.render()
+}
+
+type renderer struct {
+	src   []byte
+	event bool
+}
+
+func (r renderer) render() []elem.Node {
+	return r.children(parser.Parse(text.NewReader(r.src)))
+}
 
 func (r renderer) children(n ast.Node) []elem.Node {
 	var out []elem.Node
@@ -56,6 +67,12 @@ func (r renderer) node(n ast.Node) []elem.Node {
 	case *ast.ThematicBreak:
 		return one(elem.Hr(nil))
 	case *ast.Blockquote:
+		if r.event {
+			// A callout, not a quotation: a div keeps screen readers from
+			// announcing a quote.
+			return one(elem.Div(attrs.Props{attrs.Class: "bg-brown/20 p-6 my-8"}, r.children(n)...))
+		}
+
 		return one(elem.Blockquote(nil, r.children(n)...))
 	case *ast.CodeBlock, *ast.FencedCodeBlock:
 		return one(elem.Pre(nil, elem.Code(nil, elem.Text(r.lines(n)))))
@@ -145,11 +162,23 @@ var (
 	heading1 = "text-6xl tracking-tight mt-2 mb-4 font-display text-tre"
 	heading2 = "text-3xl font-semibold tracking-tight mt-10 pb-1 border-b"
 	headingN = "font-bold text-lg mt-8 mb-4"
+
+	eventHeading1 = "text-4xl mt-2 mb-6 font-display text-tre"
+	eventHeading2 = "text-3xl mt-8 mb-4 font-display text-tre"
 )
 
 func (r renderer) heading(n *ast.Heading) elem.Node {
 	tag := "h" + strconv.Itoa(min(n.Level+1, 6))
 	kids := r.children(n)
+
+	if r.event && n.Level <= 2 {
+		class := eventHeading1
+		if n.Level == 2 {
+			class = eventHeading2
+		}
+
+		return &elem.Element{Tag: tag, Attrs: attrs.Props{attrs.Class: class}, Children: kids}
+	}
 
 	switch n.Level {
 	case 1:
@@ -199,4 +228,62 @@ func (r renderer) link(dest []byte, kids []elem.Node) []elem.Node {
 	}
 
 	return one(elem.A(attrs.Props{attrs.Href: href, attrs.Class: "underline"}, kids...))
+}
+
+// Excerpt is the opening of src as plain text, for a list or a meta
+// description when no summary was written: whole paragraphs until there is
+// enough to give the gist, cut at a word before maxRunes. A paragraph that
+// only introduces a list ("Kursdatoer:") says nothing alone and is skipped.
+func Excerpt(src string, maxRunes int) string {
+	r := renderer{src: []byte(src)}
+
+	var paras []string
+
+	length := 0
+	for n := parser.Parse(text.NewReader(r.src)).FirstChild(); n != nil && length < maxRunes/2; n = n.NextSibling() {
+		if _, ok := n.(*ast.Paragraph); !ok {
+			continue
+		}
+
+		p := strings.Join(strings.Fields(textOf(r.children(n)...)), " ")
+		if p == "" || strings.HasSuffix(p, ":") {
+			continue
+		}
+
+		paras = append(paras, p)
+		length += len([]rune(p)) + 1
+	}
+
+	out := []rune(strings.Join(paras, " "))
+	if len(out) <= maxRunes {
+		return string(out)
+	}
+
+	cut := string(out[:maxRunes])
+	if i := strings.LastIndexByte(cut, ' '); i > 0 {
+		cut = cut[:i]
+	}
+
+	return strings.TrimRight(cut, " ,.;:–-") + "…"
+}
+
+// textOf flattens rendered nodes back to their words, so an excerpt
+// resolves escapes, entities and links exactly as the page does.
+func textOf(nodes ...elem.Node) string {
+	var b strings.Builder
+
+	for _, n := range nodes {
+		switch n := n.(type) {
+		case elem.TextNode:
+			b.WriteString(string(n))
+		case *elem.Element:
+			if n.Tag == "br" {
+				b.WriteByte(' ')
+			}
+
+			b.WriteString(textOf(n.Children...))
+		}
+	}
+
+	return b.String()
 }

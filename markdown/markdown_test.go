@@ -54,6 +54,80 @@ func TestSpecimen(t *testing.T) {
 	golden.HTML(t, "specimen", render(specimen))
 }
 
+// The parts of the old Christmas market page (src/View/Event.elm), written
+// as Markdown.
+const eventSpecimen = `# Velkommen til Julemarked på Aspargesgården!
+
+Bli med oss på en herlig helg.
+
+## Når og hvor
+
+**Dato:** 14.–15. november 2026
+
+## Høydepunkter
+
+- Nydelig kafe med hjemmebakst
+- Julepyntet gård
+
+### Liten overskrift
+
+> **Velkommen!**
+>
+> Ta med familie og venner.
+`
+
+func TestEventSpecimen(t *testing.T) {
+	got := elem.Fragment(RenderEvent(eventSpecimen)...).Render()
+
+	golden.HTML(t, "event-specimen", got)
+	require.NotContains(t, got, "<h1")
+	require.NotContains(t, got, "<blockquote")
+	require.Contains(t, got, `<h2 class="text-4xl mt-2 mb-6 font-display text-tre">`)
+	require.Contains(t, got, `<h3 class="text-3xl mt-8 mb-4 font-display text-tre">Når og hvor</h3>`)
+	require.Contains(t, got, `<h4 class="font-bold text-lg mt-8 mb-4">`)
+	require.Contains(t, got, `<div class="bg-brown/20 p-6 my-8">`)
+}
+
+func TestExcerpt(t *testing.T) {
+	tests := []struct {
+		name, src, want string
+		max             int
+	}{
+		{name: "empty", src: "", want: "", max: 100},
+		{
+			name: "markup-goes", max: 100,
+			src:  "Med [**Ingunn Anvik**](https://x.no) &amp; *venner*.\\\nNy linje.",
+			want: "Med Ingunn Anvik & venner. Ny linje.",
+		},
+		{
+			name: "short-first-paragraph-takes-the-next", max: 100,
+			src:  "# Tittel\n\nVelkommen!\n\nBli med oss.\n\n- liste",
+			want: "Velkommen! Bli med oss.",
+		},
+		{
+			name: "list-introductions-skipped", max: 100,
+			src:  "Invitasjon til kurs.\n\n**Kursdatoer:**\n\n- 31. oktober\n\n**Sted:** Bryggerhuset.",
+			want: "Invitasjon til kurs. Sted: Bryggerhuset.",
+		},
+		{
+			name: "long-cut-at-a-word", max: 20,
+			src:  "Aspargesgården inviterer denne høsten til gourmetaftener.",
+			want: "Aspargesgården…",
+		},
+		{
+			name: "stops-once-there-is-enough", max: 20,
+			src:  "Første avsnitt her.\n\nAndre.",
+			want: "Første avsnitt her.",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			require.Equal(t, tt.want, Excerpt(tt.src, tt.max))
+		})
+	}
+}
+
 func TestHeadingsLeaveH1ToThePage(t *testing.T) {
 	got := render("# En\n\n## To\n\n###### Seks")
 
