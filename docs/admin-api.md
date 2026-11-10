@@ -454,13 +454,13 @@ delete), so a photo removed by mistake can be put back within the week.
 Upload errors, all without
 `field`:
 
-| `code`             | Status | Meaning for the user                              |
-| ------------------ | ------ | ------------------------------------------------- |
-| `too_large`        | 413    | Over 40 MB. Pick a smaller copy.                  |
-| `unsupported_type` | 415    | Not a JPEG, PNG, WebP or HEIC photo by its bytes. |
-| `damaged`          | 422    | Sniffed as a photo, but its size cannot be read.  |
-| `too_small`        | 422    | Under 480 px wide upright.                        |
-| `too_many_pixels`  | 422    | Over 100 million pixels; too big to decode.       |
+| `code`             | Status | Meaning for the user                                    |
+| ------------------ | ------ | ------------------------------------------------------- |
+| `too_large`        | 413    | Over 40 MB. Pick a smaller copy.                        |
+| `unsupported_type` | 415    | Not a JPEG, PNG, WebP, HEIC or AVIF photo by its bytes. |
+| `damaged`          | 422    | Sniffed as a photo, but its size cannot be read.        |
+| `too_small`        | 422    | Under 480 px wide upright.                              |
+| `too_many_pixels`  | 422    | Over 100 million pixels; too big to decode.             |
 
 The app keeps the chosen file in memory, so after a lost connection (no
 answer at all) "Prøv igjen" sends it again and nothing typed is lost. The

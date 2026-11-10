@@ -29,7 +29,7 @@ suite =
         -- through to the generic text means the contract and the app drifted.
         , test "every documented error code has its own message" <|
             \_ ->
-                [ "not_found", "invalid_date", "invalid_time", "slug_invalid", "slug_reserved", "slug_taken", "slug_frozen", "end_before_start", "extra_date", "ticket_url", "title_required", "start_required", "main_photo_required", "alt_required", "duplicate_photo", "crop_outside", "crop_aspect", "crop_too_small", "too_large", "unsupported_type", "damaged", "too_small", "photographer_name_required", "photographer_url", "photographer_name_taken", "too_many_pixels", "conflict", "forbidden", "wrong_host", "cross_origin" ]
+                [ "not_found", "invalid_date", "invalid_time", "slug_invalid", "slug_reserved", "slug_taken", "slug_frozen", "end_before_start", "extra_date", "ticket_url", "title_required", "start_required", "main_photo_required", "alt_required", "duplicate_photo", "crop_outside", "crop_aspect", "crop_too_small", "too_large", "unsupported_type", "damaged", "too_small", "photographer_name_required", "photographer_url", "photographer_name_taken", "too_many_pixels", "conflict", "forbidden", "wrong_host", "cross_origin", "bad_request", "crop_kind" ]
                     |> List.filter (\code -> Text.problem { code = code, field = Nothing, photoId = Nothing } == Text.uploadFailure "")
                     |> Expect.equal []
         ]

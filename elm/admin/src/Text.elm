@@ -92,6 +92,12 @@ problem p =
         ( "crop_outside", _ ) ->
             "Rammen går utenfor bildet. Dra den litt innover."
 
+        ( "crop_kind", _ ) ->
+            "Denne beskjæringen finnes ikke. Trykk «Avbryt» og prøv igjen."
+
+        ( "bad_request", _ ) ->
+            "Noe gikk galt mellom administrasjonen og serveren. Prøv igjen. Hjelper ikke det, si fra til Kristoffer."
+
         ( "crop_aspect", _ ) ->
             "Rammen har feil form. Trykk «Avbryt» og prøv igjen."
 
@@ -120,7 +126,7 @@ uploadFailure code =
             "Filen er for stor (over 40 MB). Velg en mindre utgave av bildet."
 
         "unsupported_type" ->
-            "Dette er ikke et bilde nettsiden kan bruke. Velg et vanlig foto (JPEG, PNG eller HEIC)."
+            "Dette er ikke et bilde nettsiden kan bruke. Velg et vanlig foto, slik mobilen eller kameraet lagrer det."
 
         "damaged" ->
             "Filen ser ut til å være ødelagt. Velg bildet på nytt, eller velg et annet."
