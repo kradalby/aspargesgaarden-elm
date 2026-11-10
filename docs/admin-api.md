@@ -97,8 +97,8 @@ server may add codes without breaking the app.
   "height": 3024,
   "alt": "Låven pyntet til jul",
   "photographer": { "id": 3, "name": "Ola Nordmann", "url": "https://example.no" },
-  "previewUrl": "/img/v1/<sha256>/full-00000000-1200.jpg",
-  "thumbUrl": "/img/v1/<sha256>/full-00000000-480.jpg",
+  "previewUrl": "/img/v<pipeline>/<sha256>/full-<crop>-1200.jpg",
+  "thumbUrl": "/img/v<pipeline>/<sha256>/full-<crop>-480.jpg",
   "crops": {
     "card": { "x": 1012, "y": 0, "w": 2419, "h": 3024 },
     "banner": { "x": 0, "y": 378, "w": 4032, "h": 2268 },
