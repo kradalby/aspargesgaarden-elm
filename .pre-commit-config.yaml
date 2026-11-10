@@ -3,12 +3,12 @@
 # text fixers must leave them alone.
 exclude: |
   (?x)^(
-    registry\.dat|
-    elm-srcs\.nix|
+    (.*/)?registry\.dat|
+    (.*/)?elm-srcs\.nix|
     grafikk/.*|
     dist/.*|
     \.elm-pages/.*|
-    elm-stuff/.*|
+    (.*/)?elm-stuff/.*|
     result/.*|
     \.direnv/.*
   )$
