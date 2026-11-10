@@ -49,17 +49,15 @@ type GalleryPhoto struct {
 }
 
 type Photo struct {
-	ID               int64         `db:"id"`
-	Sha256           string        `db:"sha256"`
-	Mime             string        `db:"mime"`
-	Width            int64         `db:"width"`
-	Height           int64         `db:"height"`
-	Alt              string        `db:"alt"`
-	PhotographerName string        `db:"photographer_name"`
-	PhotographerUrl  string        `db:"photographer_url"`
-	PhotographerID   sql.NullInt64 `db:"photographer_id"`
-	CreatedAt        int64         `db:"created_at"`
-	UpdatedAt        int64         `db:"updated_at"`
+	ID             int64         `db:"id"`
+	Sha256         string        `db:"sha256"`
+	Mime           string        `db:"mime"`
+	Width          int64         `db:"width"`
+	Height         int64         `db:"height"`
+	Alt            string        `db:"alt"`
+	PhotographerID sql.NullInt64 `db:"photographer_id"`
+	CreatedAt      int64         `db:"created_at"`
+	UpdatedAt      int64         `db:"updated_at"`
 }
 
 type PhotoCrop struct {
