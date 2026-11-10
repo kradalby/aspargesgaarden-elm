@@ -282,21 +282,25 @@ func sweepUnusedPhotos(ctx context.Context, log *slog.Logger, store *site.Store,
 	defer t.Stop()
 
 	for {
-		gone, err := store.DeleteUnusedPhotos(ctx, unusedPhotoAge)
-
-		switch {
-		case err != nil && ctx.Err() == nil:
-			log.ErrorContext(ctx, "delete unused photos", "err", err)
-		case len(gone) > 0:
-			log.InfoContext(ctx, "deleted unused photos", "count", len(gone), "sha256", gone)
-			srv.Changed(gone...)
-		}
+		sweepOnce(ctx, log, store, srv)
 
 		select {
 		case <-ctx.Done():
 			return nil
 		case <-t.C:
 		}
+	}
+}
+
+func sweepOnce(ctx context.Context, log *slog.Logger, store *site.Store, srv *server.Server) {
+	gone, err := store.DeleteUnusedPhotos(ctx, unusedPhotoAge)
+
+	switch {
+	case err != nil && ctx.Err() == nil:
+		log.ErrorContext(ctx, "delete unused photos", "err", err)
+	case len(gone) > 0:
+		log.InfoContext(ctx, "deleted unused photos", "count", len(gone), "sha256", gone)
+		srv.Changed(gone...)
 	}
 }
 

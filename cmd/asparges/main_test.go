@@ -1,17 +1,26 @@
 package main
 
 import (
+	"context"
+	"errors"
+	"io/fs"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/peterbourgon/ff/v4"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/kradalby/asparges/db"
+	"github.com/kradalby/asparges/images"
 	"github.com/kradalby/asparges/seo"
+	"github.com/kradalby/asparges/server"
+	"github.com/kradalby/asparges/site"
 )
 
 func TestServeFlags(t *testing.T) {
@@ -192,4 +201,66 @@ func TestServeE2EOnlyInDev(t *testing.T) {
 
 	c.dev = true
 	require.NoError(t, c.validate())
+}
+
+// A photo taken out of the gallery survives the daily sweep for
+// unusedPhotoAge from that moment, then goes, files and all.
+func TestSweepUnusedPhotos(t *testing.T) {
+	dir := t.TempDir()
+
+	d, err := db.Open(t.Context(), filepath.Join(dir, "asparges.db"))
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = d.Close() })
+
+	clock := &e2eClock{}
+	store := site.NewStore(d, clock.now)
+
+	imgs, err := images.New(dir, store.Catalog())
+	require.NoError(t, err)
+
+	srv := server.New(server.Config{BaseURL: "http://127.0.0.1:8090", Dev: true, Store: store, Images: imgs, Now: clock.now})
+	log := slog.New(slog.DiscardHandler)
+
+	f, err := os.Open(filepath.Join("..", "..", "images", "testdata", "upright.jpg"))
+	require.NoError(t, err)
+	defer f.Close()
+
+	o, err := imgs.Intake(t.Context(), f)
+	require.NoError(t, err)
+
+	p, _, err := store.AddPhoto(t.Context(), site.Photo{SHA256: o.SHA256, MIME: o.MIME, Width: o.Width, Height: o.Height})
+	require.NoError(t, err)
+	require.NoError(t, store.SetGallery(t.Context(), []int64{p.ID}))
+	srv.Changed(p.SHA256) // as the upload does
+
+	ctx, cancel := context.WithCancel(t.Context())
+	done := make(chan error, 1)
+
+	go func() { done <- imgs.Run(ctx) }()
+
+	// Long in the gallery, then taken out: the grace runs from now.
+	clock.advance(30 * 24 * time.Hour)
+	require.NoError(t, store.SetGallery(t.Context(), nil))
+
+	clock.advance(unusedPhotoAge - time.Hour)
+	sweepOnce(t.Context(), log, store, srv)
+
+	_, err = store.Photo(t.Context(), p.ID)
+	require.NoError(t, err, "inside the grace period")
+
+	clock.advance(2 * time.Hour)
+	sweepOnce(t.Context(), log, store, srv)
+
+	_, err = store.Photo(t.Context(), p.ID)
+	require.ErrorIs(t, err, site.ErrNotFound)
+
+	orig := filepath.Join(dir, "originals", o.SHA256[:2], o.SHA256+".jpg")
+	require.Eventually(t, func() bool {
+		_, err := os.Stat(orig)
+		return errors.Is(err, fs.ErrNotExist)
+	}, time.Minute, 20*time.Millisecond, "the photo store removes its files")
+	require.NoDirExists(t, filepath.Join(dir, "variants", "v1", o.SHA256[:2], o.SHA256))
+
+	cancel()
+	require.NoError(t, <-done)
 }
