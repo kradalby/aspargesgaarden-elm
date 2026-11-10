@@ -1,4 +1,4 @@
-module Page.Christmas.Year_ exposing (Data, Model, Msg, page)
+module Page.Christmas.Year_ exposing (Data, Model, Msg, content, page, seo)
 
 import DataSource exposing (DataSource)
 import Head
@@ -46,9 +46,17 @@ type alias Data =
 
 head : StaticPayload Data RouteParams -> List Head.Tag
 head _ =
+    seo Nothing
+
+
+{-| Shared with /christmas, which shows the current market.
+-}
+seo : Maybe String -> List Head.Tag
+seo canonical =
     Seo.summaryLarge
         { commonSeo
-            | title = "Aspargesgården | Julemarked 14. & 15. november 2026"
+            | canonicalUrlOverride = canonical
+            , title = "Aspargesgården | Julemarked 14. & 15. november 2026"
             , description = "Velkommen til julemarked på Aspargesgården 14. og 15. november 2026 kl. 12–16. Mer enn 30 utstillere, kortreiste delikatesser, hjemmebakst og julestemning."
             , image =
                 { url = [ "arrangementer", "2026-11-14-julemarked.jpeg" ] |> Path.join |> Pages.Url.fromPath
@@ -62,6 +70,11 @@ head _ =
 
 view : Maybe PageUrl -> Shared.Model -> StaticPayload Data RouteParams -> View Msg
 view _ _ _ =
+    content
+
+
+content : View Msg
+content =
     View.html "Julemarked 2026"
         [ container [ div [] [ headline "Julemarked 2026" ] ]
         , Event.content
