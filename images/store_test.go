@@ -15,6 +15,7 @@ import (
 	"slices"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -196,6 +197,49 @@ func TestEnsureBuildsOnce(t *testing.T) {
 
 	wg.Wait()
 
+	require.Equal(t, before+1, s.builds.Load())
+}
+
+// A caller that found the file missing just before another build landed it
+// must not build it again.
+func TestEnsureAfterLandingBuildsOnce(t *testing.T) {
+	var hold atomic.Bool
+
+	paused, resume := make(chan struct{}), make(chan struct{})
+	// ensure reads the clock between its unlocked look for the files and
+	// taking the lock, so holding it there opens that gap.
+	clock := func() time.Time {
+		if hold.CompareAndSwap(true, false) {
+			close(paused)
+			<-resume
+		}
+
+		return time.Now()
+	}
+
+	cat := newFakeCatalog()
+	s := newTestStore(t, cat, WithClock(clock))
+	p := photoOf(intake(t, s, "upright.jpg"))
+	cat.put(p)
+
+	ctx := context.Background()
+	spec := VariantSpec{Photo: p.SHA256, Kind: Card, Crop: exampleCrop.ID(), Width: 480, Format: WebP}
+	g := groups(p)[slices.IndexFunc(groups(p), func(g group) bool { return g.kind == Card })]
+	before := s.builds.Load()
+
+	hold.Store(true)
+
+	done := make(chan error, 1)
+
+	go func() { done <- s.ensure(ctx, p, g, []VariantSpec{spec}) }()
+
+	<-paused
+
+	_, err := s.Ensure(ctx, spec)
+	require.NoError(t, err)
+	close(resume)
+
+	require.NoError(t, <-done)
 	require.Equal(t, before+1, s.builds.Load())
 }
 

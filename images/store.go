@@ -287,6 +287,12 @@ func (s *Store) ensure(ctx context.Context, p Photo, g group, specs []VariantSpe
 			continue
 		}
 
+		// Landed since the check above: land ends a flight under mu, after
+		// the file is in place.
+		if exists(path) {
+			continue
+		}
+
 		if fl, ok := s.failed[path]; ok && now.Before(fl.until) {
 			errs = append(errs, fmt.Errorf("failed recently, retry after %s: %w", fl.until.Format(time.TimeOnly), fl.err))
 			continue
