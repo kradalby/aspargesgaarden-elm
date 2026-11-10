@@ -16,6 +16,7 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/require"
 	"tailscale.com/client/tailscale/apitype"
 	"tailscale.com/ipn/ipnstate"
@@ -27,11 +28,11 @@ import (
 
 // The callers the admin tests make requests as.
 const (
-	kristine   = "100.64.0.1:41000" // admin user with the grant
-	anders     = "100.64.0.2:41000" // tailnet user without it
-	prometheus = "100.64.0.3:41000" // tagged monitoring node
-	stranger   = "100.64.0.9:41000" // WhoIs knows nobody here
-	adminHost  = "asparges.tail1234.ts.net"
+	kristine  = "100.64.0.1:41000" // admin user with the grant
+	anders    = "100.64.0.2:41000" // tailnet user without it
+	monitor   = "100.64.0.3:41000" // tagged monitoring node
+	stranger  = "100.64.0.9:41000" // WhoIs knows nobody here
+	adminHost = "asparges.tail1234.ts.net"
 )
 
 // fakeTailnet answers WhoIs and the node's own names as tsnet would.
@@ -70,9 +71,9 @@ func peer(login, display string, caps ...string) *apitype.WhoIsResponse {
 
 func newFakeTailnet() *fakeTailnet {
 	return &fakeTailnet{who: map[string]*apitype.WhoIsResponse{
-		kristine:   peer("kristine@example.com", "Kristine", `{"admin":true}`),
-		anders:     peer("anders@example.com", "Anders"),
-		prometheus: peer("tagged-devices", ""),
+		kristine: peer("kristine@example.com", "Kristine", `{"admin":true}`),
+		anders:   peer("anders@example.com", "Anders"),
+		monitor:  peer("tagged-devices", ""),
 	}}
 }
 
@@ -260,7 +261,7 @@ func TestAdminAccess(t *testing.T) {
 		{"admin user by short name", kristine, "asparges", true},
 		{"admin user by address", kristine, "100.64.0.100:80", true},
 		{"tailnet user without the grant", anders, "", false},
-		{"monitoring node", prometheus, "", false},
+		{"monitoring node", monitor, "", false},
 		{"no identity", stranger, "", false},
 		// A page elsewhere whose DNS name was rebound to this node's address.
 		{"admin user, foreign host", kristine, "asparges.evil.example", false},
@@ -390,7 +391,45 @@ func TestAdminHeaders(t *testing.T) {
 	require.Equal(t, []problem{{Code: "not_found"}}, errorsOf(t, rec))
 }
 
-// The admin app plugs in as a file tree; until it does, a placeholder.
+// The admin says noindex as every response does on the beta site, and is no
+// visit and no crawler request in the site's metrics.
+func TestAdminNoIndexAndUncounted(t *testing.T) {
+	a := newAdmin(t, true)
+	a.srv.cfg.NoIndex = true
+	a.h = a.srv.Public()
+	a.admin = a.h
+
+	counted := func() float64 {
+		mfs, err := prometheus.DefaultGatherer.Gather()
+		require.NoError(t, err)
+
+		var n float64
+		for _, mf := range mfs {
+			if mf.GetName() == "asparges_bot_requests_total" || mf.GetName() == "asparges_referrals_total" {
+				for _, m := range mf.GetMetric() {
+					n += m.GetCounter().GetValue()
+				}
+			}
+		}
+
+		return n
+	}
+
+	before := counted()
+
+	for _, path := range []string{"/admin/", "/admin/api/me"} {
+		rec := a.do(t, "GET", path+"?utm_source=chatgpt.com", req{
+			from: "127.0.0.1:5000", host: "127.0.0.1:8090",
+			headers: map[string]string{"User-Agent": "Mozilla/5.0 (compatible; GPTBot/1.1; +https://openai.com/gptbot)"},
+		})
+		require.Equal(t, http.StatusOK, rec.Code, path)
+		require.Equal(t, "noindex", rec.Header().Get("X-Robots-Tag"), path)
+	}
+
+	require.InDelta(t, before, counted(), 0)
+}
+
+// The admin app plugs in as a handler; until it does, a placeholder.
 func TestAdminApp(t *testing.T) {
 	a := newAdmin(t, false)
 	rec := a.do(t, "GET", "/admin/arrangementer/4", req{})

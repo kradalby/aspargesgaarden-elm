@@ -110,6 +110,10 @@ func (s *Server) Admin() http.Handler {
 		hdr.Set("X-Content-Type-Options", "nosniff")
 		hdr.Set("Referrer-Policy", "same-origin")
 		hdr.Set("Cache-Control", "no-store")
+		// As every other response; the admin is not counted as a visit.
+		if s.cfg.NoIndex {
+			hdr.Set("X-Robots-Tag", "noindex")
+		}
 
 		u, code, reason := s.identify(r)
 		if code != "" {
