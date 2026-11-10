@@ -7,27 +7,29 @@ package dbsqlc
 
 import (
 	"context"
+	"database/sql"
 )
 
 const createPhoto = `-- name: CreatePhoto :one
 INSERT INTO photos (
     sha256, mime, width, height, alt, photographer_name, photographer_url,
-    created_at, updated_at
-) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    photographer_id, created_at, updated_at
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 ON CONFLICT (sha256) DO UPDATE SET sha256 = excluded.sha256
 RETURNING id
 `
 
 type CreatePhotoParams struct {
-	Sha256           string `db:"sha256"`
-	Mime             string `db:"mime"`
-	Width            int64  `db:"width"`
-	Height           int64  `db:"height"`
-	Alt              string `db:"alt"`
-	PhotographerName string `db:"photographer_name"`
-	PhotographerUrl  string `db:"photographer_url"`
-	CreatedAt        int64  `db:"created_at"`
-	UpdatedAt        int64  `db:"updated_at"`
+	Sha256           string        `db:"sha256"`
+	Mime             string        `db:"mime"`
+	Width            int64         `db:"width"`
+	Height           int64         `db:"height"`
+	Alt              string        `db:"alt"`
+	PhotographerName string        `db:"photographer_name"`
+	PhotographerUrl  string        `db:"photographer_url"`
+	PhotographerID   sql.NullInt64 `db:"photographer_id"`
+	CreatedAt        int64         `db:"created_at"`
+	UpdatedAt        int64         `db:"updated_at"`
 }
 
 // The same upload twice is one photo: on a known sha256 the existing row's id
@@ -42,6 +44,7 @@ func (q *Queries) CreatePhoto(ctx context.Context, arg CreatePhotoParams) (int64
 		arg.Alt,
 		arg.PhotographerName,
 		arg.PhotographerUrl,
+		arg.PhotographerID,
 		arg.CreatedAt,
 		arg.UpdatedAt,
 	)
@@ -86,7 +89,7 @@ func (q *Queries) GalleryUpdatedAt(ctx context.Context) (int64, error) {
 }
 
 const getPhoto = `-- name: GetPhoto :one
-SELECT id, sha256, mime, width, height, alt, photographer_name, photographer_url, created_at, updated_at FROM photos WHERE id = ?
+SELECT id, sha256, mime, width, height, alt, photographer_name, photographer_url, photographer_id, created_at, updated_at FROM photos WHERE id = ?
 `
 
 func (q *Queries) GetPhoto(ctx context.Context, id int64) (Photo, error) {
@@ -101,6 +104,7 @@ func (q *Queries) GetPhoto(ctx context.Context, id int64) (Photo, error) {
 		&i.Alt,
 		&i.PhotographerName,
 		&i.PhotographerUrl,
+		&i.PhotographerID,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -218,7 +222,7 @@ func (q *Queries) ListPhotoCrops(ctx context.Context, photoID int64) ([]PhotoCro
 }
 
 const listPhotos = `-- name: ListPhotos :many
-SELECT id, sha256, mime, width, height, alt, photographer_name, photographer_url, created_at, updated_at FROM photos ORDER BY id
+SELECT id, sha256, mime, width, height, alt, photographer_name, photographer_url, photographer_id, created_at, updated_at FROM photos ORDER BY id
 `
 
 func (q *Queries) ListPhotos(ctx context.Context) ([]Photo, error) {
@@ -239,6 +243,7 @@ func (q *Queries) ListPhotos(ctx context.Context) ([]Photo, error) {
 			&i.Alt,
 			&i.PhotographerName,
 			&i.PhotographerUrl,
+			&i.PhotographerID,
 			&i.CreatedAt,
 			&i.UpdatedAt,
 		); err != nil {
@@ -269,18 +274,35 @@ func (q *Queries) TouchPhoto(ctx context.Context, arg TouchPhotoParams) error {
 	return err
 }
 
+const touchPhotographerPhotos = `-- name: TouchPhotographerPhotos :exec
+UPDATE photos SET updated_at = ? WHERE photographer_id = ?
+`
+
+type TouchPhotographerPhotosParams struct {
+	UpdatedAt      int64         `db:"updated_at"`
+	PhotographerID sql.NullInt64 `db:"photographer_id"`
+}
+
+// A photographer's new name or link changes the pages that credit them.
+func (q *Queries) TouchPhotographerPhotos(ctx context.Context, arg TouchPhotographerPhotosParams) error {
+	_, err := q.db.ExecContext(ctx, touchPhotographerPhotos, arg.UpdatedAt, arg.PhotographerID)
+	return err
+}
+
 const updatePhotoMeta = `-- name: UpdatePhotoMeta :execrows
 UPDATE photos
-SET alt = ?, photographer_name = ?, photographer_url = ?, updated_at = ?
+SET alt = ?, photographer_name = ?, photographer_url = ?, photographer_id = ?,
+    updated_at = ?
 WHERE id = ?
 `
 
 type UpdatePhotoMetaParams struct {
-	Alt              string `db:"alt"`
-	PhotographerName string `db:"photographer_name"`
-	PhotographerUrl  string `db:"photographer_url"`
-	UpdatedAt        int64  `db:"updated_at"`
-	ID               int64  `db:"id"`
+	Alt              string        `db:"alt"`
+	PhotographerName string        `db:"photographer_name"`
+	PhotographerUrl  string        `db:"photographer_url"`
+	PhotographerID   sql.NullInt64 `db:"photographer_id"`
+	UpdatedAt        int64         `db:"updated_at"`
+	ID               int64         `db:"id"`
 }
 
 func (q *Queries) UpdatePhotoMeta(ctx context.Context, arg UpdatePhotoMetaParams) (int64, error) {
@@ -288,6 +310,7 @@ func (q *Queries) UpdatePhotoMeta(ctx context.Context, arg UpdatePhotoMetaParams
 		arg.Alt,
 		arg.PhotographerName,
 		arg.PhotographerUrl,
+		arg.PhotographerID,
 		arg.UpdatedAt,
 		arg.ID,
 	)
