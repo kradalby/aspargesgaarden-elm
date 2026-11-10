@@ -3,9 +3,11 @@ package images
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"log/slog"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -244,6 +246,31 @@ func TestStoppedIsNoFailure(t *testing.T) {
 	st, err := s.Status(t.Context(), p.SHA256)
 	require.NoError(t, err)
 	require.Equal(t, StateReady, st.State)
+}
+
+// The original is probed once per photo, not once per group.
+func TestPrepareProbesOnce(t *testing.T) {
+	t.Parallel()
+	cat := newFakeCatalog()
+	s := newTestStore(t, cat)
+
+	p := photoOf(intake(t, s, "upright.jpg"))
+	p.Crops[Banner] = Rect{X: 0, Y: 62, W: 1200, H: 675}
+	cat.put(p)
+
+	dir := t.TempDir()
+	calls := filepath.Join(dir, "calls")
+	script := filepath.Join(dir, "vipsheader")
+	require.NoError(t, os.WriteFile(script, fmt.Appendf(nil,
+		"#!/bin/sh\necho \"$@\" >> %s\nexec %s \"$@\"\n", calls, s.vips.header), 0o700)) //nolint:gosec // a test's own script
+	s.vips.header = script
+
+	require.NoError(t, s.prepare(t.Context(), p.SHA256))
+	require.Equal(t, int64(4), s.builds.Load(), "the intake, then full, card and banner")
+
+	b, err := os.ReadFile(calls)
+	require.NoError(t, err)
+	require.Equal(t, 1, strings.Count(string(b), "vips-loader"))
 }
 
 func TestRejectsReplacedOriginal(t *testing.T) {

@@ -13,18 +13,8 @@ import (
 // It decodes the original once (stage 1), cuts the crop window (stage 2) and
 // encodes each file from that small master (stage 3). Every file is checked,
 // synced and renamed into place, so a reader never sees a partial file.
+// The caller has run preflight on orig and found it p's size.
 func (v *vips) build(ctx context.Context, p Photo, orig string, g group, specs []VariantSpec, dst func(VariantSpec) string) error {
-	hdr, err := v.preflight(ctx, orig, p.MIME)
-	if err != nil {
-		return fmt.Errorf("preflight: %w", err)
-	}
-
-	// Crops are in the frame the catalogue recorded; a different original
-	// would put them in the wrong place.
-	if hdr.width != p.Width || hdr.height != p.Height {
-		return fmt.Errorf("original is %dx%d, the catalogue says %dx%d", hdr.width, hdr.height, p.Width, p.Height)
-	}
-
 	wmax := 0
 	for _, s := range specs {
 		wmax = max(wmax, s.Width)

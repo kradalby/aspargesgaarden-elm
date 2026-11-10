@@ -207,6 +207,18 @@ func (s *Store) prepare(ctx context.Context, sha string) error {
 		return fmt.Errorf("original of %s: %w", sha, err)
 	}
 
+	// Once per photo, whatever the groups: each probe is three processes.
+	hdr, err := s.vips.preflight(ctx, orig, p.MIME)
+	if err != nil {
+		return fmt.Errorf("preflight %s: %w", sha, err)
+	}
+
+	// Crops are in the frame the catalogue recorded; a different original
+	// would put them in the wrong place.
+	if hdr.width != p.Width || hdr.height != p.Height {
+		return fmt.Errorf("original is %dx%d, the catalogue says %dx%d", hdr.width, hdr.height, p.Width, p.Height)
+	}
+
 	var (
 		errs  []error
 		n     int
