@@ -42,6 +42,11 @@ if [ -z "${BASE:-}" ]; then
   trap 'kill "$server" 2>/dev/null || true; wait; rm -rf "$work"' EXIT
 
   go build -o "$work/asparges" ./cmd/asparges
+  # Another server on the port would answer the tests in place of this one.
+  if (exec 3<>"/dev/tcp/127.0.0.1/$port") 2>/dev/null; then
+    echo "port $port is in use; set PORT to a free one" >&2
+    exit 1
+  fi
   "$work/asparges" serve --dev --listen-addr "127.0.0.1:$port" --base-url "http://127.0.0.1:$port" \
     --data-dir "$work/data" --e2e-fixtures "$here/fixtures" >"$work/serve.log" 2>&1 &
   server=$!

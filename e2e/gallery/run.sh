@@ -36,7 +36,7 @@ if [ ! -d /run/opengl-driver ]; then
   export LIBGL_DRIVERS_PATH=$mesa/lib/dri GBM_BACKENDS_PATH=$mesa/lib/gbm EGL_PLATFORM=surfaceless
 fi
 
-work=$(mktemp -d)
+work=$(mktemp -d) server=
 trap 'kill "$server" 2>/dev/null || true; rm -rf "$work"' EXIT
 mkdir -p "$out"
 data=${DATA:-$work/data}
@@ -47,6 +47,11 @@ go build -o "$work/asparges" ./cmd/asparges
   exit 1
 }
 
+# Another server on the port would answer the tests in place of this one.
+if (exec 3<>"/dev/tcp/127.0.0.1/$port") 2>/dev/null; then
+  echo "port $port is in use; set PORT to a free one" >&2
+  exit 1
+fi
 "$work/asparges" serve --dev --listen-addr "127.0.0.1:$port" --base-url "http://127.0.0.1:$port" \
   --data-dir "$data" >"$work/log" 2>&1 &
 server=$!
