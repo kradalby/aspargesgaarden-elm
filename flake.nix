@@ -61,8 +61,10 @@
         # runs the same build.sh. Photos are their own derivation so a Go edit
         # (which can change the class list) never re-encodes them.
         fs = lib.fileset;
-        staticStep =
-          name: step: inputs: tools:
+        # pre runs in the copied tree before build.sh, e.g. to install an
+        # app's pinned npm packages.
+        staticStepWith =
+          pre: name: step: inputs: tools:
           pkgs.runCommand "asparges-static-${name}"
             {
               src = fs.toSource {
@@ -72,14 +74,19 @@
               nativeBuildInputs = tools;
             }
             ''
-              cp -r $src/. . && chmod -R u+w . && cd static
+              cp -r $src/. . && chmod -R u+w .
+              ${pre}
+              cd static
               bash build.sh $out ${step}
             '';
+        staticStep = staticStepWith "";
         staticCSS =
           staticStep "css" "css fonts"
             (
               [
                 ./static/input.css
+                ./static/admin-input.css
+                ./static/theme.css
                 ./static/fonts-src
               ]
               # Tailwind scans Go and Elm sources for class names (input.css
@@ -101,7 +108,10 @@
         # The Elm apps: elm/<app>, each with its own elm.json and the packages
         # elm2nix pinned next to it (elm-srcs.nix, registry.dat), so apps keep
         # their dependencies apart. Adding an app is adding its name here.
-        elmApps = [ "gallery" ];
+        elmApps = [
+          "gallery"
+          "admin"
+        ];
         elmHome =
           app:
           pkgs.elmPackages.fetchElmDeps {
@@ -109,15 +119,37 @@
             elmPackages = import (./elm + "/${app}/elm-srcs.nix");
             registryDat = ./elm + "/${app}/registry.dat";
           };
-        # build.sh's <app> step, offline: <app>.js for static/dist.
+        # build.sh's <app> step, offline: <app>.js for static/dist. An app
+        # with a yarn.lock (its boot.js bundles npm packages) gets them from
+        # fetchYarnDeps, pinned by its hash in flakehashes.json.
         elmApp =
           app:
-          (staticStep "elm-${app}" app
-            [ (./elm + "/${app}") ]
-            [
-              pkgs.elmPackages.elm
-              pkgs.esbuild
-            ]
+          let
+            dir = ./elm + "/${app}";
+            yarn = builtins.pathExists (dir + "/yarn.lock");
+            yarnDeps = pkgs.fetchYarnDeps {
+              yarnLock = dir + "/yarn.lock";
+              hash = hashes.yarn.${app};
+            };
+          in
+          (staticStepWith
+            (lib.optionalString yarn ''
+              export HOME=$TMPDIR
+              (cd elm/${app} && yarnOfflineCache=${yarnDeps} yarnConfigHook)
+            '')
+            "elm-${app}"
+            app
+            [ dir ]
+            (
+              [
+                pkgs.elmPackages.elm
+                pkgs.esbuild
+              ]
+              ++ lib.optionals yarn [
+                pkgs.yarnConfigHook
+                pkgs.nodejs
+              ]
+            )
           ).overrideAttrs
             (old: {
               buildCommand = elmHome app + old.buildCommand;

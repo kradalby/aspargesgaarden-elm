@@ -22,6 +22,7 @@ import Route
 import Task
 import Text
 import Ui
+import Venue
 
 
 type alias Model =
@@ -1068,7 +1069,7 @@ bodyView model =
             , tool "md-header" "Overskrift" []
             , tool "md-unordered-list" "Liste" []
             , tool "md-link" "Lenke" []
-            , tool "asp-md-insert" "Telefonlenke" [ attribute "text" "[909 19 812](tel:+4790919812)" ]
+            , tool "asp-md-insert" "Telefonlenke" [ attribute "text" Venue.phoneLink ]
             ]
 
         -- The DOM owns the text so toolbar edits and undo work; Elm seeds it

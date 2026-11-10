@@ -1,6 +1,6 @@
-port module Main exposing (main)
+port module Admin exposing (main)
 
-{-| The admin app for aspargesgaarden.no, served under /admin/. Main owns
+{-| The admin app for aspargesgaarden.no, served under /admin/. Admin owns
 the address, the header and the "leave without saving?" question; each
 screen lives in Page.\*.
 -}
@@ -18,6 +18,7 @@ import Route exposing (Route)
 import Task
 import Ui
 import Url exposing (Url)
+import Venue
 
 
 {-| Tells the page whether there is unsaved work, so the browser asks before
@@ -263,7 +264,7 @@ subscriptions model =
 
 view : Model -> Browser.Document Msg
 view model =
-    { title = title model.page ++ " – Aspargesgården admin"
+    { title = title model.page ++ " – " ++ Venue.name ++ " admin"
     , body =
         [ div [ class "min-h-screen bg-brown/20 text-sort font-sans text-lg leading-normal" ]
             [ a [ A.href "#innhold", class "sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-50 focus:bg-white focus:p-3 focus:rounded-lg" ] [ text "Hopp til innholdet" ]
@@ -353,7 +354,7 @@ siteHeader model =
     header [ class "bg-white border-b border-brown" ]
         [ div [ class "max-w-7xl mx-auto px-4 md:px-8 py-3 flex flex-wrap gap-x-8 gap-y-2 items-center justify-between" ]
             [ div [ class "flex flex-wrap items-baseline gap-x-3" ]
-                [ span [ class "font-display text-3xl text-sort" ] [ text "Aspargesgården" ]
+                [ span [ class "font-display text-3xl text-sort" ] [ text Venue.name ]
                 , span [ class "text-brown-text text-base" ] [ text "Administrasjon" ]
                 ]
             , nav [ attribute "aria-label" "Hovedmeny", class "flex flex-wrap gap-2" ]

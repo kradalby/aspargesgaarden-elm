@@ -7,10 +7,10 @@
 #   build.sh [OUT [css] [fonts] [photos] [<app>...]]   default: dist, all
 #
 # <app> is a directory under ../elm. Needs tailwindcss (v4), woff2_compress,
-# vips, imagesbuild or go, elm and esbuild on PATH. Run from static/. Fonts
-# are rebuilt when their source is newer, photo variants when missing. Nix
-# runs the photo step and each app in their own derivations so a Go edit
-# never re-encodes photos.
+# vips, imagesbuild or go, elm and esbuild on PATH, and yarn for an app with
+# a package.json. Run from static/. Fonts are rebuilt when their source is
+# newer, photo variants when missing. Nix runs the photo step and each app in
+# their own derivations so a Go edit never re-encodes photos.
 set -euo pipefail
 
 out=${1:-dist}
@@ -52,17 +52,28 @@ photos() {
 
 # An Elm app ../elm/<app> with main module src/<App>.elm, optimized and
 # minified to <app>.js. The app's boot.js, if any, is appended: it mounts the
-# app, and pages run no inline script (CSP script-src 'self').
+# app, and pages run no inline script (CSP script-src 'self'). An app with a
+# package.json has a boot.js that imports pinned packages (yarn.lock): it is
+# bundled on its own and appended after the Elm part, so the Elm-only pure
+# markers below never touch the packages' code. Nix provides node_modules;
+# locally the first build installs it.
 elm_app() {
-  local app=$1 tmp
+  local app=$1 tmp dir=../elm/$1
   tmp=$(mktemp -d)
-  (cd "../elm/$app" && elm make "src/${app^}.elm" --optimize --output "$tmp/elm.js" >/dev/null)
-  if [ -f "../elm/$app/boot.js" ]; then cat "../elm/$app/boot.js" >>"$tmp/elm.js"; fi
+  (cd "$dir" && elm make "src/${app^}.elm" --optimize --output "$tmp/elm.js" >/dev/null)
+  if [ -f "$dir/package.json" ]; then
+    [ -d "$dir/node_modules" ] || (cd "$dir" && yarn install --frozen-lockfile --silent)
+    esbuild "$dir/boot.js" --bundle --minify --format=iife --target=es2020 --loader:.css=text \
+      --legal-comments=eof --log-level=warning --outfile="$tmp/boot.js"
+  elif [ -f "$dir/boot.js" ]; then
+    cat "$dir/boot.js" >>"$tmp/elm.js"
+  fi
   # Elm's curried-call helpers are pure; marking them lets esbuild drop the
   # unused ones (the minify recipe in Elm's optimization guide).
   esbuild "$tmp/elm.js" --minify --target=es2020 --log-level=warning --outfile="$out/$app.js" \
     --pure:F2 --pure:F3 --pure:F4 --pure:F5 --pure:F6 --pure:F7 --pure:F8 --pure:F9 \
     --pure:A2 --pure:A3 --pure:A4 --pure:A5 --pure:A6 --pure:A7 --pure:A8 --pure:A9
+  if [ -f "$tmp/boot.js" ]; then cat "$tmp/boot.js" >>"$out/$app.js"; fi
   rm -r "$tmp"
 }
 

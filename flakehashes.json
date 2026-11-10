@@ -2,5 +2,8 @@
   "vendor": {
     "goModSum": "FS8hKMm+fwwmQftiwmctNwXPtqu0mVEiTmAb5w+5jgc=",
     "sri": "sha256-fQEry0cHttWhB/+EhDb4BRx3gvAOqSmbc+S5NZFqcSw="
+  },
+  "yarn": {
+    "admin": "sha256-XgTVkC6K5wuZza6+5Pln5/u5YvXzCjuYgOB+Q3AIdG4="
   }
 }
