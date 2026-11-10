@@ -16,27 +16,76 @@ import (
 func TestQueueOrder(t *testing.T) {
 	s := newTestStore(t, newFakeCatalog())
 
-	// A bulk upload's tail is waiting; a new upload jumps ahead of it, and
-	// its own tail goes to the back after its first pass.
-	s.enqueue("a", false)
-	s.enqueue("b", false)
+	// A bulk upload's tail and start-up's backlog are waiting. A new upload
+	// jumps ahead of both, its own tail goes behind the upload's tail, and
+	// both tails go ahead of the backlog.
+	s.enqueue("a", tierBacklog)
+	s.enqueue("b", tierBacklog)
+	s.enqueue("u", tierSecond)
 	s.Enqueue("c")
 	s.Enqueue("c")
 
 	var got []string
 	for {
-		sha, first, ok := s.next()
+		sha, q, ok := s.next()
 		if !ok {
 			break
 		}
 
-		got = append(got, fmt.Sprintf("%s/%v", sha, first))
-		if first {
-			s.enqueue(sha, false)
+		got = append(got, fmt.Sprintf("%s/%d", sha, q))
+		if q == tierFirst {
+			s.enqueue(sha, tierSecond)
 		}
 	}
 
-	require.Equal(t, []string{"c/true", "a/false", "b/false", "c/false"}, got)
+	require.Equal(t, []string{"c/0", "u/1", "c/1", "a/2", "b/2"}, got)
+}
+
+// A crop saved while the queue works through a backlog is built next, all
+// of it, before the photo being built goes on.
+func TestCropChangeOvertakesBacklog(t *testing.T) {
+	t.Parallel()
+	cat := newFakeCatalog()
+	s := newTestStore(t, cat)
+	ctx := context.Background()
+
+	x := photoOf(intake(t, s, "upright.jpg"))
+	cat.put(x)
+
+	p := photoOf(intake(t, s, "orient6.jpg"))
+	cat.put(p)
+	require.NoError(t, s.warm(ctx, p.SHA256, allSpecs))
+
+	s.enqueue(x.SHA256, tierBacklog)
+
+	// The admin recrops p as the worker starts on x.
+	cat.onPhoto = func(string) {
+		p.Crops = map[Kind]Rect{Card: {X: 0, Y: 0, W: 480, H: 600}}
+		cat.put(p)
+		s.Enqueue(p.SHA256)
+	}
+
+	missing := func(sha string) int {
+		st, err := s.Status(ctx, sha)
+		require.NoError(t, err)
+
+		return st.Total - st.Ready
+	}
+
+	require.True(t, s.step(ctx))
+	require.Equal(t, 3, missing(x.SHA256), "x stops after its full group")
+	require.Equal(t, 3, missing(p.SHA256))
+
+	require.True(t, s.step(ctx))
+	require.Equal(t, 2, missing(p.SHA256), "first pass: the status moves")
+
+	require.True(t, s.step(ctx))
+	require.Zero(t, missing(p.SHA256), "then the rest of the new crop")
+	require.Equal(t, 3, missing(x.SHA256))
+
+	require.True(t, s.step(ctx))
+	require.Zero(t, missing(x.SHA256))
+	require.False(t, s.step(ctx))
 }
 
 func TestFirstPass(t *testing.T) {
@@ -207,9 +256,9 @@ func TestRetry(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, StateQueued, st.State)
 
-	sha, first, ok := s.next()
+	sha, q, ok := s.next()
 	require.True(t, ok)
-	require.True(t, first)
+	require.Equal(t, tierFirst, q)
 	require.Equal(t, p.SHA256, sha)
 
 	require.ErrorIs(t, s.Retry(ctx, strings.Repeat("f", 64)), ErrNotFound)

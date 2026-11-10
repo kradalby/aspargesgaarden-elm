@@ -53,9 +53,9 @@ type Store struct {
 	viewAt    time.Time
 	viewStale bool
 
-	qmu         sync.Mutex
-	first, rest fifo // see Enqueue
-	wake        chan struct{}
+	qmu    sync.Mutex
+	queues [tiers]fifo // see Enqueue
+	wake   chan struct{}
 }
 
 type flight struct {
@@ -272,18 +272,18 @@ func (s *Store) ensure(ctx context.Context, p Photo, g group, specs []VariantSpe
 		mine  []VariantSpec
 		waits []*flight
 		errs  []error
-		f     = &flight{done: make(chan struct{})}
 		now   = s.now()
 	)
+
+	// One flight per file, ended as each file lands, so a request waiting
+	// for one file does not wait for the rest of a group the queue builds.
+	flights := map[string]*flight{}
 
 	s.mu.Lock()
 	for _, sp := range missing {
 		path := s.path(sp)
 		if o := s.inflight[path]; o != nil {
-			if !slices.Contains(waits, o) {
-				waits = append(waits, o)
-			}
-
+			waits = append(waits, o)
 			continue
 		}
 
@@ -292,39 +292,28 @@ func (s *Store) ensure(ctx context.Context, p Photo, g group, specs []VariantSpe
 			continue
 		}
 
-		s.inflight[path] = f
+		flights[path] = &flight{done: make(chan struct{})}
+		s.inflight[path] = flights[path]
 		mine = append(mine, sp)
+	}
+
+	for path, fl := range s.failed {
+		if now.After(fl.until) {
+			delete(s.failed, path)
+		}
 	}
 	s.mu.Unlock()
 
 	if len(mine) > 0 {
-		f.err = s.buildGroup(ctx, p, g, mine)
+		land := func(sp VariantSpec, err error) { s.land(sp, flights[s.path(sp)], err) }
+		err := s.buildGroup(ctx, p, g, mine, land)
 
-		s.mu.Lock()
-		now := s.now()
-		until := now.Add(failTTL)
-		for path, fl := range s.failed {
-			if now.After(fl.until) {
-				delete(s.failed, path)
-			}
-		}
-
+		// Files the build never reached: it failed before encoding.
 		for _, sp := range mine {
-			path := s.path(sp)
-			delete(s.inflight, path)
-
-			switch {
-			case exists(path):
-				delete(s.failed, path)
-			case f.err != nil:
-				s.failed[path] = failure{err: f.err, until: until}
-			default:
-				s.failed[path] = failure{err: errors.New("build left no file"), until: until}
-			}
+			land(sp, err)
 		}
-		s.mu.Unlock()
-		close(f.done)
-		errs = append(errs, f.err)
+
+		errs = append(errs, err)
 	}
 
 	for _, w := range waits {
@@ -350,8 +339,35 @@ func (s *Store) ensure(ctx context.Context, p Photo, g group, specs []VariantSpe
 	return nil
 }
 
+// land ends f, the flight of sp, once: it records a failure for a file
+// that is not there and wakes whoever waits for it.
+func (s *Store) land(sp VariantSpec, f *flight, err error) {
+	path := s.path(sp)
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if s.inflight[path] != f {
+		return
+	}
+
+	delete(s.inflight, path)
+	defer close(f.done)
+
+	switch {
+	case exists(path):
+		delete(s.failed, path)
+		return
+	case err == nil:
+		err = errors.New("build left no file")
+	}
+
+	f.err = err
+	s.failed[path] = failure{err: err, until: s.now().Add(failTTL)}
+}
+
 // buildGroup runs one build in a job slot.
-func (s *Store) buildGroup(ctx context.Context, p Photo, g group, specs []VariantSpec) error {
+func (s *Store) buildGroup(ctx context.Context, p Photo, g group, specs []VariantSpec, landed func(VariantSpec, error)) error {
 	select {
 	case s.jobs <- struct{}{}:
 	case <-ctx.Done():
@@ -368,7 +384,7 @@ func (s *Store) buildGroup(ctx context.Context, p Photo, g group, specs []Varian
 	if err != nil {
 		err = fmt.Errorf("original of %s: %w", p.SHA256, err)
 	} else {
-		err = s.vips.build(ctx, p, orig, g, specs, s.path)
+		err = s.vips.build(ctx, p, orig, g, specs, s.path, landed)
 	}
 
 	metricBuildSeconds.WithLabelValues(string(g.kind)).Observe(time.Since(start).Seconds())

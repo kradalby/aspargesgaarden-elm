@@ -17,6 +17,9 @@ type fakeCatalog struct {
 	mu     sync.Mutex
 	photos map[string]Photo
 	err    error
+	// onPhoto runs once, on the next Photo lookup: what the admin does
+	// while the queue works.
+	onPhoto func(sha string)
 }
 
 func newFakeCatalog() *fakeCatalog { return &fakeCatalog{photos: map[string]Photo{}} }
@@ -34,6 +37,15 @@ func (c *fakeCatalog) remove(sha string) {
 }
 
 func (c *fakeCatalog) Photo(_ context.Context, sha string) (Photo, error) {
+	c.mu.Lock()
+	hook := c.onPhoto
+	c.onPhoto = nil
+	c.mu.Unlock()
+
+	if hook != nil {
+		hook(sha)
+	}
+
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	if c.err != nil {

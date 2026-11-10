@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 	"time"
 )
 
@@ -16,6 +17,16 @@ const (
 	// firstPassWidth is the size the admin's page preview most likely asks
 	// for; the request path builds anything else it wants.
 	firstPassWidth = 800
+)
+
+// tier is one of the worker's queues; a lower tier is always taken first.
+type tier int
+
+const (
+	tierFirst   tier = iota // a photo's first pass after Enqueue
+	tierSecond              // the rest of a photo someone just changed
+	tierBacklog             // everything Run finds missing at start
+	tiers
 )
 
 // fifo is a queue of photos without duplicates.
@@ -32,6 +43,19 @@ func (q *fifo) push(sha string) {
 	if !q.in[sha] {
 		q.in[sha] = true
 		q.items = append(q.items, sha)
+	}
+}
+
+// resume puts back a photo whose build stopped to let another tier go
+// first, so it carries on before anything that queued after it.
+func (q *fifo) resume(sha string) {
+	if q.in == nil {
+		q.in = map[string]bool{}
+	}
+
+	if !q.in[sha] {
+		q.in[sha] = true
+		q.items = append([]string{sha}, q.items...)
 	}
 }
 
@@ -55,9 +79,10 @@ func (q *fifo) pop() (string, bool) {
 //
 // The photo goes to the first pass: what someone is waiting to look at (see
 // firstPass) is built for it before the long tail of any earlier photo.
+// Its own tail follows ahead of Run's backlog, so its status keeps moving.
 func (s *Store) Enqueue(sha string) {
 	s.Changed()
-	s.enqueue(sha, true)
+	s.enqueue(sha, tierFirst)
 }
 
 // Retry forgets the photo's recent build failures and queues it again: the
@@ -79,14 +104,10 @@ func (s *Store) Retry(ctx context.Context, sha string) error {
 	return nil
 }
 
-func (s *Store) enqueue(sha string, first bool) {
+func (s *Store) enqueue(sha string, t tier) {
 	s.qmu.Lock()
-	if first {
-		s.first.push(sha)
-	} else {
-		s.rest.push(sha)
-	}
-	metricQueue.Set(float64(len(s.first.items) + len(s.rest.items)))
+	s.queues[t].push(sha)
+	s.queued()
 	s.qmu.Unlock()
 
 	select {
@@ -95,18 +116,71 @@ func (s *Store) enqueue(sha string, first bool) {
 	}
 }
 
-func (s *Store) next() (string, bool, bool) {
-	s.qmu.Lock()
-	defer s.qmu.Unlock()
-	defer func() { metricQueue.Set(float64(len(s.first.items) + len(s.rest.items))) }()
-
-	if sha, ok := s.first.pop(); ok {
-		return sha, true, true
+// queued updates the gauge; qmu is held.
+func (s *Store) queued() {
+	n := 0
+	for _, q := range s.queues {
+		n += len(q.items)
 	}
 
-	sha, ok := s.rest.pop()
+	metricQueue.Set(float64(n))
+}
 
-	return sha, false, ok
+func (s *Store) next() (string, tier, bool) {
+	s.qmu.Lock()
+	defer s.qmu.Unlock()
+	defer s.queued()
+
+	for t := range s.queues {
+		if sha, ok := s.queues[t].pop(); ok {
+			return sha, tier(t), true
+		}
+	}
+
+	return "", 0, false
+}
+
+// ahead reports whether a photo waits in a tier before t.
+func (s *Store) ahead(t tier) bool {
+	s.qmu.Lock()
+	defer s.qmu.Unlock()
+
+	for _, q := range s.queues[:t] {
+		if len(q.items) > 0 {
+			return true
+		}
+	}
+
+	return false
+}
+
+// step does the worker's next unit of work and reports whether there was
+// any. A tail stops between groups when an earlier tier has work and
+// resumes from the front of its tier, so whatever the backlog, a changed
+// photo waits for at most one group build.
+func (s *Store) step(ctx context.Context) bool {
+	sha, t, ok := s.next()
+	if !ok {
+		return false
+	}
+
+	// Failures are logged and counted by the build, and show in Status.
+	if t == tierFirst {
+		_, _ = s.warmUntil(ctx, sha, firstPass, nil)
+		s.enqueue(sha, tierSecond)
+
+		return true
+	}
+
+	stopped, _ := s.warmUntil(ctx, sha, allSpecs, func() bool { return s.ahead(t) })
+	if stopped {
+		s.qmu.Lock()
+		s.queues[t].resume(sha)
+		s.queued()
+		s.qmu.Unlock()
+	}
+
+	return true
 }
 
 // Run works the queue until ctx ends, one build at a time, so requests keep
@@ -122,7 +196,7 @@ func (s *Store) Run(ctx context.Context) error {
 	}
 
 	for _, p := range photos {
-		s.enqueue(p.SHA256, false)
+		s.enqueue(p.SHA256, tierBacklog)
 	}
 
 	t := time.NewTicker(reconcileEvery)
@@ -130,17 +204,8 @@ func (s *Store) Run(ctx context.Context) error {
 
 	for {
 		for ctx.Err() == nil {
-			sha, first, ok := s.next()
-			if !ok {
+			if !s.step(ctx) {
 				break
-			}
-
-			// Failures are logged and counted by the build, and show in Status.
-			if first {
-				_ = s.warm(ctx, sha, firstPass)
-				s.enqueue(sha, false)
-			} else {
-				_ = s.warm(ctx, sha, allSpecs)
 			}
 		}
 
@@ -251,21 +316,43 @@ func ThumbURL(p Photo) string {
 
 // warm builds the missing variants pick chooses from each group of a photo.
 func (s *Store) warm(ctx context.Context, sha string, pick func(Photo, group) []VariantSpec) error {
+	_, err := s.warmUntil(ctx, sha, pick, nil)
+	return err
+}
+
+// warmUntil is warm that stops before a further group build once stop
+// says so; stopped tells whether it did.
+func (s *Store) warmUntil(ctx context.Context, sha string, pick func(Photo, group) []VariantSpec, stop func() bool) (stopped bool, err error) {
 	p, err := s.cat.Photo(ctx, sha)
 	if errors.Is(err, ErrNotFound) {
-		return nil // deleted since it was queued
+		return false, nil // deleted since it was queued
 	}
 
 	if err != nil {
-		return fmt.Errorf("warm %s: %w", sha, err)
+		return false, fmt.Errorf("warm %s: %w", sha, err)
 	}
 
-	var errs []error
+	var (
+		errs  []error
+		built bool
+	)
+
 	for _, g := range groups(p) {
-		errs = append(errs, s.ensure(ctx, p, g, pick(p, g)))
+		specs := pick(p, g)
+		if !slices.ContainsFunc(specs, func(sp VariantSpec) bool { return !exists(s.path(sp)) }) {
+			continue
+		}
+
+		if built && stop != nil && stop() {
+			return true, errors.Join(errs...)
+		}
+
+		built = true
+
+		errs = append(errs, s.ensure(ctx, p, g, specs))
 	}
 
-	return errors.Join(errs...)
+	return false, errors.Join(errs...)
 }
 
 // WarmAll builds every missing variant of every photo, in the foreground.

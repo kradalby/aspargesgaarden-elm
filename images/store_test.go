@@ -196,6 +196,42 @@ func TestEnsureBuildsOnce(t *testing.T) {
 	require.Equal(t, before+1, s.builds.Load())
 }
 
+// A visitor asking for a file the queue is building waits for that file,
+// not for the rest of its group.
+func TestEnsureWaitsOnlyForItsFile(t *testing.T) {
+	t.Parallel()
+	cat := newFakeCatalog()
+	s := newTestStore(t, cat)
+	ctx := context.Background()
+
+	p := photoOf(intake(t, s, "upright.jpg"))
+	cat.put(p)
+
+	g := groups(p)[0]
+	// The very last is the preview, which Intake built.
+	first, last := g.specs[0], g.specs[len(g.specs)-2]
+	require.NoFileExists(t, s.path(last))
+	before := s.builds.Load()
+
+	done := make(chan error, 1)
+
+	go func() { done <- s.warm(ctx, p.SHA256, allSpecs) }()
+
+	require.Eventually(t, func() bool {
+		s.mu.Lock()
+		defer s.mu.Unlock()
+
+		return s.inflight[s.path(first)] != nil
+	}, time.Minute, time.Millisecond)
+
+	_, err := s.Ensure(ctx, first)
+	require.NoError(t, err)
+	require.NoFileExists(t, s.path(last), "the visitor waited for the whole group")
+
+	require.NoError(t, <-done)
+	require.Equal(t, before+int64(len(groups(p))), s.builds.Load(), "nothing built twice")
+}
+
 func TestEnsureRemembersFailures(t *testing.T) {
 	clock := newFakeClock()
 	cat := newFakeCatalog()
