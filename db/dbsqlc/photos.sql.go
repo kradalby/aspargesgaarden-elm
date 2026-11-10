@@ -104,6 +104,18 @@ func (q *Queries) GetPhoto(ctx context.Context, id int64) (Photo, error) {
 	return i, err
 }
 
+const getPhotoIDBySha256 = `-- name: GetPhotoIDBySha256 :one
+SELECT id FROM photos WHERE sha256 = ?
+`
+
+// images/ names photos by the sha256 of their original.
+func (q *Queries) GetPhotoIDBySha256(ctx context.Context, sha256 string) (int64, error) {
+	row := q.db.QueryRowContext(ctx, getPhotoIDBySha256, sha256)
+	var id int64
+	err := row.Scan(&id)
+	return id, err
+}
+
 const insertGalleryPhoto = `-- name: InsertGalleryPhoto :exec
 INSERT INTO gallery_photos (photo_id, position, updated_at) VALUES (?, ?, ?)
 `

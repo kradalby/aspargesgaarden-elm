@@ -11,6 +11,10 @@ RETURNING id;
 -- name: GetPhoto :one
 SELECT * FROM photos WHERE id = ?;
 
+-- name: GetPhotoIDBySha256 :one
+-- images/ names photos by the sha256 of their original.
+SELECT id FROM photos WHERE sha256 = ?;
+
 -- name: ListPhotos :many
 SELECT * FROM photos ORDER BY id;
 
