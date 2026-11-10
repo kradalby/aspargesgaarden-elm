@@ -348,6 +348,7 @@ photoCard model n i photo =
         [ Photos.image [ class "w-full aspect-[4/3] rounded-lg" ] photo
         , p [ class "font-bold" ] [ text ("Bilde " ++ String.fromInt (i + 1) ++ " av " ++ String.fromInt n) ]
         , Photos.statusView PhotosMsg photo
+        , Photos.sizeNote photo
         , Ui.field
             { id = altId
             , label = "Beskriv bildet"

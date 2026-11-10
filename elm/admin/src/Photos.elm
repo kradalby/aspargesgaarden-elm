@@ -14,6 +14,7 @@ module Photos exposing
     , liveRegion
     , photographerField
     , pick
+    , sizeNote
     , statusView
     , subscriptions
     , update
@@ -660,6 +661,18 @@ statusView toMsg photo =
                 , Ui.help [] "Du kan fortsette å skrive mens bildet gjøres klart."
                 ]
         )
+
+
+{-| For a gallery or extra photo narrower than the lightbox's largest frame.
+It is shown smaller there, not stretched, so this is said calmly.
+-}
+sizeNote : Photo -> Html msg
+sizeNote photo =
+    if photo.quality.full.soft then
+        Ui.verdict "info" [] [ Text.shownSmaller ]
+
+    else
+        text ""
 
 
 {-| The photo, or a calm placeholder until the server has made its preview.

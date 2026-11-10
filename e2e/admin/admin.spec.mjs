@@ -596,3 +596,96 @@ test("the crop dialog works from the keyboard and gives focus back", async ({
   await expect(crop).toBeHidden();
   await expect(open).toBeFocused();
 });
+
+// The course's photo is 900 px wide: its banner is just sharp (the column
+// is 896), one step smaller is not, and the floor of 800 stops Mindre.
+test("the crop dialog says, as she goes, when a crop will look soft", async ({
+  page,
+}) => {
+  await page.goto("/admin/arrangementer/4");
+  await expect(page.locator("#bilde-uskarpt")).toHaveCount(0);
+  await page.getByRole("button", { name: "Beskjær" }).click();
+  const crop = page.getByRole("dialog", { name: "Beskjær bildet" });
+  await crop.getByRole("button", { name: /Øverst på siden/ }).click();
+  const line = crop.locator("#beskjaer-skarphet");
+  await expect(line).toHaveAttribute("aria-live", "polite");
+  await expect(line.locator("[data-verdict=sharp] p")).toHaveText(["Skarpt."]);
+
+  await crop.getByRole("button", { name: "Mindre" }).click();
+  await expect(line.locator("[data-verdict=soft]")).toBeVisible();
+  await expect(line).toContainText(
+    "Dette utsnittet blir uskarpt på nettsiden. Gjør rammen større, eller bruk et større bilde om du har det.",
+  );
+  await expect(line).toContainText("Be om originalen.");
+  await expect(line).not.toContainText("kan ikke bli mindre");
+
+  await crop.getByRole("button", { name: "Større" }).click();
+  await expect(line.locator("[data-verdict=sharp] p")).toHaveText(["Skarpt."]);
+
+  for (let i = 0; i < 3; i++)
+    await crop.getByRole("button", { name: "Mindre" }).click();
+  await expect(crop.locator("asp-cropper")).toHaveAttribute(
+    "rect",
+    /^\d+,\d+,800,450$/,
+  );
+  await expect(line).toContainText("Rammen kan ikke bli mindre");
+  await expect(line).toContainText("uskarpt");
+});
+
+// Crops from before today's rules: unchanged, they are saved with the rest,
+// and her text edits never touch them.
+test("an old crop under the minimum survives the dialog and a save", async ({
+  page,
+  request,
+}) => {
+  const old = { x: 98, y: 300, w: 704, h: 396 };
+  expect(
+    (await request.post("/__crop/2", { data: { banner: old } })).ok(),
+  ).toBe(true);
+  await page.goto("/admin/arrangementer/4");
+  await page.getByRole("button", { name: "Beskjær" }).click();
+  const crop = page.getByRole("dialog", { name: "Beskjær bildet" });
+  await crop.getByRole("button", { name: /Øverst på siden/ }).click();
+  const line = crop.locator("#beskjaer-skarphet");
+  await expect(line.locator("[data-verdict=soft]")).toBeVisible();
+  await expect(line).toContainText("Rammen kan ikke bli mindre");
+  // Mindre never grows it to the minimum.
+  await crop.getByRole("button", { name: "Mindre" }).click();
+  await expect(crop.locator("asp-cropper")).toHaveAttribute(
+    "rect",
+    "98,300,704,396",
+  );
+
+  const saved = page.waitForResponse((r) => r.url().endsWith("/crops"));
+  await crop.getByRole("button", { name: "Bruk" }).click();
+  expect((await saved).status()).toBe(200);
+  await expect(crop).toBeHidden();
+
+  await page.getByLabel("Pris").fill("Kr 1700,-");
+  await page.getByRole("button", { name: "Lagre endringene" }).click();
+  await expect(page.getByText("Endringene er lagret").first()).toBeVisible();
+
+  const photo = await (await request.get("/admin/api/photos/2")).json();
+  expect(photo.crops.banner).toEqual(old);
+  if (real) {
+    const course = await publicText(
+      request,
+      "/arrangementer/2026/takkebakstkurs",
+    );
+    expect(course.status).toBe(200);
+    expect(course.text).toContain("Kr 1700,-");
+  }
+});
+
+test("a small gallery photo is said to be shown smaller, calmly", async ({
+  page,
+}) => {
+  await page.goto("/admin/galleri");
+  // portrett.jpg is 900 px wide, under the lightbox's 992; landskap is 1300.
+  await expect(
+    page.locator('[data-photo="2"] [data-verdict="info"] p'),
+  ).toHaveText(
+    "Bildet er litt lite, så det vises mindre når man åpner det stort. Det går fint.",
+  );
+  await expect(page.locator('[data-photo="1"] [data-verdict]')).toHaveCount(0);
+});

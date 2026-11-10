@@ -1,8 +1,24 @@
-module Text exposing (error, noAccess, photoFailure, problem, uploadFailure)
+module Text exposing
+    ( askForOriginal
+    , atFloor
+    , cropTooSmall
+    , error
+    , noAccess
+    , noCrop
+    , photoFailure
+    , problem
+    , sharp
+    , shownSmaller
+    , softCrop
+    , softKind
+    , softWhole
+    , uploadFailure
+    )
 
-{-| Every message the user reads about something that went wrong, in plain
-bokmål. The server sends codes only (docs/admin-api.md), so this is the one
-place the wording lives.
+{-| Every message the user reads about something that went wrong, or about
+how sharp a photo will be, in plain bokmål. The server sends codes and
+numbers only (docs/admin-api.md), so this is the one place the wording
+lives.
 -}
 
 import Api exposing (Problem)
@@ -69,7 +85,7 @@ problem p =
             "Det finnes allerede en fotograf med dette navnet."
 
         ( "crop_too_small", _ ) ->
-            "Utsnittet er for lite. Gjør rammen større."
+            cropTooSmall
 
         ( "crop_outside", _ ) ->
             "Rammen går utenfor bildet. Dra den litt innover."
@@ -115,6 +131,80 @@ uploadFailure code =
 
         _ ->
             "Noe gikk galt på serveren. Prøv igjen om litt."
+
+
+{-| How sharp a photo will be on the site. Below a kind's sharp width the
+browser stretches it on every screen; the server takes it all the same.
+-}
+sharp : String
+sharp =
+    "Skarpt."
+
+
+softCrop : String
+softCrop =
+    "Dette utsnittet blir uskarpt på nettsiden. Gjør rammen større, eller bruk et større bilde om du har det."
+
+
+cropTooSmall : String
+cropTooSmall =
+    "Utsnittet er for lite. Gjør rammen større."
+
+
+{-| Why "Mindre" stops: the server's minimum for the kind.
+-}
+atFloor : String
+atFloor =
+    "Rammen kan ikke bli mindre, for nettsiden trenger minst så mye av bildet."
+
+
+{-| Beside the photo in the form, for a kind whose crop is soft.
+-}
+softKind : String -> String
+softKind usedFor =
+    usedFor ++ ": utsnittet blir uskarpt på nettsiden. Trykk «Beskjær» og gjør rammen større, eller bruk et større bilde om du har det."
+
+
+{-| What a photo too small for a crop kind gets instead. minWidth is the
+server's minimum for the kind.
+-}
+noCrop : String -> Int -> String
+noCrop key minWidth =
+    let
+        under =
+            "under " ++ String.fromInt minWidth ++ " punkter bredt"
+    in
+    case key of
+        "share" ->
+            "Bildet er " ++ under ++ ", så det får ikke eget bilde for deling på Facebook. Da brukes bildet fra toppen av siden. Det går fint."
+
+        "banner" ->
+            "Bildet er for lite til toppen av siden (" ++ under ++ "), så der vises det uten beskjæring."
+
+        _ ->
+            "Bildet er for lite til listen (" ++ under ++ "), så der vises det uten beskjæring."
+
+
+{-| Follows noCrop when the whole photo shown there is soft.
+-}
+softWhole : String
+softWhole =
+    "Der blir det uskarpt. Bruk et større bilde om du har det."
+
+
+{-| With every warning about softness: the usual cause, and the cure.
+-}
+askForOriginal : String
+askForOriginal =
+    "Bilder sendt på Messenger eller e-post blir ofte gjort mindre. Be om originalen."
+
+
+{-| A gallery or extra photo narrower than the lightbox: it is not
+stretched, only shown smaller, so this is information, not a warning.
+-}
+shownSmaller : String
+shownSmaller =
+    "Bildet er litt lite, så det vises mindre når man åpner det stort. Det går fint."
 
 
 {-| For someone the tailnet does not let into the admin.

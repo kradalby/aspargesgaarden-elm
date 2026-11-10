@@ -1,12 +1,16 @@
 module Crop exposing
     ( Kind
+    , Sharpness(..)
     , Size
     , Thumb
     , aspectString
+    , atFloor
+    , find
     , kinds
     , nudge
     , rectString
     , resize
+    , sharpness
     , thumb
     , usable
     )
@@ -16,7 +20,7 @@ behind the crop dialog's buttons and small previews. Rectangles are in
 upright source pixels, as the server stores them.
 -}
 
-import Api exposing (Rect)
+import Api exposing (Quality, Rect)
 
 
 type alias Kind =
@@ -28,21 +32,61 @@ type alias Kind =
     , ratioW : Int
     , ratioH : Int
 
-    -- The narrowest crop the server takes for the kind, in source pixels.
-    , minWidth : Int
+    -- The server's widths for the kind, and how this photo fares.
+    , quality : Quality
     }
 
 
-{-| The minimum widths are the server's (images.Kind.MinWidth): a card needs
-the smallest size the site makes, a banner is soft under 800, and a share
-image is always 1200 wide and never upscaled.
+{-| The kinds of a photo, with the widths its server answer carries.
 -}
-kinds : List Kind
-kinds =
-    [ Kind "card" "Listen" "I listen over arrangementer" 4 5 480
-    , Kind "banner" "Toppen" "Øverst på siden til arrangementet" 16 9 800
-    , Kind "share" "Deling" "Når noen deler lenken, for eksempel på Facebook" 1200 630 1200
+kinds : Api.Qualities -> List Kind
+kinds q =
+    [ Kind "card" "Listen" "I listen over arrangementer" 4 5 q.card
+    , Kind "banner" "Toppen" "Øverst på siden til arrangementet" 16 9 q.banner
+    , Kind "share" "Deling" "Når noen deler lenken, for eksempel på Facebook" 1200 630 q.share
     ]
+
+
+{-| The kind with the key; the card for an unknown one.
+-}
+find : Api.Qualities -> String -> Kind
+find q key =
+    case List.filter (\k -> k.key == key) (kinds q) of
+        k :: _ ->
+            k
+
+        [] ->
+            Kind "card" "Listen" "I listen over arrangementer" 4 5 q.card
+
+
+{-| How a frame will look on the site. TooSmall is what the server refuses.
+-}
+type Sharpness
+    = Sharp
+    | Soft
+    | TooSmall
+
+
+{-| stored is the crop the photo has now. Sent back unchanged it is always
+accepted, so even under today's minimum it is only soft.
+-}
+sharpness : Kind -> Maybe Rect -> Rect -> Sharpness
+sharpness kind stored r =
+    if r.w < kind.quality.minWidth && stored /= Just r then
+        TooSmall
+
+    else if r.w < kind.quality.sharpWidth then
+        Soft
+
+    else
+        Sharp
+
+
+{-| Whether "Mindre" can shrink the frame no further.
+-}
+atFloor : Kind -> Rect -> Bool
+atFloor kind r =
+    r.w <= kind.quality.minWidth
 
 
 type alias Size =
@@ -78,7 +122,7 @@ usable kind photo =
             else
                 photo.width
     in
-    centredWidth >= kind.minWidth
+    centredWidth >= kind.quality.minWidth
 
 
 {-| Moves the frame by dx, dy steps of a twentieth of its own size, kept
@@ -98,7 +142,8 @@ nudge photo dx dy r =
 
 {-| Scales the frame around its centre by factor, keeping the kind's shape,
 at least the kind's minimum width (or the whole photo, if smaller) and
-inside the photo.
+inside the photo. A frame already under the minimum (an old crop) is never
+grown by shrinking it.
 -}
 resize : Kind -> Size -> Float -> Rect -> Rect
 resize kind photo factor r =
@@ -108,7 +153,7 @@ resize kind photo factor r =
 
         wanted =
             round (toFloat r.w * factor)
-                |> max (min kind.minWidth photo.width)
+                |> max (min (min kind.quality.minWidth photo.width) r.w)
                 |> min photo.width
 
         ( w, h ) =

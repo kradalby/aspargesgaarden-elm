@@ -21,6 +21,7 @@ module Ui exposing
     , secondaryButton
     , spinnerText
     , textarea
+    , verdict
     )
 
 {-| The admin's building blocks, in the site's look: Cardillac headings in
@@ -245,6 +246,36 @@ notice kind content =
             )
         ]
         content
+
+
+{-| A judgement about a photo, "sharp", "soft", "info" or "error", with an
+icon in front and in words, so the kind is not carried by colour alone.
+-}
+verdict : String -> List (Attribute msg) -> List String -> Html msg
+verdict kind attrs lines =
+    let
+        ( icon, iconClass ) =
+            case kind of
+                "sharp" ->
+                    ( "✓", "bg-mork-eukalyptus text-white" )
+
+                "soft" ->
+                    ( "!", "bg-tre text-white" )
+
+                "error" ->
+                    ( "!", "bg-rust text-white" )
+
+                _ ->
+                    ( "i", "border-2 border-brown-text text-brown-text" )
+    in
+    div (class "flex gap-2 items-start" :: A.attribute "data-verdict" kind :: attrs)
+        [ span [ A.attribute "aria-hidden" "true", class "shrink-0 inline-flex items-center justify-center w-6 h-6 rounded-full text-sm font-bold", class iconClass ] [ text icon ]
+        , div
+            [ class "flex flex-col gap-1 [overflow-wrap:anywhere]"
+            , A.classList [ ( "font-bold", kind == "soft" || kind == "error" ), ( "text-rust", kind == "error" ) ]
+            ]
+            (List.map (\l -> p [] [ text l ]) lines)
+        ]
 
 
 errorList : String -> String -> List ( String, Maybe msg ) -> Html msg

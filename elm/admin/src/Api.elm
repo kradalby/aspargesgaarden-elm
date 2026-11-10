@@ -10,6 +10,8 @@ module Api exposing
     , PhotoStatus
     , Photographer
     , Problem
+    , Qualities
+    , Quality
     , Rect
     , UsedBy
     , copyEvent
@@ -82,8 +84,21 @@ type alias Photo =
     , previewUrl : String
     , thumbUrl : String
     , crops : Crops
+    , quality : Qualities
     , status : PhotoStatus
     }
+
+
+{-| A kind's sharpness rule as the server states it: the narrowest crop it
+takes, the narrowest that is sharp on every screen, and whether what the
+pages draw for this photo now is narrower than that.
+-}
+type alias Quality =
+    { minWidth : Int, sharpWidth : Int, soft : Bool }
+
+
+type alias Qualities =
+    { card : Quality, banner : Quality, share : Quality, full : Quality }
 
 
 {-| How far the server is with the photo's sizes; state is "preparing",
@@ -198,7 +213,17 @@ photoDecoder =
         |> field "previewUrl" D.string
         |> field "thumbUrl" D.string
         |> field "crops" (D.dict rectDecoder)
+        |> field "quality" qualitiesDecoder
         |> field "status" statusDecoder
+
+
+qualitiesDecoder : Decoder Qualities
+qualitiesDecoder =
+    let
+        quality =
+            D.map3 Quality (D.field "minWidth" D.int) (D.field "sharpWidth" D.int) (D.field "soft" D.bool)
+    in
+    D.map4 Qualities (D.field "card" quality) (D.field "banner" quality) (D.field "share" quality) (D.field "full" quality)
 
 
 statusDecoder : Decoder PhotoStatus

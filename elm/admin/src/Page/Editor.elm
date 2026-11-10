@@ -670,9 +670,9 @@ mapCropRect : (Crop.Kind -> Crop.Size -> Rect -> Rect) -> Model -> Model
 mapCropRect f model =
     case model.crop of
         Just c ->
-            case ( Photos.get c.photoId model.photos, List.filter (\k -> k.key == c.kind) Crop.kinds |> List.head, Dict.get c.kind c.rects ) of
-                ( Just photo, Just kind, Just r ) ->
-                    { model | crop = Just { c | rects = Dict.insert c.kind (f kind { width = photo.width, height = photo.height } r) c.rects } }
+            case ( Photos.get c.photoId model.photos, Dict.get c.kind c.rects ) of
+                ( Just photo, Just r ) ->
+                    { model | crop = Just { c | rects = Dict.insert c.kind (f (Crop.find photo.quality c.kind) { width = photo.width, height = photo.height } r) c.rects } }
 
                 _ ->
                     model
@@ -1134,8 +1134,9 @@ mainPhotoView model =
         ]
 
 
-{-| What a photo too small for a crop kind gets instead, said once beside
-the photo; the crop dialog says it again where she would look for it.
+{-| How the main photo fares in each crop: what a kind it is too small for
+gets instead, and which kinds will look soft, said once beside the photo.
+The crop dialog says it again where she would look for it.
 -}
 smallPhotoNote : Photo -> Html Msg
 smallPhotoNote photo =
@@ -1143,27 +1144,47 @@ smallPhotoNote photo =
         size =
             { width = photo.width, height = photo.height }
 
-        missing =
-            List.filter (\k -> not (Crop.usable k size)) Crop.kinds
+        note kind =
+            case ( Crop.usable kind size, kind.quality.soft ) of
+                ( False, False ) ->
+                    Just ( False, fallbackText kind )
+
+                ( False, True ) ->
+                    Just ( True, fallbackText kind ++ " " ++ Text.softWhole )
+
+                ( True, True ) ->
+                    Just ( True, Text.softKind kind.usedFor )
+
+                ( True, False ) ->
+                    Nothing
+
+        notes =
+            List.filterMap note (Crop.kinds photo.quality)
+
+        soft =
+            List.filter Tuple.first notes |> List.map Tuple.second
+
+        calm =
+            List.filter (not << Tuple.first) notes |> List.map Tuple.second
     in
-    if List.isEmpty missing then
+    if List.isEmpty notes then
         text ""
 
     else
-        div [ class "flex flex-col gap-1" ] (List.map (\k -> Ui.help [] (fallbackText k)) missing)
+        div [ class "flex flex-col gap-2" ]
+            (List.map (Ui.help []) calm
+                ++ (if List.isEmpty soft then
+                        []
+
+                    else
+                        [ Ui.verdict "soft" [ A.id "bilde-uskarpt" ] (soft ++ [ Text.askForOriginal ]) ]
+                   )
+            )
 
 
 fallbackText : Crop.Kind -> String
 fallbackText kind =
-    case kind.key of
-        "share" ->
-            "Bildet er under 1200 punkter bredt, så det får ikke eget bilde for deling på Facebook. Da brukes bildet fra toppen av siden. Det går fint."
-
-        "banner" ->
-            "Bildet er for lite til toppen av siden (under 800 punkter bredt), så der vises det uten beskjæring."
-
-        _ ->
-            "Bildet er for lite til listen (under 480 punkter bredt), så der vises det uten beskjæring."
+    Text.noCrop kind.key kind.quality.minWidth
 
 
 altField : Model -> PhotoRef -> Html Msg
@@ -1200,6 +1221,7 @@ extraPhotosView model =
                                 , div [ class "flex-1 min-w-60 flex flex-col gap-3" ]
                                     [ p [ class "font-bold" ] [ text ("Bilde " ++ String.fromInt (i + 1) ++ " av " ++ String.fromInt n) ]
                                     , Photos.statusView PhotosMsg photo
+                                    , Photos.sizeNote photo
                                     , altField model ref
                                     , Photos.photographerField { photoId = ref.id, selected = ref.photographerId, onSelect = SetPhotographer ref.id, toMsg = PhotosMsg } model.photos
                                     , div [ class "flex flex-wrap gap-2" ]
@@ -1329,7 +1351,36 @@ cropDialog model =
                     { width = photo.width, height = photo.height }
 
                 current =
-                    List.filter (\k -> k.key == c.kind) Crop.kinds |> List.head |> Maybe.withDefault { key = "card", name = "", usedFor = "", ratioW = 4, ratioH = 5, minWidth = 480 }
+                    Crop.find photo.quality c.kind
+
+                -- Polite, and only its words change, so a screen reader
+                -- hears it as the frame crosses a limit, not on every move.
+                sharpnessLine =
+                    case Dict.get c.kind c.rects of
+                        Just r ->
+                            let
+                                floorLine =
+                                    if Crop.atFloor current r then
+                                        [ Text.atFloor ]
+
+                                    else
+                                        []
+
+                                ( kind, lines ) =
+                                    case Crop.sharpness current (Dict.get c.kind photo.crops) r of
+                                        Crop.Sharp ->
+                                            ( "sharp", Text.sharp :: floorLine )
+
+                                        Crop.Soft ->
+                                            ( "soft", Text.softCrop :: floorLine ++ [ Text.askForOriginal ] )
+
+                                        Crop.TooSmall ->
+                                            ( "error", [ Text.cropTooSmall ] )
+                            in
+                            Ui.verdict kind [] lines
+
+                        Nothing ->
+                            text ""
 
                 cropErrors =
                     case c.error of
@@ -1370,6 +1421,7 @@ cropDialog model =
                                     []
                               )
                             ]
+                        , div [ A.id "beskjaer-skarphet", attribute "aria-live" "polite", attribute "role" "status" ] [ sharpnessLine ]
                         , div [ class "flex flex-wrap gap-2 items-center", attribute "role" "group", attribute "aria-label" "Flytt eller endre rammen" ]
                             [ navButton "←" "Flytt rammen til venstre" (CropNudge -1 0)
                             , navButton "→" "Flytt rammen til høyre" (CropNudge 1 0)
@@ -1380,7 +1432,7 @@ cropDialog model =
                             ]
                         ]
                     , div [ class "flex-[1_1_14rem] flex flex-col gap-4", attribute "role" "group", attribute "aria-label" "Utsnitt" ]
-                        (List.map (cropChoice photo c) Crop.kinds)
+                        (List.map (cropChoice photo c) (Crop.kinds photo.quality))
                     ]
                 , Ui.errorText "beskjaer-feil" cropErrors
                 , Ui.help [] "Beskjæringen gjelder med en gang du trykker «Bruk», også hvis arrangementet allerede er publisert."

@@ -15,6 +15,11 @@ photoJson =
       "photographer": { "id": 3, "name": "Ola", "url": "" },
       "previewUrl": "/img/p.jpg", "thumbUrl": "/img/t.jpg",
       "crops": { "card": { "x": 1012, "y": 0, "w": 2419, "h": 3024 } },
+      "quality": {
+        "card": { "minWidth": 480, "sharpWidth": 768, "soft": false },
+        "banner": { "minWidth": 800, "sharpWidth": 896, "soft": true },
+        "share": { "minWidth": 1200, "sharpWidth": 1200, "soft": false },
+        "full": { "minWidth": 480, "sharpWidth": 992, "soft": false } },
       "status": { "state": "preparing", "done": 12, "total": 46, "previewReady": true, "reason": "" } }
     """
 
@@ -41,6 +46,11 @@ suite =
                 D.decodeString Api.photoDecoder photoJson
                     |> Result.map (\p -> ( p.status.done, p.status.previewReady, Dict.get "card" p.crops |> Maybe.map .w ))
                     |> Expect.equal (Ok ( 12, True, Just 2419 ))
+        , test "decodes each kind's widths from the server" <|
+            \_ ->
+                D.decodeString Api.photoDecoder photoJson
+                    |> Result.map (\p -> ( p.quality.banner.minWidth, p.quality.banner.sharpWidth, p.quality.banner.soft ))
+                    |> Expect.equal (Ok ( 800, 896, True ))
         , test "decodes an event as documented" <|
             \_ ->
                 D.decodeString Api.eventDecoder eventJson

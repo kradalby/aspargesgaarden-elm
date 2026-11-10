@@ -13,12 +13,12 @@ photo =
 
 banner : Crop.Kind
 banner =
-    { key = "banner", name = "", usedFor = "", ratioW = 16, ratioH = 9, minWidth = 800 }
+    { key = "banner", name = "", usedFor = "", ratioW = 16, ratioH = 9, quality = { minWidth = 800, sharpWidth = 896, soft = False } }
 
 
 share : Crop.Kind
 share =
-    { key = "share", name = "", usedFor = "", ratioW = 1200, ratioH = 630, minWidth = 1200 }
+    { key = "share", name = "", usedFor = "", ratioW = 1200, ratioH = 630, quality = { minWidth = 1200, sharpWidth = 1200, soft = False } }
 
 
 inside : Crop.Size -> { x : Int, y : Int, w : Int, h : Int } -> Bool
@@ -74,4 +74,38 @@ suite =
                 [ { width = 1000, height = 600 }, { width = 1000, height = 400 } ]
                     |> List.map (Crop.usable banner)
                     |> Expect.equal [ True, False ]
+        , describe "sharpness"
+            [ test "refused under the minimum, soft under the sharp width, then sharp" <|
+                \_ ->
+                    [ 799, 800, 895, 896 ]
+                        |> List.map (\w -> Crop.sharpness banner Nothing { x = 0, y = 0, w = w, h = w * 9 // 16 })
+                        |> Expect.equal [ Crop.TooSmall, Crop.Soft, Crop.Soft, Crop.Sharp ]
+            , test "the photo's own crop is only soft, even under the minimum" <|
+                \_ ->
+                    let
+                        old =
+                            { x = 10, y = 20, w = 700, h = 394 }
+                    in
+                    [ Crop.sharpness banner (Just old) old, Crop.sharpness banner (Just old) { old | x = 11 } ]
+                        |> Expect.equal [ Crop.Soft, Crop.TooSmall ]
+            , test "the floor stops Mindre" <|
+                \_ ->
+                    [ 800, 801 ]
+                        |> List.map (\w -> Crop.atFloor banner { x = 0, y = 0, w = w, h = 450 })
+                        |> Expect.equal [ True, False ]
+            , test "Mindre never grows an old crop under the minimum" <|
+                \_ ->
+                    Crop.resize banner photo (1 / 1.1) { x = 0, y = 0, w = 704, h = 396 }
+                        |> .w
+                        |> Expect.equal 704
+            , test "the kinds carry the server's widths" <|
+                \_ ->
+                    let
+                        q w =
+                            { minWidth = w, sharpWidth = w + 1, soft = w == 800 }
+                    in
+                    Crop.kinds { card = q 480, banner = q 800, share = q 1200, full = q 480 }
+                        |> List.map (\k -> ( k.key, k.quality.minWidth, k.quality.soft ))
+                        |> Expect.equal [ ( "card", 480, False ), ( "banner", 800, True ), ( "share", 1200, False ) ]
+            ]
         ]
