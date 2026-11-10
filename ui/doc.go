@@ -32,8 +32,8 @@
 //
 // Files: page (document, head), header (logo, menu), footer (ContactPoint),
 // container, headline, sectionheading, lead, picture, photocredit,
-// photorows, backdrop, icon, infoline, contactlink, buttonlink, external
-// (outside origins, CSP). Events: eventrows (coming, with EventItem),
-// eventcards (past), eventcolumn, eventbanner, eventfacts, eventdetail,
-// eventnotice.
+// photorows, gallery (grid; the elm/gallery lightbox over it), backdrop,
+// icon, infoline, contactlink, buttonlink, external (outside origins, CSP).
+// Events: eventrows (coming, with EventItem), eventcards (past),
+// eventcolumn, eventbanner, eventfacts, eventdetail, eventnotice.
 package ui

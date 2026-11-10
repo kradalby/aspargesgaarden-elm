@@ -1,7 +1,10 @@
 package ui
 
 import (
+	"strings"
 	"testing"
+
+	"github.com/kradalby/asparges/static"
 
 	"github.com/chasefleming/elem-go"
 	"github.com/stretchr/testify/require"
@@ -23,6 +26,19 @@ func TestPage(t *testing.T) {
 
 func TestPageWithoutAddressHasNoCanonical(t *testing.T) {
 	require.NotContains(t, testPage(""), `rel="canonical"`)
+}
+
+// The lightbox script loads once on a page with galleries and not at all on
+// one without, whatever the page author wrote.
+func TestPageLoadsLightboxOnlyWithGallery(t *testing.T) {
+	script := `<script defer src="` + static.URL("gallery.js") + `"></script>`
+	page := func(body ...elem.Node) string {
+		return Page(PageProps{BaseURL: "https://aspargesgaarden.no", Meta: Meta{Title: "x"}}, body...).Render()
+	}
+
+	require.NotContains(t, testPage("/"), "gallery.js")
+	require.NotContains(t, page(Gallery()), "gallery.js", "an empty gallery has nothing to open")
+	require.Equal(t, 1, strings.Count(page(Container(Gallery(testGallery...), Gallery(testGallery[:1]...))), script))
 }
 
 // The old site rendered the Umami tag as an empty <p>, so it never loaded.

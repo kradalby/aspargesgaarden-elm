@@ -33,6 +33,9 @@ const (
 	LayoutCardGrid
 	// LayoutHalfColumn is a photo in a two-column grid inside EventColumn.
 	LayoutHalfColumn
+	// LayoutGallery is a Gallery thumbnail: full width on a phone, 20rem
+	// from md, 27rem from lg.
+	LayoutGallery
 )
 
 func (l Layout) sizes(photo images.Ref) string {
@@ -53,6 +56,8 @@ func (l Layout) sizes(photo images.Ref) string {
 		return "(min-width: 64rem) 25vw, (min-width: 48rem) 33vw, 50vw"
 	case LayoutHalfColumn:
 		return "(min-width: 56rem) 28rem, 50vw"
+	case LayoutGallery:
+		return "(min-width: 64rem) 27rem, (min-width: 48rem) 20rem, 100vw"
 	}
 
 	panic("ui: Picture needs a Layout")
@@ -100,39 +105,20 @@ func Picture(p PictureProps) elem.Node {
 	}
 
 	sizes := p.Layout.sizes(p.Photo)
+	sources, img := encodings(p.Photo)
 
-	byFormat := map[images.Format][]images.Variant{}
-	for _, v := range p.Photo.Variants {
-		byFormat[v.Format] = append(byFormat[v.Format], v)
-	}
-
-	var present []images.Format
-
-	for _, f := range formats {
-		if len(byFormat[f]) > 0 {
-			present = append(present, f)
-		}
-	}
-
-	if len(present) == 0 {
-		panic("ui: Picture of a photo without variants")
-	}
-
-	// The least preferred format present is the <img>; the rest are sources.
-	kids := make([]elem.Node, 0, len(present))
-	for _, f := range present[:len(present)-1] {
+	kids := make([]elem.Node, 0, len(sources)+1)
+	for _, s := range sources {
 		kids = append(kids, elem.Source(attrs.Props{
-			attrs.Type:  "image/" + string(f),
-			"srcset":    srcset(byFormat[f]),
+			attrs.Type:  s.mime(),
+			"srcset":    srcset(s.variants),
 			attrs.Sizes: sizes,
 		}))
 	}
 
-	img := byFormat[present[len(present)-1]]
-
 	props := attrs.Props{
-		attrs.Src:    fallback(img).URL,
-		"srcset":     srcset(img),
+		attrs.Src:    fallback(img.variants).URL,
+		"srcset":     srcset(img.variants),
 		attrs.Sizes:  sizes,
 		attrs.Width:  strconv.Itoa(p.Photo.Width),
 		attrs.Height: strconv.Itoa(p.Photo.Height),
@@ -151,6 +137,37 @@ func Picture(p PictureProps) elem.Node {
 	}
 
 	return elem.Picture(nil, append(kids, elem.Img(props))...)
+}
+
+// encoding is one format of a photo with its variants.
+type encoding struct {
+	format   images.Format
+	variants []images.Variant
+}
+
+func (e encoding) mime() string { return "image/" + string(e.format) }
+
+// encodings splits a photo's variants by format: the <source>s in order of
+// preference, and the least preferred format present, which is the <img>.
+func encodings(photo images.Ref) (sources []encoding, img encoding) {
+	byFormat := map[images.Format][]images.Variant{}
+	for _, v := range photo.Variants {
+		byFormat[v.Format] = append(byFormat[v.Format], v)
+	}
+
+	var present []encoding
+
+	for _, f := range formats {
+		if len(byFormat[f]) > 0 {
+			present = append(present, encoding{format: f, variants: byFormat[f]})
+		}
+	}
+
+	if len(present) == 0 {
+		panic("ui: Picture of a photo without variants")
+	}
+
+	return present[:len(present)-1], present[len(present)-1]
 }
 
 func srcset(vs []images.Variant) string {

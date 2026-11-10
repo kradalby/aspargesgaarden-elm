@@ -67,6 +67,12 @@ func Page(p PageProps, body ...elem.Node) *elem.Element {
 		elem.Script(attrs.Props{attrs.Src: umamiScript, "data-website-id": umamiSiteID, attrs.Defer: "true"}),
 	)
 
+	// The lightbox is the site's only own script, and loads only where a
+	// gallery is, so a page author cannot forget or misplace it.
+	if holdsGallery(body) {
+		head = append(head, elem.Script(attrs.Props{attrs.Src: static.URL("gallery.js"), attrs.Defer: "true"}))
+	}
+
 	kids := append([]elem.Node{Header(p.Menu, p.Meta.Path)},
 		// display: contents keeps the body's flex column exactly as the old
 		// site laid it out while still marking the main landmark.
