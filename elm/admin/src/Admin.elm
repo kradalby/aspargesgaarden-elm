@@ -33,6 +33,11 @@ type alias Model =
     , url : Url
     , me : Maybe Api.Me
     , page : Page
+
+    -- Counts the pages opened. A reply carries the count of the page that
+    -- asked, so one arriving after she has moved on is dropped instead of
+    -- landing in the next page (and, say, saving over another event).
+    , gen : Int
     , leave : Maybe Url
     , leaving : Bool
     , dirty : Bool
@@ -56,9 +61,9 @@ type Msg
     | GotMe (Result Api.Error Api.Me)
     | StayHere
     | LeaveAnyway
-    | OverviewMsg Overview.Msg
-    | EditorMsg Editor.Msg
-    | GalleryMsg Gallery.Msg
+    | OverviewMsg Int Overview.Msg
+    | EditorMsg Int Editor.Msg
+    | GalleryMsg Int Gallery.Msg
 
 
 main : Program () Model Msg
@@ -77,27 +82,27 @@ init : () -> Url -> Nav.Key -> ( Model, Cmd Msg )
 init _ url key =
     let
         ( page, cmd ) =
-            pageFor (Route.fromUrl url)
+            pageFor 0 (Route.fromUrl url)
     in
-    ( { key = key, url = url, me = Nothing, page = page, leave = Nothing, leaving = False, dirty = False, denied = Nothing }
+    ( { key = key, url = url, me = Nothing, page = page, gen = 0, leave = Nothing, leaving = False, dirty = False, denied = Nothing }
     , Cmd.batch [ cmd, Api.getMe GotMe ]
     )
 
 
-pageFor : Maybe Route -> ( Page, Cmd Msg )
-pageFor route =
+pageFor : Int -> Maybe Route -> ( Page, Cmd Msg )
+pageFor gen route =
     case route of
         Just Route.Overview ->
-            Overview.init |> wrap Overview OverviewMsg
+            Overview.init |> wrap Overview (OverviewMsg gen)
 
         Just Route.NewEvent ->
-            Editor.init Nothing |> wrap Editor EditorMsg
+            Editor.init Nothing |> wrap Editor (EditorMsg gen)
 
         Just (Route.EditEvent id) ->
-            Editor.init (Just id) |> wrap Editor EditorMsg
+            Editor.init (Just id) |> wrap Editor (EditorMsg gen)
 
         Just Route.Gallery ->
-            Gallery.init |> wrap Gallery GalleryMsg
+            Gallery.init |> wrap Gallery (GalleryMsg gen)
 
         Nothing ->
             ( NotFound, Cmd.none )
@@ -208,64 +213,89 @@ update msg model =
                 Nothing ->
                     ( model, Cmd.none )
 
-        ( OverviewMsg sub, Overview m ) ->
-            let
-                ( m2, cmd, out ) =
-                    Overview.update sub m
-            in
-            ( { model | page = Overview m2 }
-            , Cmd.batch
-                [ Cmd.map OverviewMsg cmd
-                , case out of
-                    Just (Overview.Open id) ->
-                        Nav.pushUrl model.key (Route.toString (Route.EditEvent id))
+        ( OverviewMsg gen sub, Overview m ) ->
+            if gen /= model.gen then
+                ( model, Cmd.none )
 
-                    Nothing ->
-                        Cmd.none
-                ]
-            )
+            else
+                overview sub m model
 
-        ( EditorMsg sub, Editor m ) ->
-            let
-                ( m2, cmd, out ) =
-                    Editor.update sub m
-            in
-            ( { model | page = Editor m2 }
-            , Cmd.batch
-                [ Cmd.map EditorMsg cmd
-                , case out of
-                    Just (Editor.Created id) ->
-                        Nav.replaceUrl model.key (Route.toString (Route.EditEvent id))
+        ( EditorMsg gen sub, Editor m ) ->
+            if gen /= model.gen then
+                ( model, Cmd.none )
 
-                    Nothing ->
-                        Cmd.none
-                ]
-            )
+            else
+                editor sub m model
 
-        ( GalleryMsg sub, Gallery m ) ->
-            Gallery.update sub m |> wrap Gallery GalleryMsg |> (\( p, c ) -> ( { model | page = p }, c ))
+        ( GalleryMsg gen sub, Gallery m ) ->
+            if gen /= model.gen then
+                ( model, Cmd.none )
+
+            else
+                Gallery.update sub m |> wrap Gallery (GalleryMsg gen) |> (\( p, c ) -> ( { model | page = p }, c ))
 
         _ ->
             ( model, Cmd.none )
 
 
+overview : Overview.Msg -> Overview.Model -> Model -> ( Model, Cmd Msg )
+overview sub m model =
+    let
+        ( m2, cmd, out ) =
+            Overview.update sub m
+    in
+    ( { model | page = Overview m2 }
+    , Cmd.batch
+        [ Cmd.map (OverviewMsg model.gen) cmd
+        , case out of
+            Just (Overview.Open id) ->
+                Nav.pushUrl model.key (Route.toString (Route.EditEvent id))
+
+            Nothing ->
+                Cmd.none
+        ]
+    )
+
+
+editor : Editor.Msg -> Editor.Model -> Model -> ( Model, Cmd Msg )
+editor sub m model =
+    let
+        ( m2, cmd, out ) =
+            Editor.update sub m
+    in
+    ( { model | page = Editor m2 }
+    , Cmd.batch
+        [ Cmd.map (EditorMsg model.gen) cmd
+        , case out of
+            Just (Editor.Created id) ->
+                Nav.replaceUrl model.key (Route.toString (Route.EditEvent id))
+
+            Nothing ->
+                Cmd.none
+        ]
+    )
+
+
 go : Url -> Maybe Route -> Model -> ( Model, Cmd Msg )
 go url route model =
     let
+        gen =
+            model.gen + 1
+
         ( page, cmd ) =
-            pageFor route
+            pageFor gen route
     in
-    ( { model | url = url, page = page, leaving = False }, cmd )
+    ( { model | url = url, page = page, gen = gen, leaving = False }, cmd )
 
 
 subscriptions : Model -> Sub Msg
 subscriptions model =
     case model.page of
         Editor m ->
-            Sub.map EditorMsg (Editor.subscriptions m)
+            Sub.map (EditorMsg model.gen) (Editor.subscriptions m)
 
         Gallery m ->
-            Sub.map GalleryMsg (Gallery.subscriptions m)
+            Sub.map (GalleryMsg model.gen) (Gallery.subscriptions m)
 
         _ ->
             Sub.none
@@ -298,13 +328,13 @@ view model =
                             ]
 
                     ( Nothing, Overview m ) ->
-                        Html.map OverviewMsg (Overview.view m)
+                        Html.map (OverviewMsg model.gen) (Overview.view m)
 
                     ( Nothing, Editor m ) ->
-                        Html.map EditorMsg (Editor.view m)
+                        Html.map (EditorMsg model.gen) (Editor.view m)
 
                     ( Nothing, Gallery m ) ->
-                        Html.map GalleryMsg (Gallery.view m)
+                        Html.map (GalleryMsg model.gen) (Gallery.view m)
                 ]
             , leaveDialog model
             ]

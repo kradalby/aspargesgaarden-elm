@@ -710,3 +710,39 @@ test("a small gallery photo is said to be shown smaller, calmly", async ({
     page.locator(`[data-photo="${seed.landskap}"] [data-verdict]`),
   ).toHaveCount(0);
 });
+
+// Holds requests to url (a glob) with the method for ms before they go on;
+// answered resolves once the first answer has reached the page.
+async function hold(page, url, ms, method = "POST") {
+  let done;
+  const answered = new Promise((r) => (done = r));
+  await page.route(url, async (route) => {
+    if (route.request().method() !== method) return route.fallback();
+    await new Promise((r) => setTimeout(r, ms));
+    await route.continue();
+    done();
+  });
+  return { answered };
+}
+
+test("a late answer stays with the page that asked", async ({ page, seed }) => {
+  await page.goto(`/admin/arrangementer/${seed.course}`);
+  await expect(page.getByLabel("Tittel")).toHaveValue("Takkebakstkurs");
+  const { answered: late } = await hold(page, "**/unpublish", 1500);
+  await page.getByRole("button", { name: "Gjør om til kladd" }).click();
+  await page
+    .getByRole("link", { name: "Arrangementer", exact: true })
+    .first()
+    .click();
+  await page.getByRole("link", { name: "Nytt arrangement" }).click();
+  await expect(page).toHaveURL(/\/admin\/arrangementer\/ny$/);
+  await late;
+  // The answer would land within a frame or two of reaching the page.
+  await page.waitForTimeout(300);
+  await expect(page).toHaveURL(/\/admin\/arrangementer\/ny$/);
+  await expect(page.getByLabel("Tittel")).toHaveValue("");
+  await expect(page.getByText("Kladd – vises ikke på nettsiden")).toBeVisible();
+  await expect(
+    page.getByText("Arrangementet er gjort om til kladd"),
+  ).toHaveCount(0);
+});
