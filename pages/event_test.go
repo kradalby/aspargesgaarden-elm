@@ -80,4 +80,8 @@ func TestEventCancelled(t *testing.T) {
 	require.Contains(t, got, "Arrangementet er avlyst.")
 	require.NotContains(t, got, "fabnite.com/julemarked")
 	require.Equal(t, 1, strings.Count(got, "Arrangementet er"))
+
+	// Search results show the head, not the page's notice.
+	require.Contains(t, got, "<title>Avlyst: Julemarked på Aspargesgården – 14. november 2026 | Aspargesgården</title>")
+	require.Contains(t, got, `<meta content="Avlyst. 14. november 2026 på Aspargesgården i Tjølling, Larvik: `)
 }

@@ -56,22 +56,31 @@ func Event(s Site, e site.Event, now time.Time) *elem.Element {
 const descriptionRunes = 160
 
 // eventMeta names the event with its first day, since a yearly event keeps
-// its title, and opens the description with when and where.
+// its title, and opens the description with when and where. A cancelled
+// event says so first: search results show these, not the page's notice.
 func eventMeta(s Site, e site.Event, ticketURL string) ui.Meta {
 	m := ui.Meta{
-		Title:       e.Title,
-		Description: seo.Clip(teaser(e), descriptionRunes),
-		Path:        e.Path(),
-		JSONLD:      seo.EventNodes(s.BaseURL, seo.EventInput{Event: e, Description: teaser(e), TicketURL: ticketURL}),
+		Title:  e.Title,
+		Path:   e.Path(),
+		JSONLD: seo.EventNodes(s.BaseURL, seo.EventInput{Event: e, Description: teaser(e), TicketURL: ticketURL}),
 	}
+
+	description := teaser(e)
 
 	// Only a draft in the admin's preview has no date yet.
 	if !e.Start.IsZero() {
 		day := site.NorwegianDate(e.Start)
 		m.Title += " – " + day
-		m.Description = seo.Clip(fmt.Sprintf("%s på %s i %s, %s: %s",
-			day, seo.Venue.Name, seo.Venue.Area, seo.Venue.Municipality, teaser(e)), descriptionRunes)
+		description = fmt.Sprintf("%s på %s i %s, %s: %s",
+			day, seo.Venue.Name, seo.Venue.Area, seo.Venue.Municipality, description)
 	}
+
+	if e.Cancelled {
+		m.Title = "Avlyst: " + m.Title
+		description = "Avlyst. " + description
+	}
+
+	m.Description = seo.Clip(description, descriptionRunes)
 
 	if e.MainPhoto != nil {
 		m.Image, _ = seo.PhotoImage(*e.MainPhoto)
