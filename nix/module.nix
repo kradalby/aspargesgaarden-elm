@@ -109,7 +109,15 @@ in
         "nss-lookup.target"
       ];
 
+      # Photos are built by the vips CLI, looked up on PATH; asparges refuses
+      # to start without it.
+      path = [ (lib.getBin self.packages.${pkgs.stdenv.hostPlatform.system}.vips) ];
+
       serviceConfig = {
+        # vips children count against this: two builds of a large photo plus
+        # the server, with room left for the rest of the host.
+        MemoryMax = lib.mkDefault "2G";
+
         ExecStart = lib.escapeShellArgs (
           [
             (lib.getExe cfg.package)

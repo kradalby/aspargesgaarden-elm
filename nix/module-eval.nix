@@ -74,6 +74,10 @@ assert check (
 assert check (
   custom.EnvironmentFile == "/run/agenix/asparges-env"
 ) "custom EnvironmentFile not set";
+assert check (lib.any (p: lib.hasInfix "-vips-" "${p}")
+  (configFor { enable = true; }).systemd.services.asparges.path
+) "vips must be on the unit's PATH";
+assert check (default.MemoryMax == "2G") "default MemoryMax is ${default.MemoryMax}";
 assert check (
   failedAssertions {
     enable = true;
