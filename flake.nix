@@ -40,28 +40,6 @@
         inherit (pkgs) lib;
         fc = flake-checks.lib;
 
-        # The old elm-pages site stays in the tree as the reference for the
-        # port and the source for the import, until the cleanup phase removes
-        # it. Formatters and linters must leave it exactly as it is.
-        legacy = [
-          "AGENTS.md"
-          "CLAUDE.md"
-          "README.md"
-          "content"
-          "elm-srcs.nix"
-          "elm-tooling.json"
-          "elm.json"
-          "grafikk"
-          "nix/images.nix"
-          "package.json"
-          "plugins"
-          "public"
-          "registry.dat"
-          "src"
-          "tailwind.config.js"
-          "yarn.lock"
-        ];
-
         # static/dist is built here and copied in before go:embed sees it, for
         # the binary and for every Go check. Locally `go generate ./static`
         # runs the same build.sh. Photos are their own derivation so a Go edit
@@ -214,22 +192,14 @@
           # Pulls .elm into the formatting check's source, so elm-format sees
           # the Elm apps once they exist instead of silently checking nothing.
           fmtExts = [ "elm" ];
-          fmtExclude = map (p: ./. + "/${p}") legacy;
           treefmtExtra = {
             programs.elm-format.enable = true;
             # prettier reads .editorconfig and walks past the repo root to find
             # one, so a developer's ~/.editorconfig would restyle files the
             # sandboxed check sees differently. Pin it off.
             settings.formatter.prettier.options = [ "--no-editorconfig" ];
-            # fmtExclude only trims the check's source; `nix fmt` walks the
-            # working tree, so it needs the same paths as treefmt excludes.
             # Golden files are byte-exact renderer output, one tag per line.
-            settings.global.excludes =
-              lib.concatMap (p: [
-                p
-                "${p}/**"
-              ]) legacy
-              ++ [ "**/testdata/**" ];
+            settings.global.excludes = [ "**/testdata/**" ];
           };
         };
 

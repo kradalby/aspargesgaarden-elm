@@ -1,16 +1,9 @@
-# The old elm-pages site (src/, public/, grafikk/, …) stays in the tree until
-# the cleanup phase; its generated and binary files are not hand-edited, so the
-# text fixers must leave them alone.
+# elm2nix output is generated, and registry.dat is binary: the text fixers
+# must leave them alone.
 exclude: |
   (?x)^(
     (.*/)?registry\.dat|
-    (.*/)?elm-srcs\.nix|
-    grafikk/.*|
-    dist/.*|
-    \.elm-pages/.*|
-    (.*/)?elm-stuff/.*|
-    result/.*|
-    \.direnv/.*
+    (.*/)?elm-srcs\.nix
   )$
 
 repos:
@@ -25,10 +18,6 @@ repos:
       - id: check-merge-conflict
       - id: check-added-large-files
         args: [--maxkb=1000]
-        # Full-resolution course photos feed the old site's image pipeline.
-        # The embedded photos' masters in static/photos-src stay under the
-        # limit (2400 px, JPEG Q84), so they need no exception.
-        exclude: ^public/arrangementer/2026-takkebakstkurs-anita-saga-[12]\.jpeg$
       - id: detect-private-key
       - id: mixed-line-ending
 

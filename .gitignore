@@ -1,8 +1,5 @@
 node_modules
 elm-stuff/
-dist/
-.elm-pages/
-functions/render/elm-pages-cli.js
 result
 result-*
 
@@ -11,12 +8,6 @@ result-*
 
 # Local agent settings
 .claude/settings.local.json
-
-# Generated images from process-images script
-*_*w_resize.jpeg
-*.webp
-*.avif
-!/images/testdata/*.webp
 
 # asparges
 /asparges
