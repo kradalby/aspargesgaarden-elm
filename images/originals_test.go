@@ -193,6 +193,47 @@ func TestIntakeCutOffKeepsOthersOriginal(t *testing.T) {
 	require.FileExists(t, s.originalPath(o.SHA256, o.MIME))
 }
 
+// An upload's vips ends with the service, though its request goes on.
+func TestIntakeEndsWithTheService(t *testing.T) {
+	t.Parallel()
+	s := newTestStore(t, newFakeCatalog())
+
+	dir := t.TempDir()
+	started, fifo := filepath.Join(dir, "started"), filepath.Join(dir, "never")
+	require.NoError(t, syscall.Mkfifo(fifo, 0o600))
+
+	mkdir, err := exec.LookPath("mkdir")
+	require.NoError(t, err)
+
+	// A probe that hangs, as a decoder stuck on a crafted file would.
+	script := filepath.Join(dir, "vipsheader")
+	require.NoError(t, os.WriteFile(script, fmt.Appendf(nil,
+		"#!/bin/sh\n%s %s\nread x < %s\n", mkdir, started, fifo), 0o700)) //nolint:gosec // a test's own script
+	s.vips.header = script
+
+	ctx, stop := context.WithCancel(t.Context())
+	run := make(chan error, 1)
+
+	go func() { run <- s.Run(ctx) }()
+
+	f, err := os.Open(fixture(t, "upright.jpg"))
+	require.NoError(t, err)
+	defer f.Close()
+
+	upload := make(chan error, 1)
+
+	go func() {
+		_, err := s.Intake(t.Context(), f)
+		upload <- err
+	}()
+
+	require.Eventually(t, func() bool { return exists(started) }, time.Minute, 10*time.Millisecond)
+
+	stop()
+	require.NoError(t, <-run)
+	require.ErrorIs(t, <-upload, context.Canceled)
+}
+
 // A photo whose original went missing heals when the same file is uploaded
 // again.
 func TestIntakeHealsMissingOriginal(t *testing.T) {

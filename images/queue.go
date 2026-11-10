@@ -128,6 +128,8 @@ func (s *Store) step(ctx context.Context) bool {
 // queues every photo, so sizes lost to a restart, a new pipeline version or
 // a restore without variants/ are built without anyone asking.
 func (s *Store) Run(ctx context.Context) error {
+	defer close(s.stopped)
+
 	photos, err := s.cat.Photos(ctx)
 	if err != nil {
 		s.log.Error("images: list photos to prepare", "err", err)

@@ -32,6 +32,9 @@ type Store struct {
 	maxUpload int64
 	slots     chan struct{} // see jobs
 	builds    atomic.Int64  // group builds started; tests read it
+	// stopped closes when Run returns: an upload's vips must not outlive
+	// the service, whatever its request does.
+	stopped chan struct{}
 
 	mu      sync.Mutex
 	queue   []string // photos for the worker, next first; see Enqueue
@@ -68,6 +71,7 @@ func New(root string, cat Catalog, opts ...Option) (*Store, error) {
 		failed:    map[string]error{},
 		fresh:     map[string]bool{},
 		wake:      make(chan struct{}, 1),
+		stopped:   make(chan struct{}),
 	}
 
 	for _, o := range opts {

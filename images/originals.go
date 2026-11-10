@@ -42,6 +42,17 @@ type Original struct {
 //
 // The caller then writes the photos row.
 func (s *Store) Intake(ctx context.Context, r io.Reader) (Original, error) {
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	go func() {
+		select {
+		case <-s.stopped:
+			cancel()
+		case <-ctx.Done():
+		}
+	}()
+
 	tmp := filepath.Join(s.root, "tmp")
 
 	f, err := os.CreateTemp(tmp, "upload-")
