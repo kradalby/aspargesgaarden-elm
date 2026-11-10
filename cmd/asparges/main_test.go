@@ -200,12 +200,25 @@ func TestEveryServeFlagIsInTheModule(t *testing.T) {
 	}
 	require.NotNil(t, serve)
 
+	// Only the unit's command line counts, and not its comments.
+	start := strings.Index(string(module), "ExecStart = ")
+	require.NotEqual(t, -1, start, "no ExecStart in nix/module.nix")
+	end := strings.Index(string(module)[start:], ");\n")
+	require.NotEqual(t, -1, end, "ExecStart in nix/module.nix does not end in );")
+
+	var execStart strings.Builder
+	for line := range strings.Lines(string(module)[start : start+end]) {
+		if !strings.HasPrefix(strings.TrimSpace(line), "#") {
+			execStart.WriteString(line)
+		}
+	}
+
 	require.NoError(t, serve.Flags.WalkFlags(func(f ff.Flag) error {
 		name, _ := f.GetLongName()
-		rendered := strings.Contains(string(module), `"--`+name+`=`) || strings.Contains(string(module), `"--`+name+`"`)
+		rendered := strings.Contains(execStart.String(), `"--`+name+`=`) || strings.Contains(execStart.String(), `"--`+name+`"`)
 
 		if devOnlyFlags[name] {
-			assert.False(t, rendered, "--%s is dev-only: the module must not pass it", name)
+			assert.NotContains(t, string(module), `"--`+name, "--%s is dev-only: the module must not pass it", name)
 		} else {
 			assert.True(t, rendered, "--%s has no services.asparges option rendered into the unit in nix/module.nix", name)
 		}
