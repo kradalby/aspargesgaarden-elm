@@ -9,6 +9,8 @@ package pages
 import (
 	"github.com/chasefleming/elem-go"
 
+	"github.com/kradalby/asparges/images"
+	"github.com/kradalby/asparges/site"
 	"github.com/kradalby/asparges/ui"
 )
 
@@ -20,17 +22,36 @@ type Site struct {
 	Menu []ui.MenuItem
 }
 
+// photoRef is what ui.Picture needs to show an uploaded photo as kind. A
+// photo without a crop of that kind (too small for it, or not set yet) is
+// shown whole rather than not at all; Intake refuses photos too small for
+// that.
+func photoRef(p site.Photo, kind images.Kind) images.Ref {
+	ref, err := images.RefFor(p.Image(), kind)
+	if err != nil {
+		ref, _ = images.RefFor(p.Image(), images.Full)
+	}
+
+	return ref
+}
+
 func (s Site) page(meta ui.Meta, body ...elem.Node) *elem.Element {
 	return ui.Page(ui.PageProps{BaseURL: s.BaseURL, Meta: meta, Menu: s.Menu}, body...)
 }
 
-// Menu is the main menu. events are the events marked "Vis i menyen"; they
-// follow Arrangementer, where Julemarked has always been.
-func Menu(events ...ui.MenuItem) []ui.MenuItem {
-	return append(append([]ui.MenuItem{
+// Menu is the main menu. events are the entries of events marked "Vis i
+// menyen" (site.Menu); they follow Arrangementer, where Julemarked has
+// always been.
+func Menu(events ...site.MenuEntry) []ui.MenuItem {
+	items := []ui.MenuItem{
 		{Label: "Muligheter", Href: "/lokaler"},
 		{Label: "Arrangementer", Href: "/arrangementer"},
-	}, events...),
+	}
+	for _, e := range events {
+		items = append(items, ui.MenuItem{Label: e.Label, Href: e.Path})
+	}
+
+	return append(items,
 		ui.MenuItem{Label: "Galleri", Href: "/galleri"},
 		ui.MenuItem{Label: "Om gården", Href: "/om-oss"},
 		ui.MenuItem{Label: "Kontakt", Href: "/kontakt"},

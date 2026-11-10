@@ -14,33 +14,48 @@ import (
 	"github.com/stretchr/testify/require"
 	"golang.org/x/net/html"
 
+	"github.com/kradalby/asparges/site"
 	"github.com/kradalby/asparges/static"
 	"github.com/kradalby/asparges/ui"
 )
 
 const testBase = "https://aspargesgaarden.no"
 
-var testSite = Site{BaseURL: testBase, Menu: Menu(ui.MenuItem{Label: "Julemarked", Href: "/julemarked"})}
+var testSite = Site{
+	BaseURL: testBase,
+	Menu:    Menu(site.MenuEntry{Label: "Julemarked", Path: "/arrangementer/2026/julemarked"}),
+}
 
 // rendered is every page this package builds, by address ("404" for NotFound).
 func rendered(t *testing.T) map[string]string {
 	t.Helper()
 
-	out := map[string]string{"404": NotFound(testSite).Render()}
+	out := map[string]string{
+		"404":                    NotFound(testSite).Render(),
+		"/arrangementer":         Events(testSite, testEvents(), testNow).Render(),
+		"/arrangementer (empty)": Events(testSite, nil, testNow).Render(),
+	}
 	for path, page := range Fixed {
 		out[path] = page(testSite).Render()
+	}
+
+	for _, e := range testEvents() {
+		out[e.Path()] = Event(testSite, e, testNow).Render()
 	}
 
 	return out
 }
 
 func TestMenu(t *testing.T) {
-	labels := make([]string, 0, 6)
-	for _, m := range Menu(ui.MenuItem{Label: "Julemarked", Href: "/julemarked"}) {
+	got := Menu(site.MenuEntry{Label: "Julemarked", Path: "/arrangementer/2026/julemarked"})
+
+	labels := make([]string, 0, len(got))
+	for _, m := range got {
 		labels = append(labels, m.Label)
 	}
 
 	require.Equal(t, []string{"Muligheter", "Arrangementer", "Julemarked", "Galleri", "Om gården", "Kontakt"}, labels)
+	require.Equal(t, "/arrangementer/2026/julemarked", got[2].Href)
 	require.Len(t, Menu(), 5)
 }
 

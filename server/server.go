@@ -10,6 +10,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 
 	"github.com/kradalby/asparges/pages"
+	"github.com/kradalby/asparges/site"
 	"github.com/kradalby/asparges/static"
 	"github.com/kradalby/asparges/ui"
 )
@@ -26,7 +27,7 @@ var redirects = map[string]string{
 
 // shortcut: a fixed Julemarked entry keeps today's menu until events carry
 // "Vis i menyen"; then the entries come from the database.
-var menuEvents = []ui.MenuItem{{Label: "Julemarked", Href: "/julemarked"}}
+var menuEvents = []site.MenuEntry{{Label: "Julemarked", Path: "/julemarked"}}
 
 // Public returns the handler for the local listener. In production nginx
 // exposes that listener to the internet, so it must only carry public pages;
