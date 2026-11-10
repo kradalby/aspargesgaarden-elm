@@ -17,7 +17,7 @@ func EventCards(items ...EventItem) elem.Node {
 
 		kids := []elem.Node{
 			PhotoCredit(it.By, hiddenLink(it.Href, pic)),
-			elem.H3(attrs.Props{attrs.Class: "pt-2 font-display text-xl text-tre"},
+			elem.H3(attrs.Props{attrs.Class: "pt-2 font-display text-xl text-tre break-words hyphens-auto"},
 				elem.A(attrs.Props{attrs.Href: it.Href, attrs.Class: "hover:text-rust"}, elem.Text(it.Title))),
 			elem.P(attrs.Props{attrs.Class: "text-sm text-brown-text"}, elem.Text(it.Date)),
 		}
