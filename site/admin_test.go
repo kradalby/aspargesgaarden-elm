@@ -79,6 +79,74 @@ func TestStoreEventSavesPhotoMeta(t *testing.T) {
 	require.Equal(t, FieldError{Field: FieldExtraPhotos, PhotoID: extra.ID}, FieldError{Field: fe.Field, PhotoID: fe.PhotoID})
 }
 
+// Events share photos after "Lag kopi". Saving one must not undo a
+// description written in the other since the editor loaded hers: the photo
+// carries the version she saw, as the event does.
+func TestStoreEventKeepsPhotoEditsMadeElsewhere(t *testing.T) {
+	s, clock := newTestStore(t, oslo("2026-10-10 12:00"))
+	ctx := t.Context()
+
+	shared := addPhoto(t, s, 'a', "Boder")
+	a, err := s.CreateEvent(ctx, Event{Title: "Julemarked", MainPhoto: &shared})
+	require.NoError(t, err)
+	b, err := s.CopyEvent(ctx, a.ID)
+	require.NoError(t, err)
+
+	// A's editor describes the photo better.
+	clock.t = clock.t.Add(time.Minute)
+	a.MainPhoto.Alt = "Boder med julepynt i låven"
+	a, err = s.UpdateEvent(ctx, a, a.UpdatedAt)
+	require.NoError(t, err)
+
+	// B's editor, who loaded before that, saves her own change.
+	clock.t = clock.t.Add(time.Minute)
+	b.Summary = "Neste års marked."
+	_, err = s.UpdateEvent(ctx, b, b.UpdatedAt)
+	require.ErrorIs(t, err, ErrStale)
+
+	var fe *FieldError
+	require.ErrorAs(t, err, &fe)
+	require.Equal(t, FieldError{Field: FieldMainPhoto, PhotoID: shared.ID}, FieldError{Field: fe.Field, PhotoID: fe.PhotoID})
+
+	got, err := s.Photo(ctx, shared.ID)
+	require.NoError(t, err)
+	require.Equal(t, "Boder med julepynt i låven", got.Alt, "a stale save writes nothing")
+
+	// Loaded afresh, the save goes through and keeps the new description.
+	b, err = s.Event(ctx, b.ID)
+	require.NoError(t, err)
+	b.Summary = "Neste års marked."
+	_, err = s.UpdateEvent(ctx, b, b.UpdatedAt)
+	require.NoError(t, err)
+
+	got, err = s.Photo(ctx, shared.ID)
+	require.NoError(t, err)
+	require.Equal(t, "Boder med julepynt i låven", got.Alt)
+
+	// "Keep mine" sends hers again with the photo's current version.
+	clock.t = clock.t.Add(time.Minute)
+	b, err = s.Event(ctx, b.ID)
+	require.NoError(t, err)
+	b.MainPhoto.Alt = "Boder"
+	b, err = s.UpdateEvent(ctx, b, b.UpdatedAt)
+	require.NoError(t, err)
+	require.Equal(t, "Boder", b.MainPhoto.Alt)
+
+	// A photo that is sent as stored is not a change, whatever its version.
+	a.Summary = "Velkommen."
+	a.MainPhoto.Alt = "Boder"
+	_, err = s.UpdateEvent(ctx, a, a.UpdatedAt)
+	require.NoError(t, err)
+
+	// A caller that does not know the version (an older app) is not checked.
+	clock.t = clock.t.Add(time.Minute)
+	a, err = s.Event(ctx, a.ID)
+	require.NoError(t, err)
+	a.MainPhoto.Alt, a.MainPhoto.UpdatedAt = "Låven", time.Time{}
+	_, err = s.UpdateEvent(ctx, a, a.UpdatedAt)
+	require.NoError(t, err)
+}
+
 func TestStoreSetCrops(t *testing.T) {
 	s, _ := newTestStore(t, oslo("2026-10-10 12:00"))
 	ctx := t.Context()

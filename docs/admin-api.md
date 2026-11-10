@@ -52,37 +52,37 @@ Any `4xx`/`5xx` from `/admin/api/` has this body:
 - The app owns the Norwegian text, so the server never sends user-facing
   text. A server may add `"detail": "<english>"` for logs; the app ignores it.
 
-| `code`                                                                     | Status      | `site` error           | `field`                              | Notes                                                                                                                                                      |
-| -------------------------------------------------------------------------- | ----------- | ---------------------- | ------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `bad_request`                                                              | 400         | —                      | —                                    | Body is not valid JSON, has the wrong types, or came without `Content-Type: application/json`.                                                             |
-| `forbidden`                                                                | 403         | —                      | —                                    | The caller has no identity on the tailnet, or no grant of the capability. The app says she lacks access and whom to ask.                                   |
-| `wrong_host`                                                               | 403         | —                      | —                                    | The request's `Host` is not this node (in `--dev`: not loopback). Guards against a rebound DNS name.                                                       |
-| `cross_origin`                                                             | 403         | —                      | —                                    | A write from another origin.                                                                                                                               |
-| `not_found`                                                                | 404         | `ErrNotFound`          | —                                    | Event or photo id unknown. On an event save, a photo id that does not exist is also `not_found` with `field` = `mainPhoto` or `extraPhotos` and `photoId`. |
-| `conflict`                                                                 | 409         | `ErrStale`             | —                                    | `updatedAt` precondition failed (also an empty or unreadable one), see [Two editors](#two-editors).                                                        |
-| `invalid_date`                                                             | 422         | `ErrInvalidDate`       | `start`, `end` or `extraDates`       |                                                                                                                                                            |
-| `invalid_time`                                                             | 422         | `ErrInvalidTime`       | `startTime` or `endTime`             | The server checks the two times one by one so it knows which.                                                                                              |
-| `slug_invalid`                                                             | 422         | `ErrSlugInvalid`       | `slug`                               |                                                                                                                                                            |
-| `slug_reserved`                                                            | 422         | `ErrSlugReserved`      | `slug`                               |                                                                                                                                                            |
-| `slug_taken`                                                               | 422         | `ErrSlugTaken`         | `slug`                               |                                                                                                                                                            |
-| `slug_frozen`                                                              | 422         | `ErrSlugFrozen`        | `slug`                               |                                                                                                                                                            |
-| `end_before_start`                                                         | 422         | `ErrEndBeforeStart`    | `end` or `endTime`                   | `end` when the last day is before the first; `endTime` when a one-day event ends before it starts.                                                         |
-| `extra_date`                                                               | 422         | `ErrExtraDate`         | `extraDates`                         |                                                                                                                                                            |
-| `ticket_url`                                                               | 422         | `ErrTicketURL`         | `ticketUrl`                          |                                                                                                                                                            |
-| `title_required`                                                           | 422         | `ErrTitleRequired`     | `title`                              |                                                                                                                                                            |
-| `start_required`                                                           | 422         | `ErrStartRequired`     | `start`                              |                                                                                                                                                            |
-| `main_photo_required`                                                      | 422         | `ErrMainPhotoRequired` | `mainPhoto`                          |                                                                                                                                                            |
-| `alt_required`                                                             | 422         | `ErrAltRequired`       | `mainPhoto`, `extraPhotos` or `alt`  | With `photoId`. One entry per photo. `alt` on the photo route.                                                                                             |
-| `duplicate_photo`                                                          | 422         | `ErrDuplicatePhoto`    | `mainPhoto`, `extraPhotos` or —      | With `photoId`. No field for the gallery.                                                                                                                  |
-| `photographer_name_required`                                               | 422         | `ErrPhotographerName`  | `name`                               | Empty name on a photographer create or update.                                                                                                             |
-| `photographer_name_taken`                                                  | 409         | `ErrPhotographerTaken` | `name`                               | Another photographer has that name. Body also has `existing`: that Photographer, so the app can pick it instead.                                           |
-| `photographer_url`                                                         | 422         | `ErrPhotographerURL`   | `url`                                | A non-empty link that is not an `http`/`https` address with a host (same rule as `ticket_url`).                                                            |
-| `photo_in_use`                                                             | 409         | `ErrPhotoInUse`        | —                                    | Body also has `usedBy`, see [Delete a photo](#delete-a-photo).                                                                                             |
-| `crop_kind`                                                                | 422         | (images/)              | the kind                             |                                                                                                                                                            |
-| `crop_outside`                                                             | 422         | (images/)              | the kind (`card`, `banner`, `share`) |                                                                                                                                                            |
-| `crop_aspect`                                                              | 422         | (images/)              | the kind                             | `\|h − w/aspect\|` over max(2 px, 1 % of `w/aspect`).                                                                                                      |
-| `crop_too_small`                                                           | 422         | (images/)              | the kind                             | Narrower than the kind's minimum, see [Crops](#crops).                                                                                                     |
-| `too_large`, `unsupported_type`, `damaged`, `too_small`, `too_many_pixels` | 413/415/422 | (images/)              | —                                    | Upload only, see [Photos](#photos).                                                                                                                        |
+| `code`                                                                     | Status      | `site` error           | `field`                              | Notes                                                                                                                                                                                        |
+| -------------------------------------------------------------------------- | ----------- | ---------------------- | ------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `bad_request`                                                              | 400         | —                      | — or `mainPhoto`/`extraPhotos`       | Body is not valid JSON, has the wrong types, or came without `Content-Type: application/json`. With `field` and `photoId`: that photo reference has an `updatedAt` that is no RFC 3339 time. |
+| `forbidden`                                                                | 403         | —                      | —                                    | The caller has no identity on the tailnet, or no grant of the capability. The app says she lacks access and whom to ask.                                                                     |
+| `wrong_host`                                                               | 403         | —                      | —                                    | The request's `Host` is not this node (in `--dev`: not loopback). Guards against a rebound DNS name.                                                                                         |
+| `cross_origin`                                                             | 403         | —                      | —                                    | A write from another origin.                                                                                                                                                                 |
+| `not_found`                                                                | 404         | `ErrNotFound`          | —                                    | Event or photo id unknown. On an event save, a photo id that does not exist is also `not_found` with `field` = `mainPhoto` or `extraPhotos` and `photoId`.                                   |
+| `conflict`                                                                 | 409         | `ErrStale`             | — or `mainPhoto`/`extraPhotos`       | `updatedAt` precondition failed (also an empty or unreadable one), see [Two editors](#two-editors). With `field` and `photoId`: that photo changed since the form loaded it.                 |
+| `invalid_date`                                                             | 422         | `ErrInvalidDate`       | `start`, `end` or `extraDates`       |                                                                                                                                                                                              |
+| `invalid_time`                                                             | 422         | `ErrInvalidTime`       | `startTime` or `endTime`             | The server checks the two times one by one so it knows which.                                                                                                                                |
+| `slug_invalid`                                                             | 422         | `ErrSlugInvalid`       | `slug`                               |                                                                                                                                                                                              |
+| `slug_reserved`                                                            | 422         | `ErrSlugReserved`      | `slug`                               |                                                                                                                                                                                              |
+| `slug_taken`                                                               | 422         | `ErrSlugTaken`         | `slug`                               |                                                                                                                                                                                              |
+| `slug_frozen`                                                              | 422         | `ErrSlugFrozen`        | `slug`                               |                                                                                                                                                                                              |
+| `end_before_start`                                                         | 422         | `ErrEndBeforeStart`    | `end` or `endTime`                   | `end` when the last day is before the first; `endTime` when a one-day event ends before it starts.                                                                                           |
+| `extra_date`                                                               | 422         | `ErrExtraDate`         | `extraDates`                         |                                                                                                                                                                                              |
+| `ticket_url`                                                               | 422         | `ErrTicketURL`         | `ticketUrl`                          |                                                                                                                                                                                              |
+| `title_required`                                                           | 422         | `ErrTitleRequired`     | `title`                              |                                                                                                                                                                                              |
+| `start_required`                                                           | 422         | `ErrStartRequired`     | `start`                              |                                                                                                                                                                                              |
+| `main_photo_required`                                                      | 422         | `ErrMainPhotoRequired` | `mainPhoto`                          |                                                                                                                                                                                              |
+| `alt_required`                                                             | 422         | `ErrAltRequired`       | `mainPhoto`, `extraPhotos` or `alt`  | With `photoId`. One entry per photo. `alt` on the photo route.                                                                                                                               |
+| `duplicate_photo`                                                          | 422         | `ErrDuplicatePhoto`    | `mainPhoto`, `extraPhotos` or —      | With `photoId`. No field for the gallery.                                                                                                                                                    |
+| `photographer_name_required`                                               | 422         | `ErrPhotographerName`  | `name`                               | Empty name on a photographer create or update.                                                                                                                                               |
+| `photographer_name_taken`                                                  | 409         | `ErrPhotographerTaken` | `name`                               | Another photographer has that name. Body also has `existing`: that Photographer, so the app can pick it instead.                                                                             |
+| `photographer_url`                                                         | 422         | `ErrPhotographerURL`   | `url`                                | A non-empty link that is not an `http`/`https` address with a host (same rule as `ticket_url`).                                                                                              |
+| `photo_in_use`                                                             | 409         | `ErrPhotoInUse`        | —                                    | Body also has `usedBy`, see [Delete a photo](#delete-a-photo).                                                                                                                               |
+| `crop_kind`                                                                | 422         | (images/)              | the kind                             |                                                                                                                                                                                              |
+| `crop_outside`                                                             | 422         | (images/)              | the kind (`card`, `banner`, `share`) |                                                                                                                                                                                              |
+| `crop_aspect`                                                              | 422         | (images/)              | the kind                             | `\|h − w/aspect\|` over max(2 px, 1 % of `w/aspect`).                                                                                                                                        |
+| `crop_too_small`                                                           | 422         | (images/)              | the kind                             | Narrower than the kind's minimum, see [Crops](#crops).                                                                                                                                       |
+| `too_large`, `unsupported_type`, `damaged`, `too_small`, `too_many_pixels` | 413/415/422 | (images/)              | —                                    | Upload only, see [Photos](#photos).                                                                                                                                                          |
 
 Any other `code` is shown as a generic "something went wrong" message, so the
 server may add codes without breaking the app.
@@ -111,7 +111,8 @@ server may add codes without breaking the app.
     "share": { "minWidth": 1200, "sharpWidth": 1200, "soft": false },
     "full": { "minWidth": 480, "sharpWidth": 992, "soft": false }
   },
-  "status": PhotoStatus
+  "status": PhotoStatus,
+  "updatedAt": "2026-11-10T09:12:44Z"
 }
 ```
 
@@ -138,6 +139,11 @@ server may add codes without breaking the app.
   `share` without a crop is never soft: the link preview then uses the
   banner. Soft never blocks anything; the app warns (for `full`: the photo is
   only shown smaller when opened large).
+- `updatedAt`: the photo's version, a token like an event's. It changes with
+  every change to the photo: its description or credit, a crop, its
+  photographer's name or link, an upload of the same bytes again, and its
+  release from the last event or gallery that used it. Every answer that
+  carries a Photo carries its current `updatedAt`.
 
 ### PhotoStatus
 
@@ -255,8 +261,20 @@ photos as references:
   "showInMenu": false,
   "menuLabel": "",
   "cancelled": false,
-  "mainPhoto": { "id": 12, "alt": "Låven pyntet til jul", "photographerId": 3 },
-  "extraPhotos": [{ "id": 13, "alt": "Boder i fjøset", "photographerId": null }]
+  "mainPhoto": {
+    "id": 12,
+    "alt": "Låven pyntet til jul",
+    "photographerId": 3,
+    "updatedAt": "2026-11-10T09:12:44Z"
+  },
+  "extraPhotos": [
+    {
+      "id": 13,
+      "alt": "Boder i fjøset",
+      "photographerId": null,
+      "updatedAt": "2026-11-09T17:02:10Z"
+    }
+  ]
 }
 ```
 
@@ -272,6 +290,16 @@ photos as references:
   not part of this body; they are saved on their own (see [Crops](#crops)).
   Photographers themselves are created and corrected through their own
   routes, never through an event save.
+- A photo reference's `updatedAt` is the Photo's `updatedAt` as the form
+  last got it (from the event, an upload, a crop save or a conflict). Events
+  share photos (a copy shows the original's), so a save whose `alt` or
+  `photographerId` differs from what is stored, for a photo changed since
+  that version, is refused with `409 conflict` for that photo (see
+  [Two editors](#two-editors)) instead of undoing the other change unseen.
+  A photo sent as stored is never a conflict. Leaving `updatedAt` out (or
+  `""`) skips the check, as older apps do; anything else that is not an
+  RFC 3339 time is `400 bad_request` with `field` and `photoId`. Preview
+  ignores it.
 - Text fields are stored as sent, except that the server trims surrounding
   whitespace from `title`, `slug`, `ticketUrl`, `menuLabel` and `priceText`.
 
@@ -341,13 +369,32 @@ stored `updatedAt` differs, nothing is written and the answer is:
 `409`
 
 ```json
-{ "errors": [{ "code": "conflict" }], "current": Event }
+{ "errors": [{ "code": "conflict" }], "current": Event, "photos": [] }
 ```
 
 The app keeps the user's form, says that someone else has saved changes, and
 offers two buttons: keep mine (resend with `current.updatedAt`) or take
 theirs (load `current`). `copy` and `DELETE` need no precondition: a copy
 reads the stored event, and a delete is confirmed by the user.
+
+A save can also conflict on a photo it refers to (see
+[EventInput](#eventinput)): the photo's description or credit was changed
+elsewhere (another event that shows it, or the gallery) since the form
+loaded it. Each such photo is one entry with `field` and `photoId`, and
+`photos` holds them as stored now:
+
+```json
+{
+  "errors": [{ "code": "conflict", "field": "mainPhoto", "photoId": 12 }],
+  "current": Event,
+  "photos": [Photo]
+}
+```
+
+Keep mine resends with each photo's `updatedAt` from `photos`; take theirs
+takes `alt` and `photographer` from there. `photos` is `[]` when only the
+event itself conflicts. The event is checked first, so a save stale on both
+reports the event, and the photo on the next try.
 
 ### Preview
 

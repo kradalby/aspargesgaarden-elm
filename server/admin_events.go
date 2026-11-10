@@ -4,6 +4,7 @@ import (
 	"cmp"
 	"context"
 	"errors"
+	"fmt"
 	"net/http"
 	"slices"
 	"strings"
@@ -108,6 +109,8 @@ type photoRefJSON struct {
 	ID             int64  `json:"id"`
 	Alt            string `json:"alt"`
 	PhotographerID *int64 `json:"photographerId"`
+	// UpdatedAt is the photo's version the form loaded; "" skips the check.
+	UpdatedAt string `json:"updatedAt"`
 }
 
 // eventInput is the form: an event's editable fields, photos by reference.
@@ -180,7 +183,14 @@ func (s *Server) toEvent(ctx context.Context, in eventInput, strict bool) (site.
 			return site.Photo{}, false
 		}
 
-		p.Alt, p.Photographer = ref.Alt, nil
+		p.Alt, p.Photographer, p.UpdatedAt = ref.Alt, nil, time.Time{}
+
+		if strict && ref.UpdatedAt != "" {
+			if p.UpdatedAt, err = time.Parse(time.RFC3339, ref.UpdatedAt); err != nil {
+				errs = append(errs, &site.FieldError{Field: f, PhotoID: ref.ID, Err: fmt.Errorf("%w: updatedAt %q", errBadRequest, ref.UpdatedAt)})
+				return site.Photo{}, false
+			}
+		}
 
 		if ref.PhotographerID != nil {
 			ph, err := s.cfg.Store.Photographer(ctx, *ref.PhotographerID)
@@ -361,7 +371,10 @@ func (s *Server) eventWritten(w http.ResponseWriter, r *http.Request, e site.Eve
 			return
 		}
 
-		s.apiFail(w, r, err, map[string]any{"current": s.eventJSON(r.Context(), current)})
+		s.apiFail(w, r, err, map[string]any{
+			"current": s.eventJSON(r.Context(), current),
+			"photos":  s.stalePhotos(r.Context(), err),
+		})
 
 		return
 	}
@@ -386,6 +399,26 @@ func (s *Server) eventWritten(w http.ResponseWriter, r *http.Request, e site.Eve
 	s.Changed(shas...)
 	s.audit(r, action, "event", e.ID, "title", e.Title, "status", e.Status)
 	s.writeJSON(w, r, http.StatusOK, s.eventJSON(r.Context(), e))
+}
+
+// stalePhotos is each photo a conflict names, as stored now: the form's
+// version of it is older, so "keep mine" needs its updatedAt and "take
+// theirs" its description.
+func (s *Server) stalePhotos(ctx context.Context, err error) []photoJSON {
+	out := []photoJSON{}
+
+	for _, leaf := range leaves(err) {
+		var fe *site.FieldError
+		if !errors.Is(leaf, site.ErrStale) || !errors.As(leaf, &fe) || fe.PhotoID == 0 {
+			continue
+		}
+
+		if p, err := s.cfg.Store.Photo(ctx, fe.PhotoID); err == nil {
+			out = append(out, s.photoJSON(ctx, p))
+		}
+	}
+
+	return out
 }
 
 func (s *Server) copyEvent(w http.ResponseWriter, r *http.Request, src site.Event) {

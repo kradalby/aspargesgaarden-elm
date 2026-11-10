@@ -336,4 +336,63 @@ func TestAdminEventConflict(t *testing.T) {
 	require.Equal(t, "Kr 100,-", decode[eventJSON](t, rec).PriceText)
 }
 
+// A copy shares its photos with the original. A form that loaded a photo
+// before someone described it in the other event gets a conflict naming the
+// photo, not a silent revert; an app that sends no version is not checked.
+func TestAdminEventPhotoConflict(t *testing.T) {
+	a := newAdmin(t, false)
+	main := a.storedPhoto(t, 'a')
+
+	orig := decode[eventJSON](t, a.do(t, "POST", "/admin/api/events", req{body: julemarked(main)}))
+	cp := decode[eventJSON](t, a.do(t, "POST", "/admin/api/events/"+itoa(orig.ID)+"/copy", req{}))
+	loaded := cp.MainPhoto.UpdatedAt
+	require.NotEmpty(t, loaded)
+
+	a.clock.set(a.clock.now().Add(time.Second))
+
+	theirs := julemarked(main)
+	theirs["updatedAt"] = orig.UpdatedAt
+	theirs["mainPhoto"] = map[string]any{"id": main.ID, "alt": "Boder med julepynt", "photographerId": nil, "updatedAt": loaded}
+	rec := a.do(t, "PUT", "/admin/api/events/"+itoa(orig.ID), req{body: theirs})
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+	described := decode[eventJSON](t, rec).MainPhoto
+
+	a.clock.set(a.clock.now().Add(time.Second))
+
+	mine := julemarked(main)
+	mine["updatedAt"], mine["start"], mine["end"] = cp.UpdatedAt, "2027-11-13", "2027-11-14"
+	mine["mainPhoto"] = map[string]any{"id": main.ID, "alt": "Boder i låven", "photographerId": nil, "updatedAt": loaded}
+	rec = a.do(t, "PUT", "/admin/api/events/"+itoa(cp.ID), req{body: mine})
+	require.Equal(t, http.StatusConflict, rec.Code, rec.Body.String())
+
+	got := decode[struct {
+		Errors  []problem   `json:"errors"`
+		Current eventJSON   `json:"current"`
+		Photos  []photoJSON `json:"photos"`
+	}](t, rec)
+	require.Equal(t, []problem{{Code: "conflict", Field: "mainPhoto", PhotoID: main.ID}}, got.Errors)
+	require.Equal(t, cp.ID, got.Current.ID)
+	require.Equal(t, []photoJSON{*described}, got.Photos)
+
+	// Keep mine: the photo's version from the conflict.
+	mine["mainPhoto"].(map[string]any)["updatedAt"] = got.Photos[0].UpdatedAt
+	rec = a.do(t, "PUT", "/admin/api/events/"+itoa(cp.ID), req{body: mine})
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+	require.Equal(t, "Boder i låven", decode[eventJSON](t, rec).MainPhoto.Alt)
+
+	// An app that does not send the version saves as before.
+	a.clock.set(a.clock.now().Add(time.Second))
+	cp = decode[eventJSON](t, a.do(t, "GET", "/admin/api/events/"+itoa(cp.ID), req{}))
+	old := julemarked(main)
+	old["updatedAt"], old["start"], old["end"] = cp.UpdatedAt, "2027-11-13", "2027-11-14"
+	rec = a.do(t, "PUT", "/admin/api/events/"+itoa(cp.ID), req{body: old})
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+
+	// A version that is no time is a malformed body.
+	mine["updatedAt"] = decode[eventJSON](t, rec).UpdatedAt
+	mine["mainPhoto"].(map[string]any)["updatedAt"] = "igår"
+	rec = a.do(t, "PUT", "/admin/api/events/"+itoa(cp.ID), req{body: mine})
+	require.Equal(t, []problem{{Code: "bad_request", Field: "mainPhoto", PhotoID: main.ID}}, errorsOf(t, rec))
+}
+
 func itoa(id int64) string { return strconv.FormatInt(id, 10) }

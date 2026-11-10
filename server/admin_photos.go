@@ -54,6 +54,7 @@ type photoJSON struct {
 	Crops        map[string]rectJSON    `json:"crops"`
 	Quality      map[string]qualityJSON `json:"quality"`
 	Status       statusJSON             `json:"status"`
+	UpdatedAt    string                 `json:"updatedAt"`
 }
 
 // qualityJSON is the sharpness rule of one kind, and how this photo fares.
@@ -95,6 +96,7 @@ func (s *Server) photoJSON(ctx context.Context, p site.Photo) photoJSON {
 		Crops:      map[string]rectJSON{},
 		Quality:    quality(p),
 		Status:     s.photoStatus(ctx, p.SHA256),
+		UpdatedAt:  stamp(p.UpdatedAt),
 	}
 
 	if p.Photographer != nil {

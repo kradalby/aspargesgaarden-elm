@@ -297,6 +297,10 @@ func writeEventChildren(ctx context.Context, q *dbsqlc.Queries, id int64, e Even
 
 // writePhotoMeta stores the alt text and credit the event form edits with
 // it. An unchanged photo is left alone, so its pages' lastmod stays put.
+// p.UpdatedAt is the version of the photo the editor loaded: events share
+// photos, and if it was changed since, writing hers would undo that change
+// unseen, so the save fails with ErrStale. Zero (a caller that does not
+// know) skips the check.
 func writePhotoMeta(ctx context.Context, q *dbsqlc.Queries, e Event, p Photo) error {
 	row, err := q.GetPhoto(ctx, p.ID)
 	if err != nil {
@@ -306,6 +310,12 @@ func writePhotoMeta(ctx context.Context, q *dbsqlc.Queries, e Event, p Photo) er
 	ref := photographerRef(p.Photographer)
 	if row.Alt == p.Alt && row.PhotographerID == ref {
 		return nil
+	}
+
+	// shortcut: whole seconds, as for events (modify).
+	if !p.UpdatedAt.IsZero() && row.UpdatedAt != p.UpdatedAt.Unix() {
+		return e.photoErr(p.ID, fmt.Errorf("saved at %s, editor has %s: %w",
+			fromUnix(row.UpdatedAt).Format(time.RFC3339), p.UpdatedAt.UTC().Format(time.RFC3339), ErrStale))
 	}
 
 	_, err = q.UpdatePhotoMeta(ctx, dbsqlc.UpdatePhotoMetaParams{

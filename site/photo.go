@@ -59,6 +59,8 @@ type Photo struct {
 	// falls back to a centred crop.
 	Crops     map[images.Kind]images.Rect
 	CreatedAt time.Time
+	// UpdatedAt is the last change. In an event being saved it is the
+	// version the editor loaded; see writePhotoMeta.
 	UpdatedAt time.Time
 }
 
