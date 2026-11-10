@@ -41,6 +41,7 @@ let
     hostname = "asparges-beta";
     listenAddr = "127.0.0.1:9000";
     baseURL = "https://beta.aspargesgaarden.no";
+    noindex = true;
     tailscaleKeyPath = "/run/agenix/asparges-tskey";
     environmentFile = "/run/agenix/asparges-env";
   };
@@ -57,6 +58,11 @@ assert check (
 assert check (
   !lib.hasInfix "--tailscale-auth-key-path" default.ExecStart && !(default ? LoadCredential)
 ) "default must not wire an auth key credential: ${default.ExecStart}";
+assert check (
+  !lib.hasInfix "--noindex" default.ExecStart
+) "the default must be indexable: ${default.ExecStart}";
+assert check (lib.hasInfix "--noindex" custom.ExecStart)
+  "custom ExecStart missing noindex: ${custom.ExecStart}";
 assert check (lib.hasInfix "--hostname=asparges-beta" custom.ExecStart)
   "custom ExecStart missing hostname: ${custom.ExecStart}";
 assert check (lib.hasInfix "--listen-addr=127.0.0.1:9000" custom.ExecStart)

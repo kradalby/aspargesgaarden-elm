@@ -6,6 +6,8 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/peterbourgon/ff/v4"
 	"github.com/stretchr/testify/require"
+
+	"github.com/kradalby/asparges/seo"
 )
 
 func TestServeFlags(t *testing.T) {
@@ -63,6 +65,12 @@ func TestServeFlags(t *testing.T) {
 			env:  map[string]string{"ASPARGES_HOSTNAME": "env"},
 			want: func(c *serveConfig) { c.hostname = "flag" },
 		},
+		{
+			name: "noindex",
+			args: []string{"serve"},
+			env:  map[string]string{"ASPARGES_NOINDEX": "true"},
+			want: func(c *serveConfig) { c.noindex = true },
+		},
 	}
 
 	for _, tt := range tests {
@@ -84,6 +92,13 @@ func TestServeFlags(t *testing.T) {
 			}
 		})
 	}
+}
+
+// Search engines hear of changes only from the real site.
+func TestIndexNowEndpoint(t *testing.T) {
+	require.Equal(t, seo.IndexNowEndpoint, serveConfig{}.indexNowEndpoint())
+	require.Empty(t, serveConfig{dev: true}.indexNowEndpoint())
+	require.Empty(t, serveConfig{noindex: true}.indexNowEndpoint())
 }
 
 func TestServeConfigValidate(t *testing.T) {

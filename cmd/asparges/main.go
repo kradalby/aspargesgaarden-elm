@@ -27,6 +27,7 @@ import (
 
 	"github.com/kradalby/asparges/db"
 	"github.com/kradalby/asparges/images"
+	"github.com/kradalby/asparges/seo"
 	"github.com/kradalby/asparges/server"
 	"github.com/kradalby/asparges/site"
 )
@@ -76,6 +77,7 @@ type serveConfig struct {
 	baseURL     string
 	authKeyPath string
 	dev         bool
+	noindex     bool
 }
 
 func newRootCmd(a *app) *ff.Command {
@@ -99,6 +101,7 @@ func newServeCmd(a *app, parent *ff.FlagSet) *ff.Command {
 	fs.StringVar(&cfg.baseURL, 0, "base-url", "https://aspargesgaarden.no", "public origin used for absolute links, without a trailing slash")
 	fs.StringVar(&cfg.authKeyPath, 0, "tailscale-auth-key-path", "", "file holding the Tailscale auth key (TS_AUTHKEY takes precedence)")
 	fs.BoolVar(&cfg.dev, 0, "dev", "local development: no Tailscale, metrics on the loopback-only local listener")
+	fs.BoolVar(&cfg.noindex, 0, "noindex", "keep the site out of search engines (beta): noindex on every response, robots.txt disallows all, no IndexNow")
 
 	return &ff.Command{
 		Name:      "serve",
@@ -133,6 +136,16 @@ func (c serveConfig) validate() error {
 	}
 
 	return nil
+}
+
+// indexNowEndpoint is where page changes are announced: nowhere from a
+// laptop or from the beta site, which must stay out of search engines.
+func (c serveConfig) indexNowEndpoint() string {
+	if c.dev || c.noindex {
+		return ""
+	}
+
+	return seo.IndexNowEndpoint
 }
 
 func isLoopback(hostport string) bool {
@@ -183,19 +196,28 @@ func serve(ctx context.Context, log *slog.Logger, cfg serveConfig) error {
 		return fmt.Errorf("photo store: %w", err)
 	}
 
+	key, err := store.IndexNowKey(ctx)
+	if err != nil {
+		return err
+	}
+
 	public := server.New(server.Config{
-		BaseURL: cfg.baseURL,
-		Dev:     cfg.dev,
-		Store:   store,
-		Images:  imgs,
-		Now:     time.Now,
-		Log:     log,
+		BaseURL:          cfg.baseURL,
+		Dev:              cfg.dev,
+		Store:            store,
+		Images:           imgs,
+		Now:              time.Now,
+		Log:              log,
+		NoIndex:          cfg.noindex,
+		IndexNowKey:      key,
+		IndexNowEndpoint: cfg.indexNowEndpoint(),
 	})
 	srv.Handle("/", public.Public())
 
 	g, ctx := errgroup.WithContext(ctx)
 	g.Go(func() error { return srv.ListenAndServe(ctx) })
 	g.Go(func() error { return imgs.Run(ctx) })
+	g.Go(func() error { return public.Run(ctx) })
 
 	return g.Wait()
 }

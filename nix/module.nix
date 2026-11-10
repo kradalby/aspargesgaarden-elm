@@ -63,6 +63,16 @@ in
       description = "Public origin used for absolute links, without a trailing slash.";
     };
 
+    noindex = lib.mkOption {
+      type = lib.types.bool;
+      default = false;
+      description = ''
+        Keep the site out of search engines, for the beta site: every response
+        carries X-Robots-Tag: noindex, robots.txt disallows everything and no
+        IndexNow pings are sent. Turn off at cutover.
+      '';
+    };
+
     tailscaleKeyPath = lib.mkOption {
       type = lib.types.nullOr lib.types.str;
       default = null;
@@ -129,6 +139,7 @@ in
           ]
           # systemd expands %d inside the quoted argument.
           ++ lib.optional (cfg.tailscaleKeyPath != null) "--tailscale-auth-key-path=%d/tskey"
+          ++ lib.optional cfg.noindex "--noindex"
         );
 
         User = cfg.user;
