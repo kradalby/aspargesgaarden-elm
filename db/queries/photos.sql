@@ -70,11 +70,20 @@ ORDER BY events.id;
 DELETE FROM gallery_photos WHERE photo_id = ?;
 
 -- name: DeleteUnusedPhotos :many
--- Uploads no event or gallery took up, untouched since the cutoff. The
--- check and the delete are one statement, so a save that links one of them
--- either lands first and keeps it, or fails on the foreign key.
+-- Photos no event or gallery uses, not uploaded, edited or taken out of use
+-- (ReleasePhotos) since the cutoff. The check and the delete are one
+-- statement, so a save that links one of them either lands first and keeps
+-- it, or fails on the foreign key.
 DELETE FROM photos
 WHERE photos.updated_at < ?
     AND NOT EXISTS (SELECT 1 FROM event_photos WHERE event_photos.photo_id = photos.id)
     AND NOT EXISTS (SELECT 1 FROM gallery_photos WHERE gallery_photos.photo_id = photos.id)
 RETURNING sha256;
+
+-- name: ReleasePhotos :exec
+-- Of photos just taken out of an event or the gallery, those nothing else
+-- uses start their unused grace period now (DeleteUnusedPhotos).
+UPDATE photos SET updated_at = ?
+WHERE id IN (sqlc.slice('ids'))
+    AND NOT EXISTS (SELECT 1 FROM event_photos WHERE event_photos.photo_id = photos.id)
+    AND NOT EXISTS (SELECT 1 FROM gallery_photos WHERE gallery_photos.photo_id = photos.id);

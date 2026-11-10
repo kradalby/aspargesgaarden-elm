@@ -69,3 +69,6 @@ DELETE FROM event_photos WHERE event_id = ?;
 
 -- name: InsertEventPhoto :exec
 INSERT INTO event_photos (event_id, photo_id, role, position) VALUES (?, ?, ?, ?);
+
+-- name: ListEventPhotoIDs :many
+SELECT photo_id FROM event_photos WHERE event_id = ? ORDER BY position;

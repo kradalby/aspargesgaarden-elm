@@ -300,6 +300,33 @@ func (q *Queries) ListAllEventPhotos(ctx context.Context) ([]EventPhoto, error) 
 	return items, nil
 }
 
+const listEventPhotoIDs = `-- name: ListEventPhotoIDs :many
+SELECT photo_id FROM event_photos WHERE event_id = ? ORDER BY position
+`
+
+func (q *Queries) ListEventPhotoIDs(ctx context.Context, eventID int64) ([]int64, error) {
+	rows, err := q.db.QueryContext(ctx, listEventPhotoIDs, eventID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []int64
+	for rows.Next() {
+		var photo_id int64
+		if err := rows.Scan(&photo_id); err != nil {
+			return nil, err
+		}
+		items = append(items, photo_id)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listEvents = `-- name: ListEvents :many
 SELECT id, year, slug, title, summary, body_md, start_date, start_time, end_date, end_time, price_text, ticket_url, show_in_menu, menu_label, status, cancelled, published_at, created_at, updated_at FROM events ORDER BY start_date DESC, id DESC
 `

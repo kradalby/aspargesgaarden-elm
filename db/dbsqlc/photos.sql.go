@@ -8,6 +8,7 @@ package dbsqlc
 import (
 	"context"
 	"database/sql"
+	"strings"
 )
 
 const createPhoto = `-- name: CreatePhoto :one
@@ -86,9 +87,10 @@ WHERE photos.updated_at < ?
 RETURNING sha256
 `
 
-// Uploads no event or gallery took up, untouched since the cutoff. The
-// check and the delete are one statement, so a save that links one of them
-// either lands first and keeps it, or fails on the foreign key.
+// Photos no event or gallery uses, not uploaded, edited or taken out of use
+// (ReleasePhotos) since the cutoff. The check and the delete are one
+// statement, so a save that links one of them either lands first and keeps
+// it, or fails on the foreign key.
 func (q *Queries) DeleteUnusedPhotos(ctx context.Context, updatedAt int64) ([]string, error) {
 	rows, err := q.db.QueryContext(ctx, deleteUnusedPhotos, updatedAt)
 	if err != nil {
@@ -340,6 +342,36 @@ func (q *Queries) ListPhotos(ctx context.Context) ([]Photo, error) {
 		return nil, err
 	}
 	return items, nil
+}
+
+const releasePhotos = `-- name: ReleasePhotos :exec
+UPDATE photos SET updated_at = ?
+WHERE id IN (/*SLICE:ids*/?)
+    AND NOT EXISTS (SELECT 1 FROM event_photos WHERE event_photos.photo_id = photos.id)
+    AND NOT EXISTS (SELECT 1 FROM gallery_photos WHERE gallery_photos.photo_id = photos.id)
+`
+
+type ReleasePhotosParams struct {
+	UpdatedAt int64   `db:"updated_at"`
+	Ids       []int64 `db:"ids"`
+}
+
+// Of photos just taken out of an event or the gallery, those nothing else
+// uses start their unused grace period now (DeleteUnusedPhotos).
+func (q *Queries) ReleasePhotos(ctx context.Context, arg ReleasePhotosParams) error {
+	query := releasePhotos
+	var queryParams []interface{}
+	queryParams = append(queryParams, arg.UpdatedAt)
+	if len(arg.Ids) > 0 {
+		for _, v := range arg.Ids {
+			queryParams = append(queryParams, v)
+		}
+		query = strings.Replace(query, "/*SLICE:ids*/?", strings.Repeat(",?", len(arg.Ids))[1:], 1)
+	} else {
+		query = strings.Replace(query, "/*SLICE:ids*/?", "NULL", 1)
+	}
+	_, err := q.db.ExecContext(ctx, query, queryParams...)
+	return err
 }
 
 const touchPhoto = `-- name: TouchPhoto :exec
