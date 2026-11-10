@@ -79,7 +79,9 @@ gallery); without it the site starts empty and the admin fills it.
   step.
 - Changed markup on purpose: `UPDATE_GOLDEN=1 go test ./...`, then review the
   diff of the `testdata/*.html` golden files.
-- Changed `db/schema.sql` or `db/queries/`: `sqlc generate`.
+- Changed `db/schema.sql` or `db/queries/`: `sqlc generate`. A schema change
+  also needs an update rule in `db/db.go` and the replaced schema in
+  `db/testdata/` (see AGENTS.md).
 - Changed `go.mod`: `go run ./cmd/vendorhash update`.
 - Changed an Elm app's `elm.json`: `cd elm/<app> && elm2nix convert > elm-srcs.nix && elm2nix snapshot`.
 - Changed `elm/admin/yarn.lock`: put the new hash under `yarn.admin` in
