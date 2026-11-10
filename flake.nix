@@ -56,6 +56,51 @@
           "yarn.lock"
         ];
 
+        # static/dist is built here and copied in before go:embed sees it, for
+        # the binary and for every Go check. Locally `go generate ./static`
+        # runs the same build.sh. Photos are their own derivation so a Go edit
+        # (which can change the class list) never re-encodes them.
+        fs = lib.fileset;
+        staticStep =
+          name: step: inputs: tools:
+          pkgs.runCommand "asparges-static-${name}"
+            {
+              src = fs.toSource {
+                root = ./.;
+                fileset = fs.unions ([ ./static/build.sh ] ++ inputs);
+              };
+              nativeBuildInputs = tools;
+            }
+            ''
+              cp -r $src/. . && chmod -R u+w . && cd static
+              bash build.sh $out ${step}
+            '';
+        staticCSS =
+          staticStep "css" "css fonts"
+            (
+              [
+                ./static/input.css
+                ./static/fonts-src
+              ]
+              # Tailwind scans Go sources for class names (input.css @source
+              # picks the packages); photos stay cached either way.
+              ++ [ (fs.fileFilter (f: f.hasExt "go") ./.) ]
+            )
+            [
+              pkgs.tailwindcss_4
+              pkgs.woff2
+            ];
+        staticPhotos = staticStep "photos" "photos" [ ./static/photos-src ] [ pkgs.vips ];
+        withStatic =
+          drv:
+          drv.overrideAttrs (old: {
+            postPatch = (old.postPatch or "") + ''
+              mkdir -p static/dist
+              cp -r ${staticCSS}/. ${staticPhotos}/. static/dist/
+              chmod -R u+w static/dist
+            '';
+          });
+
         common = {
           inherit pkgs;
           root = ./.;
@@ -67,6 +112,8 @@
           # db/db.go embeds schema.sql; flake-checks' source filter keeps only
           # .go files, so the schema has to be added by hand.
           extraSrc = [ ./db/schema.sql ];
+          # Committed embedded files; static/dist comes from withStatic.
+          embedDirs = [ ./static/files ];
 
           prettier = true;
           # Pulls .elm into the formatting check's source, so elm-format sees
@@ -91,7 +138,7 @@
           };
         };
 
-        asparges = (fc.goBuild common).overrideAttrs (_: {
+        asparges = (withStatic (fc.goBuild common)).overrideAttrs (_: {
           meta = {
             description = "aspargesgaarden.no web server";
             homepage = "https://github.com/kradalby/aspargesgaarden-elm";
@@ -123,6 +170,7 @@
             pkgs.yarn
             pkgs.esbuild
             pkgs.tailwindcss_4
+            pkgs.woff2
 
             pkgs.vips
           ];
@@ -134,8 +182,8 @@
         };
         checks = {
           build = asparges;
-          gotest = fc.goTest (common // { goRace = true; });
-          golangci-lint = fc.goLint common;
+          gotest = withStatic (fc.goTest (common // { goRace = true; }));
+          golangci-lint = withStatic (fc.goLint common);
           formatting = fc.goFormat common;
           # db/dbsqlc is sqlc output with no //go:generate directive, so the
           # drift check runs sqlc itself over the config, schema and queries.

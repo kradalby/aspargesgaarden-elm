@@ -25,3 +25,6 @@ result-*
 # Agent scratch: worktrees and plugin state
 .claude/worktrees/
 .superpowers/
+
+# Built by static/build.sh (go generate ./static)
+/static/dist/

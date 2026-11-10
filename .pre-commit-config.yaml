@@ -26,7 +26,9 @@ repos:
       - id: check-added-large-files
         args: [--maxkb=1000]
         # Full-resolution course photos feed the old site's image pipeline.
-        exclude: ^public/arrangementer/2026-takkebakstkurs-anita-saga-[12]\.jpeg$
+        # static/photos-src holds the embedded photos' web masters, capped at
+        # 2500 px on the long side; a few still pass 1 MB at that size.
+        exclude: ^(public/arrangementer/2026-takkebakstkurs-anita-saga-[12]|static/photos-src/.*)\.jpeg$
       - id: detect-private-key
       - id: mixed-line-ending
 
