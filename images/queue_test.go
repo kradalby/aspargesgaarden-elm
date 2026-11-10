@@ -1,0 +1,200 @@
+package images
+
+import (
+	"context"
+	"fmt"
+	"os"
+	"path/filepath"
+	"testing"
+	"time"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+)
+
+func TestQueueOrder(t *testing.T) {
+	s := newTestStore(t, newFakeCatalog())
+
+	// A bulk upload's tail is waiting; a new upload jumps ahead of it, and
+	// its own tail goes to the back after its first pass.
+	s.enqueue("a", false)
+	s.enqueue("b", false)
+	s.Enqueue("c")
+	s.Enqueue("c")
+
+	var got []string
+	for {
+		sha, first, ok := s.next()
+		if !ok {
+			break
+		}
+
+		got = append(got, fmt.Sprintf("%s/%v", sha, first))
+		if first {
+			s.enqueue(sha, false)
+		}
+	}
+
+	require.Equal(t, []string{"c/true", "a/false", "b/false", "c/false"}, got)
+}
+
+func TestFirstPass(t *testing.T) {
+	p := Photo{
+		SHA256: testSHA, Width: 3000, Height: 2000,
+		Crops: map[Kind]Rect{
+			Card:   {X: 0, Y: 0, W: 1600, H: 2000},
+			Banner: {X: 0, Y: 0, W: 3000, H: 1687},
+			Share:  {X: 0, Y: 0, W: 3000, H: 1575},
+		},
+	}
+
+	got := map[Kind][]string{}
+	for _, g := range groups(p) {
+		for _, s := range firstPass(p, g) {
+			got[g.kind] = append(got[g.kind], fmt.Sprintf("%s/%d", s.Format, s.Width))
+		}
+	}
+
+	require.Equal(t, map[Kind][]string{
+		Full:   {"jpeg/1200", "avif/800"},
+		Card:   {"avif/800"},
+		Banner: {"avif/800"},
+		Share:  {"jpeg/1200"},
+	}, got)
+}
+
+func TestStatus(t *testing.T) {
+	t.Parallel()
+	cat := newFakeCatalog()
+	s := newTestStore(t, cat)
+	ctx := context.Background()
+
+	o := intake(t, s, "upright.jpg")
+	p := photoOf(o)
+	cat.put(p)
+	s.Changed()
+
+	st, err := s.Status(ctx, p.SHA256)
+	require.NoError(t, err)
+	require.Equal(t, Status{
+		State: StateQueued, Ready: 1, Total: len(Expected(p)),
+		Preview: o.Preview, Width: 1200, Height: 800,
+	}, st)
+
+	require.NoError(t, s.warm(ctx, p.SHA256, allSpecs))
+
+	st, err = s.Status(ctx, p.SHA256)
+	require.NoError(t, err)
+	require.Equal(t, StateReady, st.State)
+	require.Equal(t, st.Total, st.Ready)
+
+	// A crop change: only the card is rebuilt, and status says so.
+	p.Crops = map[Kind]Rect{Card: {X: 0, Y: 0, W: 480, H: 600}}
+	cat.put(p)
+	s.Changed()
+
+	st, err = s.Status(ctx, p.SHA256)
+	require.NoError(t, err)
+	require.Equal(t, StateQueued, st.State)
+	require.Equal(t, st.Total-3, st.Ready)
+
+	before := s.builds.Load()
+	require.NoError(t, s.warm(ctx, p.SHA256, allSpecs))
+	require.Equal(t, before+1, s.builds.Load())
+}
+
+func TestStatusFailed(t *testing.T) {
+	t.Parallel()
+	cat := newFakeCatalog()
+	s := newTestStore(t, cat)
+	ctx := context.Background()
+
+	// A damaged original that skipped Intake, as a bad restore would leave.
+	b, err := os.ReadFile(fixture(t, "truncated.jpg"))
+	require.NoError(t, err)
+
+	p := Photo{SHA256: testSHA, MIME: "image/jpeg", Width: 1200, Height: 800}
+	orig := s.originalPath(p.SHA256, p.MIME)
+	require.NoError(t, os.MkdirAll(filepath.Dir(orig), dirPerm))
+	require.NoError(t, os.WriteFile(orig, b, 0o600))
+	cat.put(p)
+
+	require.ErrorIs(t, s.warm(ctx, p.SHA256, allSpecs), ErrBroken)
+
+	st, err := s.Status(ctx, p.SHA256)
+	require.NoError(t, err)
+	require.Equal(t, StateFailed, st.State)
+	require.Equal(t, ReasonDamaged, st.Reason)
+	require.Empty(t, st.Preview)
+
+	// Gone: a restore is the only fix.
+	require.NoError(t, os.Remove(orig))
+	s.failed = map[string]failure{}
+	require.Error(t, s.warm(ctx, p.SHA256, allSpecs))
+
+	st, err = s.Status(ctx, p.SHA256)
+	require.NoError(t, err)
+	require.Equal(t, ReasonMissingOriginal, st.Reason)
+}
+
+func TestRun(t *testing.T) {
+	t.Parallel()
+	cat := newFakeCatalog()
+	s := newTestStore(t, cat)
+
+	// Queued before a restart: Run finds it again.
+	old := photoOf(intake(t, s, "orient6.jpg"))
+	cat.put(old)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan error, 1)
+
+	go func() { done <- s.Run(ctx) }()
+
+	o := intake(t, s, "upright.jpg")
+	p := photoOf(o)
+	share, err := DefaultCrop(Share, o.Width, o.Height)
+	require.NoError(t, err)
+
+	p.Crops[Share] = share
+	cat.put(p)
+	s.Enqueue(p.SHA256)
+	s.Enqueue(p.SHA256)
+
+	for _, sha := range []string{p.SHA256, old.SHA256} {
+		require.EventuallyWithT(t, func(c *assert.CollectT) {
+			st, err := s.Status(ctx, sha)
+			require.NoError(c, err)
+			assert.Equal(c, StateReady, st.State)
+		}, time.Minute, 50*time.Millisecond)
+	}
+
+	cancel()
+	require.NoError(t, <-done)
+}
+
+func TestQueueSkipsDeletedPhotos(t *testing.T) {
+	t.Parallel()
+	s := newTestStore(t, newFakeCatalog())
+
+	require.NoError(t, s.warm(context.Background(), testSHA, allSpecs))
+	require.Zero(t, s.builds.Load())
+}
+
+func TestWarmAll(t *testing.T) {
+	t.Parallel()
+	cat := newFakeCatalog()
+	s := newTestStore(t, cat)
+
+	good := photoOf(intake(t, s, "upright.jpg"))
+	cat.put(good)
+	// A row whose original is gone: reported, the rest still built.
+	cat.put(Photo{SHA256: testSHA, MIME: "image/jpeg", Width: 1200, Height: 800})
+
+	err := s.WarmAll(context.Background())
+	require.ErrorContains(t, err, "original of "+testSHA)
+
+	st, err := s.Status(context.Background(), good.SHA256)
+	require.NoError(t, err)
+	require.Equal(t, StateReady, st.State)
+}
