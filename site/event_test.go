@@ -9,7 +9,7 @@ import (
 )
 
 // legacyEvent is one file of the old site's content/events, as the import
-// will store it: eventDates minus the start date become ExtraDates, and the
+// stores it: eventDates minus the start date become ExtraDates, and the
 // free-text "ca. 15:00" is normalised to 15:00.
 type legacyEvent struct {
 	file  string

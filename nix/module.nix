@@ -129,8 +129,9 @@ in
     };
     users.groups.${cfg.group} = { };
 
-    # import seeds the state directory: run it as the service user, e.g.
-    # sudo -u asparges asparges import --data-dir /var/lib/asparges <checkout>.
+    # import seeds the state directory: run it as the service user with the
+    # unit's umask, or the database it creates is not group-writable, e.g.
+    # sudo -u asparges sh -c 'umask 0007 && asparges import --data-dir /var/lib/asparges <checkout>'.
     environment.systemPackages = [ cfg.package ];
 
     # The service creates the database 0660 and SQLite gives -wal and -shm
