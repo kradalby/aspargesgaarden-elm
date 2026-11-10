@@ -1,8 +1,8 @@
 """Browser checks of the gallery: ui.Gallery's grid and the elm/gallery lightbox.
 
-run.sh imports the old site and serves it at $BASE: /galleri with its 51
-photos, the 2026 Christmas market with four more, and /e2e/two, a page with
-two galleries. Every test runs with the site's Content-Security-Policy and
+run.sh imports the import tests' miniature old site and serves it at $BASE:
+/galleri with its $PHOTOS photos, the 2026 Christmas market with four more,
+and /e2e/two, a page with two galleries. Every test runs with the site's Content-Security-Policy and
 fails on a violation or a page error.
 """
 
@@ -13,6 +13,7 @@ from playwright.sync_api import expect, sync_playwright
 
 BASE = os.environ["BASE"]
 OUT = os.environ["OUT"]
+PHOTOS = int(os.environ["PHOTOS"])
 BROWSERS = os.environ.get("BROWSERS", "chromium firefox webkit").split()
 
 DIALOG = "[role=dialog]"
@@ -131,9 +132,9 @@ def test_without_javascript_links_open_the_photo(browser):
     ctx.route("https://umami.kradalby.no/**", lambda r: r.abort())
     page = ctx.new_page()
     page.goto(BASE + "/galleri")
-    assert page.locator("[data-gallery] a[data-index]").count() == 51
+    assert page.locator("[data-gallery] a[data-index]").count() == PHOTOS
     href = link(page, 0).get_attribute("href")
-    assert "/full-" in href and href.endswith("-2000.jpg")
+    assert "/full-" in href and href.endswith(".jpg")
     with page.expect_navigation() as nav:
         link(page, 0).click()
     assert nav.value.ok
@@ -146,7 +147,7 @@ def test_keys_browse_and_wrap(desktop):
     page = desktop.page("/galleri")
     photos = galleries(page)[0]
     link(page, 0).click()
-    expect(page.locator(DIALOG)).to_have_attribute("aria-label", "Bilde 1 av 51")
+    expect(page.locator(DIALOG)).to_have_attribute("aria-label", f"Bilde 1 av {PHOTOS}")
     expect_shown(page, photos[0])
     page.keyboard.press("ArrowRight")
     expect_shown(page, photos[1])
@@ -154,7 +155,7 @@ def test_keys_browse_and_wrap(desktop):
     expect_shown(page, photos[0])
     page.keyboard.press("ArrowLeft")  # wraps, as the old gallery did
     expect_shown(page, photos[-1])
-    expect(page.locator(DIALOG)).to_have_attribute("aria-label", "Bilde 51 av 51")
+    expect(page.locator(DIALOG)).to_have_attribute("aria-label", f"Bilde {PHOTOS} av {PHOTOS}")
     page.keyboard.press("ArrowRight")
     expect_shown(page, photos[0])
 
@@ -359,7 +360,7 @@ def test_phone_swipe(phone, browser):
     expect_shown(page, photos[1])
     swipe(page, name, -30)  # a wobble, not a swipe
     swipe(page, name, -60, 120)  # mostly vertical
-    expect(page.locator(DIALOG)).to_have_attribute("aria-label", "Bilde 2 av 51")
+    expect(page.locator(DIALOG)).to_have_attribute("aria-label", f"Bilde 2 av {PHOTOS}")
 
 
 @pytest.mark.parametrize("width,height", [(390, 844), (1280, 800)])

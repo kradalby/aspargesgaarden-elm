@@ -1,6 +1,6 @@
 // Command server serves the gallery's browser tests (../run.sh) with the
 // wiring of `asparges serve` (site.Store, images.Store, server.New) over a
-// data directory `asparges import` filled from the old site, plus /e2e/two:
+// data directory `asparges import` filled from cmd/asparges/testdata/oldsite, plus /e2e/two:
 // a page with two galleries, which no real page has yet.
 package main
 

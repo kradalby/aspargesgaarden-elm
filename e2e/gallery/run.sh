@@ -4,16 +4,15 @@
 #
 #   nix develop -c e2e/gallery/run.sh [pytest args]   e.g. -k swipe
 #
-# Builds static/dist (go generate), runs `asparges import` of this checkout
-# (the old site) into $DATA, kept between runs with its photo variants, then
-# serves it with the harness (serve's wiring plus a two-gallery page) and
-# runs test_gallery.py. Screenshots go to $OUT. BROWSERS narrows the
-# browsers ("chromium webkit").
+# Builds static/dist (go generate), runs `asparges import` of the import
+# tests' miniature old site (cmd/asparges/testdata/oldsite) into $DATA, a
+# fresh directory unless set, then serves it with the harness (serve's wiring
+# plus a two-gallery page) and runs test_gallery.py. Screenshots go to $OUT.
+# BROWSERS narrows the browsers ("chromium webkit").
 set -euo pipefail
 
 root=$(cd "$(dirname "$0")/../.." && pwd)
 here=$root/e2e/gallery
-data=${DATA:-${XDG_CACHE_HOME:-$HOME/.cache}/asparges-e2e/data}
 out=${OUT:-$here/out}
 port=${PORT:-8095}
 cd "$root"
@@ -40,10 +39,10 @@ fi
 work=$(mktemp -d)
 trap 'kill "$server" 2>/dev/null || true; rm -rf "$work"' EXIT
 mkdir -p "$out"
+data=${DATA:-$work/data}
 
-# Import leaves what is already there alone, so a kept $DATA costs nothing.
 go build -o "$work/asparges" ./cmd/asparges
-"$work/asparges" import --data-dir "$data" "$root" >"$work/import.log" 2>&1 || {
+"$work/asparges" import --data-dir "$data" "$root/cmd/asparges/testdata/oldsite" >"$work/import.log" 2>&1 || {
   cat "$work/import.log" >&2
   exit 1
 }
@@ -51,7 +50,7 @@ go build -o "$work/asparges" ./cmd/asparges
 go build -o "$work/server" ./e2e/gallery/server
 "$work/server" -addr "127.0.0.1:$port" -data-dir "$data" >"$work/log" 2>&1 &
 server=$!
-# The first run builds every variant with vips, which takes a while.
+# The server builds every gallery variant with vips before it is ready.
 until grep -q '^ready' "$work/log"; do
   if ! kill -0 "$server" 2>/dev/null; then
     cat "$work/log" >&2
@@ -60,4 +59,5 @@ until grep -q '^ready' "$work/log"; do
   sleep 0.5
 done
 
-BASE=http://127.0.0.1:$port OUT=$out "$py" -I -m pytest -p no:cacheprovider "$here/test_gallery.py" "$@"
+photos=$(awk '/^ready/ { print $2; exit }' "$work/log")
+BASE=http://127.0.0.1:$port OUT=$out PHOTOS=$photos "$py" -I -m pytest -p no:cacheprovider "$here/test_gallery.py" "$@"
