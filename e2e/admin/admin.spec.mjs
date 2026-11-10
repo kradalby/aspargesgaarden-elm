@@ -979,3 +979,32 @@ test("the mouse wheel over the photo leaves the frame alone", async ({
   await page.waitForTimeout(500);
   await expect(cropper).toHaveAttribute("rect", before);
 });
+
+test("the preview stays where she scrolled it while she writes", async ({
+  page,
+  seed,
+}) => {
+  await page.goto(`/admin/arrangementer/${seed.course}`);
+  const iframe = page.locator("#forhandsvisning iframe");
+  await expect(iframe).toBeVisible();
+  const frame = await (await iframe.elementHandle()).contentFrame();
+  // Halfway down the course's page.
+  await expect
+    .poll(() => frame.evaluate(() => document.body.scrollHeight - innerHeight))
+    .toBeGreaterThan(100);
+  const y = await frame.evaluate(() => {
+    scrollTo(0, Math.floor((document.body.scrollHeight - innerHeight) / 2));
+    return scrollY;
+  });
+
+  await page
+    .getByLabel("Kort tekst")
+    .fill("Lær å bake lefser, flatbrød og lomper.");
+  await expect(
+    page
+      .frameLocator("#forhandsvisning iframe")
+      .getByText("og lomper.")
+      .first(),
+  ).toBeAttached();
+  await expect.poll(() => frame.evaluate(() => scrollY)).toBe(y);
+});
