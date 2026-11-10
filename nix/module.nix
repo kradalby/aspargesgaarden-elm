@@ -129,8 +129,8 @@ in
     };
     users.groups.${cfg.group} = { };
 
-    # import and images seed and maintain the state directory: run them as
-    # the service user, e.g. sudo -u asparges asparges images check.
+    # import seeds the state directory: run it as the service user, e.g.
+    # sudo -u asparges asparges import --data-dir /var/lib/asparges <checkout>.
     environment.systemPackages = [ cfg.package ];
 
     systemd.services.asparges = {

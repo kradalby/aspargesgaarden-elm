@@ -121,9 +121,8 @@ server may add codes without breaking the app.
 - `previewUrl`: the server's own uncropped, upright JPEG, the widest of its
   sizes up to 1200 px (smaller for a smaller photo) — never the original. The
   crop editor draws on it; it exists once `status.previewReady` is `true`.
-  `thumbUrl`: the same at 480 px wide, for lists, built on its first request
-  if the queue has not got to it. Before `previewReady` the app shows a
-  placeholder and requests neither.
+  `thumbUrl`: the same at 480 px wide, for lists; the upload builds both.
+  Before `previewReady` the app shows a placeholder and requests neither.
 - `crops`: always all three kinds. A kind that was never set, or that the
   photo is too small for (see [Crops](#crops)), holds the largest centred
   rectangle of its shape, so the app never computes one itself.
@@ -159,24 +158,27 @@ polling (see [Photo status](#photo-status)).
 }
 ```
 
-- `state`: `preparing` (variants still being built), `ready` (every variant
-  the public pages need for this photo and its current crops exists), or
-  `failed` (the server gave up; see `reason`). A crop change sends a `ready`
-  photo back to `preparing` until the new set is built.
+- `state`: `preparing` (variants waiting for or in the build), `ready`
+  (every variant the public pages need for this photo and its current crops
+  exists), or `failed` (variants are missing and nothing is building them;
+  see `reason`). `failed` stays until a build succeeds or the app asks again
+  (`prepare`, a crop save, a re-upload). A crop change sends a `ready` photo
+  back to `preparing` until the new set is built.
 - `done`/`total`: variants built so far, of all expected (real counts; how
   many depends on the photo). `total` is `0` until known. The app shows
   "Klargjør bildet … 12 av 46" from them.
-- `previewReady`: the preview and thumb sizes exist. Built first, so the user
-  can see and crop the photo while the rest is still being made.
+- `previewReady`: the preview and thumb sizes exist. The upload builds them,
+  so the user can see and crop the photo while the rest is still being made.
 - `reason`: `""` unless `failed`. What is wrong with the photo itself has
   the upload's code for it (see [Photos](#photos)): `damaged` (the file
   could not be read as a picture: truncated, corrupt), `too_small` (smaller
   than the smallest size the site uses, 480 px wide), and the rarer
   `unsupported_type`, `too_large` and `too_many_pixels`. `internal` is
-  anything else (vips crashed, timed out, disk full, the stored original is
-  gone): worth a retry. Any other code is shown like `internal`.
-- A `failed` photo can still be referred to by events and the gallery; the
-  public pages fall back to building on request. Publishing is never blocked
+  anything else (vips killed for memory or timed out, disk full, the stored
+  original is gone, which uploading the same file again repairs): worth a
+  retry. Any other code is shown like `internal`.
+- A `failed` photo can still be referred to by events and the gallery; its
+  missing sizes are missing on the public pages. Publishing is never blocked
   by a photo's status.
 - No state is guaranteed to be seen: a photo whose sizes are still on disk
   (the same bytes uploaded again) is `ready` in the upload answer, and a
@@ -613,8 +615,8 @@ refused (and a preview is not a visit).
    the precondition. Accepted as rare for four admins; a `version` counter
    would close it.
 2. **Crops take effect at once**, also on a published page (see Crops). The
-   alternative, crops saved with the event, needs `/img/` to serve variants of
-   a crop that is not yet stored, which the strict variant rule forbids.
+   alternative, crops saved with the event, needs variants of a crop that is
+   not yet stored, and the server builds only stored crops.
 3. **Photographer delete.** `Store.DeletePhotographer` exists but the app
    has no screen for it (the owner asked for no management area), so there is
    no route. A misspelt duplicate is corrected in place instead.

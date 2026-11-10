@@ -195,9 +195,10 @@ Follow `hvor` and `ghdl`, which run the same way on the same host:
   - `"asparges-beta" = "core-oracldn";` in the VIP backing map.
   - `"https://beta.aspargesgaarden.no"` in the HTTPS probes.
   - Alerts, each with a promtool test in `checks/prometheus-rules/tests.yaml`:
-    `increase(asparges_images_build_errors_total[1h]) > 0`,
-    `asparges_images_missing_originals > 0`, and
-    `asparges_images_queue_length > 0` for an hour.
+    `increase(asparges_images_build_errors_total[1h]) > 0` and
+    `asparges_images_queue_length > 0` for three hours (a full rebuild, after
+    a new pipeline version or a restore without `variants/`, keeps the queue
+    busy for more than one).
 
 ### 4. Seed data — [you], before the first deploy
 
@@ -257,8 +258,7 @@ this host. Check, in order:
 ```bash
 ssh root@core-oracldn
 systemctl status asparges litestream
-journalctl -u asparges -b --no-pager | tail -50
-sudo -u asparges asparges images check --data-dir /var/lib/asparges   # nothing missing, nothing to delete
+journalctl -u asparges -b --no-pager | tail -50   # no "images: photo not prepared"
 ```
 
 - [ ] The unit is active; `tailscale status` lists `asparges-beta` with
@@ -300,9 +300,9 @@ sudo -u asparges asparges images check --data-dir /var/lib/asparges   # nothing 
 | `asparges.db`       | `sqlite-backup`, hourly safe copy to `/var/backup/sqlite`, then restic | `xz -dc` the archive |
 | `/var/lib/asparges` | restic, hourly, to tjoda, ldn and Jotta (live db files excluded)       | `restic restore`     |
 
-Restore: stop the service, put back `originals/` (and `variants/`, or rebuild
-them) from restic and the database from litestream or a `sqlite-backup`
-archive, fix ownership, start:
+Restore: stop the service, put back `originals/` and `variants/` from restic
+and the database from litestream or a `sqlite-backup` archive, fix
+ownership, start:
 
 ```bash
 systemctl stop asparges
@@ -310,8 +310,11 @@ systemctl stop asparges
 litestream restore -o /var/lib/asparges/asparges.db <replica of asparges.db>
 chown -R asparges:asparges /var/lib/asparges
 systemctl start asparges
-sudo -u asparges asparges images warm --data-dir /var/lib/asparges   # only if variants/ was not restored
 ```
+
+Sizes missing from `variants/` (not restored, or a new pipeline version) are
+built after start, one photo at a time; until then those pictures are
+missing on the pages. `asparges_images_queue_length` returns to 0 when done.
 
 A database and `originals/` alone are enough; `vm-basic` tests exactly that.
 Keep `tsnet/` if it is restored; without it the node needs a new auth key
@@ -325,12 +328,8 @@ Go runtime's:
 | Metric                                                                  |                                                  |
 | ----------------------------------------------------------------------- | ------------------------------------------------ |
 | `asparges_images_build_errors_total`                                    | Failed variant builds. Should stay 0.            |
-| `asparges_images_missing_originals`                                     | Photos whose original file is gone. Should be 0. |
 | `asparges_images_queue_length`                                          | Photos waiting for their sizes; returns to 0.    |
 | `asparges_images_variants_built_total`, `asparges_images_build_seconds` | Build count and time.                            |
-| `asparges_images_serve_seconds`                                         | Image response time.                             |
-| `asparges_images_files`, `asparges_images_bytes`                        | Folder sizes.                                    |
-| `asparges_images_orphans_removed_total`                                 | Cleanup.                                         |
 | `asparges_bot_requests_total{agent,purpose}`                            | Search and AI crawlers.                          |
 | `asparges_referrals_total{source}`                                      | Visits from search, AI answers and social sites. |
 | `asparges_indexnow_submissions_total`                                   | IndexNow pings (off with `noindex`).             |
@@ -372,9 +371,6 @@ needed for them.
 
 ```bash
 journalctl -u asparges -f
-sudo -u asparges asparges images check --data-dir /var/lib/asparges   # report only
-sudo -u asparges asparges images gc --data-dir /var/lib/asparges      # remove what nothing uses
-sudo -u asparges asparges images warm --data-dir /var/lib/asparges    # build every missing size
 ```
 
 Run `import` only into an empty data directory, with the service stopped.

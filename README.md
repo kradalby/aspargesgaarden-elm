@@ -25,7 +25,7 @@ Open work is in [TODO.md](TODO.md). Rules for changing the code are in
 
 | Path                       | What                                                                                                                         |
 | -------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
-| `cmd/asparges`             | The binary: `serve`, `import`, `images check\|gc\|warm`. Flags also read `ASPARGES_*` environment variables.                 |
+| `cmd/asparges`             | The binary: `serve`, `import`. Flags also read `ASPARGES_*` environment variables.                                           |
 | `cmd/imagesbuild`          | Builds the embedded photos' variants at build time, with the same `images` code.                                             |
 | `cmd/vendorhash`           | Keeps `flakehashes.json` in step with `go.mod`.                                                                              |
 | `ui/`                      | The component kit: one file per component, typed props, golden tests.                                                        |
@@ -36,7 +36,7 @@ Open work is in [TODO.md](TODO.md). Rules for changing the code are in
 | `server/`                  | Routes, redirects from the old addresses, the admin API and its capability check.                                            |
 | `site/`                    | Domain logic: events, gallery, slugs, Oslo dates, publish rules.                                                             |
 | `db/`                      | `schema.sql`, `queries/`, sqlc output in `dbsqlc/`.                                                                          |
-| `images/`                  | Every image file: originals, crops, variants, URLs, the vips pipeline, cleanup.                                              |
+| `images/`                  | Every image file: originals, crops, variants, URLs, the vips pipeline, the build worker.                                     |
 | `static/`                  | Embedded assets: Tailwind input, font sources, logo and icons, fixed-page photo masters, and `build.sh` that builds `dist/`. |
 | `elm/admin`, `elm/gallery` | The two Elm apps.                                                                                                            |
 | `golden/`                  | The golden-file helper.                                                                                                      |
@@ -111,9 +111,9 @@ module option.
 
 State lives in the data directory: `asparges.db` (WAL mode),
 `originals/` (uploads as received), `variants/` (built sizes), `tmp/`, and
-`tsnet/`. A restore needs only the database and `originals/`; variants are
-rebuilt on request or with `asparges images warm`. `asparges images check`
-reports what `gc` would delete.
+`tsnet/`. A restore needs only the database and `originals/`: at start
+`serve` queues every photo and builds the sizes that are missing, one photo at
+a time; until a size is built, its picture is missing on the page.
 
 Old addresses (`/events`, `/christmas/2026`, `/gallery`, …) redirect to the
 Norwegian ones; a table test in `server/` covers every row.
