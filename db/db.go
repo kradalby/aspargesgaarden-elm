@@ -10,8 +10,6 @@ import (
 	_ "embed"
 	"errors"
 	"fmt"
-	"os"
-	"path/filepath"
 
 	"github.com/juanfont/headscale/hscontrol/db/sqliteconfig"
 	"github.com/tailscale/squibble"
@@ -93,58 +91,6 @@ func (d *DB) InTx(ctx context.Context, fn func(*dbsqlc.Queries) error) error {
 
 	if err := tx.Commit(); err != nil {
 		return fmt.Errorf("committing: %w", err)
-	}
-
-	return nil
-}
-
-// Snapshot writes a consistent copy of the live database to dst, for restic.
-// The live file cannot be copied safely while the service writes to it, and a
-// half-written dst must never replace the last good one, so the copy is
-// written next to dst, synced, and renamed into place.
-func (d *DB) Snapshot(ctx context.Context, dst string) error {
-	dir := filepath.Dir(dst)
-	if err := os.MkdirAll(dir, 0o750); err != nil {
-		return fmt.Errorf("creating snapshot dir: %w", err)
-	}
-
-	tmp := dst + ".tmp"
-	// VACUUM INTO refuses an existing non-empty target, such as the leftover
-	// of a snapshot that was interrupted.
-	if err := os.Remove(tmp); err != nil && !errors.Is(err, os.ErrNotExist) {
-		return fmt.Errorf("removing stale snapshot: %w", err)
-	}
-
-	// sqlc's grammar only takes a literal file name after VACUUM INTO, so this
-	// maintenance statement is the one query that does not go through dbsqlc.
-	if _, err := d.sql.ExecContext(ctx, "VACUUM INTO ?", tmp); err != nil {
-		_ = os.Remove(tmp)
-		return fmt.Errorf("vacuum into %s: %w", tmp, err)
-	}
-
-	if err := syncPath(tmp); err != nil {
-		_ = os.Remove(tmp)
-		return err
-	}
-
-	if err := os.Rename(tmp, dst); err != nil {
-		_ = os.Remove(tmp)
-		return fmt.Errorf("renaming snapshot: %w", err)
-	}
-
-	// The rename is durable only once the directory entry is.
-	return syncPath(dir)
-}
-
-func syncPath(path string) error {
-	f, err := os.Open(path)
-	if err != nil {
-		return fmt.Errorf("opening %s for sync: %w", path, err)
-	}
-	defer f.Close()
-
-	if err := f.Sync(); err != nil {
-		return fmt.Errorf("syncing %s: %w", path, err)
 	}
 
 	return nil

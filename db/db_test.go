@@ -3,7 +3,6 @@ package db
 import (
 	"database/sql"
 	"errors"
-	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -327,34 +326,4 @@ func TestInTxRollsBack(t *testing.T) {
 	events, err := d.Queries().ListEvents(t.Context())
 	require.NoError(t, err)
 	require.Empty(t, events)
-}
-
-func TestSnapshot(t *testing.T) {
-	d := openTest(t)
-	ctx := t.Context()
-
-	_, err := d.Queries().CreateEvent(ctx, draft(2026, "julemarked"))
-	require.NoError(t, err)
-
-	dst := filepath.Join(t.TempDir(), "backup", "asparges.db")
-	// A leftover from an interrupted run must not block the next snapshot.
-	require.NoError(t, os.MkdirAll(filepath.Dir(dst), 0o750))
-	require.NoError(t, os.WriteFile(dst+".tmp", []byte("partial"), 0o600))
-
-	require.NoError(t, d.Snapshot(ctx, dst))
-	// A second snapshot replaces the first.
-	_, err = d.Queries().CreateEvent(ctx, draft(2027, "julemarked"))
-	require.NoError(t, err)
-	require.NoError(t, d.Snapshot(ctx, dst))
-
-	_, err = os.Stat(dst + ".tmp")
-	require.ErrorIs(t, err, os.ErrNotExist)
-
-	restored, err := Open(ctx, dst)
-	require.NoError(t, err)
-	t.Cleanup(func() { _ = restored.Close() })
-
-	events, err := restored.Queries().ListEvents(ctx)
-	require.NoError(t, err)
-	require.Len(t, events, 2)
 }
