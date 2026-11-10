@@ -22,6 +22,8 @@ type Site struct {
 	Menu []ui.MenuItem
 	// Umami is the analytics site; the zero value loads no tracker.
 	Umami ui.Umami
+	// NoIndex is the beta site (--noindex); see seo.Meta.
+	NoIndex bool
 }
 
 // photoRef is what ui.Picture needs to show an uploaded photo as kind. A
@@ -38,6 +40,8 @@ func photoRef(p site.Photo, kind images.Kind) images.Ref {
 }
 
 func (s Site) page(meta ui.Meta, body ...elem.Node) *elem.Element {
+	meta.NoIndex = s.NoIndex
+
 	return ui.Page(ui.PageProps{BaseURL: s.BaseURL, Meta: meta, Menu: s.Menu, Umami: s.Umami}, body...)
 }
 

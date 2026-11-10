@@ -63,6 +63,13 @@ func TestTagsWithoutImageUseTheDefault(t *testing.T) {
 	require.NotContains(t, got, "ld+json", "no structured data unless the page has some")
 }
 
+// The beta site's header says noindex; a robots tag beside it would only
+// muddle that.
+func TestTagsRobots(t *testing.T) {
+	require.Contains(t, render(Tags(testBase, Meta{Title: "Kontakt"})), `<meta content="max-image-preview:large" name="robots">`)
+	require.NotContains(t, render(Tags(testBase, Meta{Title: "Kontakt", NoIndex: true})), "robots")
+}
+
 func TestTagsWithoutPathHaveNoAddress(t *testing.T) {
 	got := render(Tags(testBase, Meta{Title: "Fant ikke siden", Description: "Finnes ikke."}))
 

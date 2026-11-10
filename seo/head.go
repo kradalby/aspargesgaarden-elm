@@ -27,6 +27,9 @@ type Meta struct {
 	// JSONLD are the page's schema.org nodes, typed values from this
 	// package.
 	JSONLD []any
+	// NoIndex is the beta site (--noindex), whose response header already
+	// keeps it out of search engines; it gets no robots tag.
+	NoIndex bool
 }
 
 // Image is a share image: a JPEG every scraper can read.
@@ -87,6 +90,12 @@ func Tags(baseURL string, m Meta) []elem.Node {
 	tags := []elem.Node{
 		elem.Title(nil, elem.Text(m.FullTitle())),
 		named("description", m.Description),
+	}
+
+	// Google shows large previews (Discover, big thumbnails) only when a
+	// page allows them.
+	if !m.NoIndex {
+		tags = append(tags, named("robots", "max-image-preview:large"))
 	}
 
 	if m.Path != "" {

@@ -332,7 +332,7 @@ func (s *Server) gallery(ctx context.Context) (*elem.Element, error) {
 // site is what pages need, with today's menu. On error the menu lacks the
 // events' entries but is still usable, for the 404 page.
 func (s *Server) site(ctx context.Context) (pages.Site, error) {
-	st := pages.Site{BaseURL: s.cfg.BaseURL, Menu: pages.Menu(), Umami: s.umami}
+	st := pages.Site{BaseURL: s.cfg.BaseURL, Menu: pages.Menu(), Umami: s.umami, NoIndex: s.cfg.NoIndex}
 
 	entries, err := s.cfg.Store.Menu(ctx)
 	if err != nil {

@@ -113,6 +113,9 @@ func TestNoIndex(t *testing.T) {
 		require.Equal(t, "noindex", rec.Header().Get("X-Robots-Tag"), target)
 	}
 
+	require.NotContains(t, f.get(t, "/").Body.String(), "max-image-preview", "the header's noindex stands alone")
+	require.Contains(t, newFixture(t, false).get(t, "/").Body.String(), `<meta content="max-image-preview:large" name="robots">`)
+
 	robots := f.get(t, "/robots.txt").Body.String()
 	require.Contains(t, robots, "User-agent: *\nDisallow: /\n")
 	require.NotContains(t, robots, "Allow")
