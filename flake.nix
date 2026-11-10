@@ -347,6 +347,15 @@
               system
               ;
           };
+        }
+        # VM tests run on x86_64-linux only, as the server will.
+        // lib.optionalAttrs (system == "x86_64-linux") {
+          vm-basic = pkgs.testers.nixosTest (
+            import ./nix/tests/basic.nix {
+              inherit pkgs vips;
+              module = self.nixosModules.default;
+            }
+          );
         };
       }
     );
