@@ -79,7 +79,7 @@ yet.
       16383 px a side, and even its 480 px wide size is taller. Give it a
       reason code and a text of its own if it ever happens.
 - [ ] `images.Store.Status` loads its photo from the database again, though
-      every caller in `server/` already has it: about a fifth of the time of
+      every caller in `server/` already has it, once per photo on
       `GET /admin/api/events`. Pass the photo in (`Status(images.Photo)`).
 - [ ] A two-day market (start and end date, start and end time) reads as
       one event from the first day's start to the last day's end, in the
