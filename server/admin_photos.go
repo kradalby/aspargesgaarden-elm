@@ -395,8 +395,16 @@ func (s *Server) setCrops(w http.ResponseWriter, r *http.Request, p site.Photo) 
 
 	for _, k := range slices.Sorted(maps.Keys(in)) {
 		c := in[k]
+		kind, rect := images.Kind(k), images.Rect{X: c.X, Y: c.Y, W: c.W, H: c.H}
 
-		err := images.ValidateCrop(images.Kind(k), p.Width, p.Height, images.Rect{X: c.X, Y: c.Y, W: c.W, H: c.H})
+		// The app sends every kind back, also the centred one photoJSON
+		// shows for a kind the photo is too small for. Nothing to store.
+		if _, small := images.DefaultCrop(kind, p.Width, p.Height); errors.Is(small, images.ErrTooSmall) &&
+			rect == images.CentredCrop(kind, p.Width, p.Height) {
+			continue
+		}
+
+		err := images.ValidateCrop(kind, p.Width, p.Height, rect)
 		if images.Kind(k) == images.Full {
 			err = fmt.Errorf("%w: %q", images.ErrKind, k)
 		}

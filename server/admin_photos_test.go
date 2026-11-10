@@ -277,6 +277,25 @@ func TestAdminCrops(t *testing.T) {
 	stored, err := a.store.Photo(t.Context(), p.ID)
 	require.NoError(t, err)
 	require.Equal(t, site.Rect{X: 100, Y: 0, W: 960, H: 1200}, stored.Crops[site.CropCard])
+
+	// Too narrow for a share image: the app sends back the centred share
+	// rectangle it was shown, which is accepted and not stored; any other
+	// share rectangle is refused.
+	narrow, err := a.store.AddPhoto(t.Context(), site.Photo{SHA256: strings.Repeat("e", 64), MIME: "image/jpeg", Width: 1000, Height: 1219})
+	require.NoError(t, err)
+
+	shown := decode[photoJSON](t, a.do(t, "GET", "/admin/api/photos/"+itoa(narrow.ID), req{})).Crops
+	path = "/admin/api/photos/" + itoa(narrow.ID) + "/crops"
+
+	rec = a.do(t, "PUT", path, req{body: map[string]rectJSON{"card": {0, 0, 960, 1200}, "share": shown["share"]}})
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+
+	stored, err = a.store.Photo(t.Context(), narrow.ID)
+	require.NoError(t, err)
+	require.Equal(t, map[site.CropKind]site.Rect{site.CropCard: {X: 0, Y: 0, W: 960, H: 1200}}, stored.Crops)
+
+	rec = a.do(t, "PUT", path, req{body: map[string]rectJSON{"share": {0, 0, 950, 499}}})
+	require.Equal(t, []problem{{Code: "crop_too_small", Field: "share"}}, errorsOf(t, rec))
 }
 
 func TestAdminPhotoStatus(t *testing.T) {
