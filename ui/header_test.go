@@ -65,9 +65,9 @@ func TestHeaderMarksEventInMenu(t *testing.T) {
 	}
 }
 
-// The old site's menu was a hidden checkbox no keyboard could reach. The
-// menu now comes twice, and each copy must be display: none at the other's
-// widths, so a screen reader meets one.
+// A hidden checkbox toggle cannot be reached by keyboard; the phone menu is
+// a named <summary>. The menu comes twice, and each copy must be display:
+// none at the other's widths, so a screen reader meets one.
 func TestHeaderMenuIsReachable(t *testing.T) {
 	got := Header(testMenu, "/").Render()
 
