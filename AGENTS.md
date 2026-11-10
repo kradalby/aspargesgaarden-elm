@@ -26,8 +26,9 @@ conventions (Go, Nix, Elm, git, services, secrets) are in
   only `--dev` and `--e2e-fixtures` stay out. Document new options in
   `docs/deploy.md`.
 - **Goldens are reviewed output.** `testdata/*.html` holds rendered markup,
-  one tag per line. Change on purpose with `UPDATE_GOLDEN=1 go test ./...`
-  and read the diff before committing.
+  one tag per line, the JSON in it indented. Change on purpose with
+  `UPDATE_GOLDEN=1 go test ./...`, which also rewrites
+  `elm/admin/tests/ApiExamples.elm`, and read the diff before committing.
 - **Old addresses keep working.** `TestAddresses` in `server/` lists every
   redirect; never remove a row.
 - **A schema change migrates whole.** Change `db/schema.sql` with an update
@@ -42,7 +43,11 @@ conventions (Go, Nix, Elm, git, services, secrets) are in
   `flakehashes.json` after a `yarn.lock`.
 - **The admin API is a contract.** `docs/admin-api.md` describes it; change
   both together. `TestEveryCodeAndFieldIsDocumented` fails when the server
-  can send a code or field the document does not name.
+  can send a code or field the document does not name. Its first JSON
+  example under the Photo, PhotoStatus, Photographer, Event and EventInput
+  headings is part of the contract: `TestAdminJSONMatchesTheDocs` fails when
+  the server's JSON has other keys, and the app's tests decode those
+  examples from `elm/admin/tests/ApiExamples.elm`, which that test writes.
 
 ## Elm apps
 

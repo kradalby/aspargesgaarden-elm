@@ -5,10 +5,11 @@ binary that renders the public site and serves a small admin app to the
 farm's owners over Tailscale.
 
 - **Public pages** are HTML rendered in Go with
-  [elem-go](https://github.com/chasefleming/elem-go) components, kept in
-  memory after the first request and thrown away on any change. They work
+  [elem-go](https://github.com/chasefleming/elem-go) components. They work
   without JavaScript; the only script is the gallery lightbox (Elm), on pages
-  that show a gallery.
+  that show a gallery. Pages, the 404 page, `/sitemap.xml` and `/llms.txt`
+  are kept in memory after the first request and thrown away on any change;
+  only the admin preview is rendered every time.
 - **Content** (events, the Christmas market, the gallery, photographers)
   lives in SQLite. Photos are uploaded originals, cropped and resized by
   [libvips](https://www.libvips.org/) into AVIF, WebP and JPEG.
@@ -77,8 +78,10 @@ without it the site starts empty and the admin fills it.
   Elm app; then restart `serve`. Fonts and photo variants are rebuilt only
   when their source changed. `cd static && ./build.sh dist admin` builds one
   step.
-- Changed markup on purpose: `UPDATE_GOLDEN=1 go test ./...`, then review the
-  diff of the `testdata/*.html` golden files.
+- Changed markup or an admin API example on purpose:
+  `UPDATE_GOLDEN=1 go test ./...`, then review the diff of the
+  `testdata/*.html` golden files (JSON in them indented) and of
+  `elm/admin/tests/ApiExamples.elm`.
 - Changed `db/schema.sql` or `db/queries/`: `sqlc generate`. A schema change
   also needs an update rule in `db/db.go` and the replaced schema in
   `db/testdata/` (see AGENTS.md).
