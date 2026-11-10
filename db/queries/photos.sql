@@ -3,9 +3,8 @@
 -- is returned and its fields are left alone. The no-op DO UPDATE is there
 -- because SQLite cannot RETURN from a bare DO NOTHING.
 INSERT INTO photos (
-    sha256, mime, width, height, alt, photographer_name, photographer_url,
-    photographer_id, created_at, updated_at
-) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    sha256, mime, width, height, alt, photographer_id, created_at, updated_at
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
 ON CONFLICT (sha256) DO UPDATE SET sha256 = excluded.sha256
 RETURNING id;
 
@@ -17,8 +16,7 @@ SELECT * FROM photos ORDER BY id;
 
 -- name: UpdatePhotoMeta :execrows
 UPDATE photos
-SET alt = ?, photographer_name = ?, photographer_url = ?, photographer_id = ?,
-    updated_at = ?
+SET alt = ?, photographer_id = ?, updated_at = ?
 WHERE id = ?;
 
 -- name: TouchPhoto :exec

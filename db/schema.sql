@@ -69,18 +69,16 @@ CREATE TABLE photographers (
 -- photos is one uploaded original, named by the sha256 of its content; the
 -- file itself lives in originals/ and is never referenced by any other key.
 CREATE TABLE photos (
-    id                INTEGER PRIMARY KEY,
-    sha256            TEXT    NOT NULL UNIQUE
+    id              INTEGER PRIMARY KEY,
+    sha256          TEXT    NOT NULL UNIQUE
         CHECK (length(sha256) = 64 AND sha256 NOT GLOB '*[^0-9a-f]*'),
-    mime              TEXT    NOT NULL CHECK (mime <> ''),
-    width             INTEGER NOT NULL CHECK (width > 0),
-    height            INTEGER NOT NULL CHECK (height > 0),
-    alt               TEXT    NOT NULL DEFAULT '',
-    photographer_name TEXT    NOT NULL DEFAULT '',
-    photographer_url  TEXT    NOT NULL DEFAULT '',
-    photographer_id   INTEGER REFERENCES photographers (id),
-    created_at        INTEGER NOT NULL,
-    updated_at        INTEGER NOT NULL
+    mime            TEXT    NOT NULL CHECK (mime <> ''),
+    width           INTEGER NOT NULL CHECK (width > 0),
+    height          INTEGER NOT NULL CHECK (height > 0),
+    alt             TEXT    NOT NULL DEFAULT '',
+    photographer_id INTEGER REFERENCES photographers (id),
+    created_at      INTEGER NOT NULL,
+    updated_at      INTEGER NOT NULL
 );
 
 -- Without ON DELETE: a photographer credited on a photo cannot be deleted.
