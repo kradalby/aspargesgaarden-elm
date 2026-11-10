@@ -1,11 +1,11 @@
 package images
 
 import (
+	"bytes"
 	"context"
-	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 	"time"
 
@@ -16,47 +16,55 @@ import (
 func TestQueueOrder(t *testing.T) {
 	s := newTestStore(t, newFakeCatalog())
 
-	// A bulk upload's tail and start-up's backlog are waiting. A new upload
-	// jumps ahead of both, its own tail goes behind the upload's tail, and
-	// both tails go ahead of the backlog.
-	s.enqueue("a", tierBacklog)
-	s.enqueue("b", tierBacklog)
-	s.enqueue("u", tierSecond)
+	// Start-up's backlog is waiting. What someone asks for goes ahead of it,
+	// in the order asked; asking again keeps the place, and asking for a
+	// photo of the backlog takes it out of there.
+	s.push("a", false)
+	s.push("b", false)
 	s.Enqueue("c")
+	s.Enqueue("d")
 	s.Enqueue("c")
+	s.push("a", false)
+	s.Enqueue("b")
 
 	var got []string
 	for {
-		sha, q, ok := s.next()
+		sha, ok := s.next()
 		if !ok {
 			break
 		}
 
-		got = append(got, fmt.Sprintf("%s/%d", sha, q))
-		if q == tierFirst {
-			s.enqueue(sha, tierSecond)
-		}
+		got = append(got, sha)
 	}
 
-	require.Equal(t, []string{"c/0", "u/1", "c/1", "a/2", "b/2"}, got)
+	require.Equal(t, []string{"c", "d", "b", "a"}, got)
+
+	// Asked after the front was taken: still ahead of the backlog.
+	s.push("x", false)
+	s.Enqueue("y")
+	sha, _ := s.next()
+	require.Equal(t, "y", sha)
 }
 
-// A crop saved while the queue works through a backlog is built next, all
-// of it, before the photo being built goes on.
+// A crop saved while the worker goes through start-up's backlog is built
+// after the group in hand; the photo it interrupted carries on next.
 func TestCropChangeOvertakesBacklog(t *testing.T) {
 	t.Parallel()
 	cat := newFakeCatalog()
 	s := newTestStore(t, cat)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	x := photoOf(intake(t, s, "upright.jpg"))
-	cat.put(x)
-
+	y := photoOf(intake(t, s, "p3.jpg"))
 	p := photoOf(intake(t, s, "orient6.jpg"))
-	cat.put(p)
-	require.NoError(t, s.warm(ctx, p.SHA256, allSpecs))
 
-	s.enqueue(x.SHA256, tierBacklog)
+	for _, ph := range []Photo{x, y, p} {
+		cat.put(ph)
+	}
+
+	require.NoError(t, s.prepare(ctx, p.SHA256))
+	s.push(x.SHA256, false)
+	s.push(y.SHA256, false)
 
 	// The admin recrops p as the worker starts on x.
 	cat.onPhoto = func(string) {
@@ -65,72 +73,64 @@ func TestCropChangeOvertakesBacklog(t *testing.T) {
 		s.Enqueue(p.SHA256)
 	}
 
-	missing := func(sha string) int {
+	state := func(sha string) State {
 		st, err := s.Status(ctx, sha)
 		require.NoError(t, err)
 
-		return st.Total - st.Ready
+		return st.State
+	}
+
+	built := func(sha string) int {
+		st, err := s.Status(ctx, sha)
+		require.NoError(t, err)
+
+		return st.Ready
 	}
 
 	require.True(t, s.step(ctx))
-	require.Equal(t, 3, missing(x.SHA256), "x stops after its full group")
-	require.Equal(t, 3, missing(p.SHA256))
+	require.Equal(t, len(groups(x)[0].specs), built(x.SHA256), "x stops after its first group")
+	require.Equal(t, StateQueued, state(x.SHA256))
+	require.Equal(t, StateQueued, state(p.SHA256))
 
 	require.True(t, s.step(ctx))
-	require.Equal(t, 2, missing(p.SHA256), "first pass: the status moves")
+	require.Equal(t, StateReady, state(p.SHA256), "the crop goes next")
+	require.Equal(t, StateQueued, state(x.SHA256))
 
 	require.True(t, s.step(ctx))
-	require.Zero(t, missing(p.SHA256), "then the rest of the new crop")
-	require.Equal(t, 3, missing(x.SHA256))
+	require.Equal(t, StateReady, state(x.SHA256), "then x, ahead of the backlog")
+	require.Equal(t, StateQueued, state(y.SHA256))
 
 	require.True(t, s.step(ctx))
-	require.Zero(t, missing(x.SHA256))
+	require.Equal(t, StateReady, state(y.SHA256))
 	require.False(t, s.step(ctx))
-}
-
-func TestFirstPass(t *testing.T) {
-	p := Photo{
-		SHA256: testSHA, Width: 3000, Height: 2000,
-		Crops: map[Kind]Rect{
-			Card:   {X: 0, Y: 0, W: 1600, H: 2000},
-			Banner: {X: 0, Y: 0, W: 3000, H: 1687},
-			Share:  {X: 0, Y: 0, W: 3000, H: 1575},
-		},
-	}
-
-	got := map[Kind][]string{}
-	for _, g := range groups(p) {
-		for _, s := range firstPass(p, g) {
-			got[g.kind] = append(got[g.kind], fmt.Sprintf("%s/%d", s.Format, s.Width))
-		}
-	}
-
-	require.Equal(t, map[Kind][]string{
-		Full:   {"jpeg/1200", "avif/800"},
-		Card:   {"avif/800"},
-		Banner: {"avif/800"},
-		Share:  {"jpeg/1200"},
-	}, got)
 }
 
 func TestStatus(t *testing.T) {
 	t.Parallel()
 	cat := newFakeCatalog()
 	s := newTestStore(t, cat)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	o := intake(t, s, "upright.jpg")
 	p := photoOf(o)
 	cat.put(p)
+	s.Enqueue(p.SHA256)
 
 	st, err := s.Status(ctx, p.SHA256)
 	require.NoError(t, err)
 	require.Equal(t, Status{
-		State: StateQueued, Ready: 1, Total: len(Expected(p)),
+		State: StateQueued, Ready: 2, Total: len(Expected(p)),
 		Preview: o.Preview, Width: 1200, Height: 800,
 	}, st)
 
-	require.NoError(t, s.warm(ctx, p.SHA256, allSpecs))
+	// The worker's view while it builds.
+	cat.onPhoto = func(string) {
+		st, err := s.Status(ctx, p.SHA256)
+		require.NoError(t, err)
+		require.Equal(t, StatePreparing, st.State)
+	}
+
+	require.True(t, s.step(ctx))
 
 	st, err = s.Status(ctx, p.SHA256)
 	require.NoError(t, err)
@@ -140,6 +140,7 @@ func TestStatus(t *testing.T) {
 	// A crop change: only the card is rebuilt, and status says so.
 	p.Crops = map[Kind]Rect{Card: {X: 0, Y: 0, W: 480, H: 600}}
 	cat.put(p)
+	s.Enqueue(p.SHA256)
 
 	st, err = s.Status(ctx, p.SHA256)
 	require.NoError(t, err)
@@ -147,15 +148,17 @@ func TestStatus(t *testing.T) {
 	require.Equal(t, st.Total-3, st.Ready)
 
 	before := s.builds.Load()
-	require.NoError(t, s.warm(ctx, p.SHA256, allSpecs))
+	require.True(t, s.step(ctx))
 	require.Equal(t, before+1, s.builds.Load())
 }
 
+// A failed photo stays failed, with its reason, until someone asks again;
+// then it is queued, and ready once the cause is gone.
 func TestStatusFailed(t *testing.T) {
 	t.Parallel()
 	cat := newFakeCatalog()
 	s := newTestStore(t, cat)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// A damaged original that skipped Intake, as a bad restore would leave.
 	b, err := os.ReadFile(fixture(t, "truncated.jpg"))
@@ -167,22 +170,91 @@ func TestStatusFailed(t *testing.T) {
 	require.NoError(t, os.WriteFile(orig, b, 0o600))
 	cat.put(p)
 
-	require.ErrorIs(t, s.warm(ctx, p.SHA256, allSpecs), ErrBroken)
+	status := func() Status {
+		st, err := s.Status(ctx, p.SHA256)
+		require.NoError(t, err)
 
-	st, err := s.Status(ctx, p.SHA256)
-	require.NoError(t, err)
-	require.Equal(t, StateFailed, st.State)
-	require.Equal(t, ReasonDamaged, st.Reason)
-	require.Empty(t, st.Preview)
+		return st
+	}
+
+	s.Enqueue(p.SHA256)
+	require.True(t, s.step(ctx))
+	require.Equal(t, StateFailed, status().State)
+	require.Equal(t, ReasonDamaged, status().Reason)
+	require.Empty(t, status().Preview)
+
+	// Other work comes and goes; the failure stays.
+	other := photoOf(intake(t, s, "upright.jpg"))
+	cat.put(other)
+	s.Enqueue(other.SHA256)
+	require.True(t, s.step(ctx))
+	require.Equal(t, StateFailed, status().State)
 
 	// Gone: a restore is the only fix.
 	require.NoError(t, os.Remove(orig))
-	s.failed = map[string]failure{}
-	require.Error(t, s.warm(ctx, p.SHA256, allSpecs))
+	require.NoError(t, s.Retry(ctx, p.SHA256))
+	require.Equal(t, StateQueued, status().State)
+	require.True(t, s.step(ctx))
+	require.Equal(t, ReasonMissingOriginal, status().Reason)
 
-	st, err = s.Status(ctx, p.SHA256)
+	// Restored: the next try succeeds.
+	good, err := os.ReadFile(fixture(t, "upright.jpg"))
 	require.NoError(t, err)
-	require.Equal(t, ReasonMissingOriginal, st.Reason)
+	require.NoError(t, os.WriteFile(orig, good, 0o600))
+	require.NoError(t, s.Retry(ctx, p.SHA256))
+	require.True(t, s.step(ctx))
+	require.Equal(t, StateReady, status().State)
+}
+
+// Files missing that nothing is building is offered for a retry, whatever
+// removed them.
+func TestStatusMissingIsFailed(t *testing.T) {
+	t.Parallel()
+	cat := newFakeCatalog()
+	s := newTestStore(t, cat)
+
+	p := photoOf(intake(t, s, "upright.jpg"))
+	cat.put(p)
+
+	st, err := s.Status(t.Context(), p.SHA256)
+	require.NoError(t, err)
+	require.Equal(t, StateFailed, st.State)
+	require.Equal(t, ReasonInternal, st.Reason)
+}
+
+// A build stopped by shutdown is no failure: not logged as one, and not
+// remembered against the photo.
+func TestStoppedIsNoFailure(t *testing.T) {
+	logs := &bytes.Buffer{}
+	cat := newFakeCatalog()
+	s := newTestStore(t, cat, WithLogger(slog.New(slog.NewTextHandler(logs, nil))))
+	p := photoOf(intake(t, s, "upright.jpg"))
+	cat.put(p)
+
+	ctx, cancel := context.WithCancel(t.Context())
+	cancel()
+	s.Enqueue(p.SHA256)
+	require.True(t, s.step(ctx))
+	require.Empty(t, s.failed)
+	require.NotContains(t, logs.String(), "level=ERROR")
+
+	s.Enqueue(p.SHA256)
+	require.True(t, s.step(t.Context()))
+
+	st, err := s.Status(t.Context(), p.SHA256)
+	require.NoError(t, err)
+	require.Equal(t, StateReady, st.State)
+}
+
+func TestRejectsReplacedOriginal(t *testing.T) {
+	cat := newFakeCatalog()
+	s := newTestStore(t, cat)
+	p := photoOf(intake(t, s, "upright.jpg"))
+	// The catalogue remembers another size: the crop would land elsewhere.
+	p.Width, p.Height = 1600, 1000
+	cat.put(p)
+
+	require.ErrorContains(t, s.prepare(t.Context(), p.SHA256), "the catalogue says 1600x1000")
 }
 
 func TestRun(t *testing.T) {
@@ -190,11 +262,11 @@ func TestRun(t *testing.T) {
 	cat := newFakeCatalog()
 	s := newTestStore(t, cat)
 
-	// Queued before a restart: Run finds it again.
+	// Known before a restart: Run finds it again.
 	old := photoOf(intake(t, s, "orient6.jpg"))
 	cat.put(old)
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	done := make(chan error, 1)
 
 	go func() { done <- s.Run(ctx) }()
@@ -221,45 +293,12 @@ func TestRun(t *testing.T) {
 	require.NoError(t, <-done)
 }
 
-func TestQueueSkipsDeletedPhotos(t *testing.T) {
+func TestPrepareSkipsDeletedPhotos(t *testing.T) {
 	t.Parallel()
 	s := newTestStore(t, newFakeCatalog())
 
-	require.NoError(t, s.warm(context.Background(), testSHA, allSpecs))
+	require.NoError(t, s.prepare(t.Context(), testSHA))
 	require.Zero(t, s.builds.Load())
-}
-
-func TestRetry(t *testing.T) {
-	t.Parallel()
-	cat := newFakeCatalog()
-	s := newTestStore(t, cat)
-	ctx := context.Background()
-
-	b, err := os.ReadFile(fixture(t, "truncated.jpg"))
-	require.NoError(t, err)
-
-	p := Photo{SHA256: testSHA, MIME: "image/jpeg", Width: 1200, Height: 800}
-	orig := s.originalPath(p.SHA256, p.MIME)
-	require.NoError(t, os.MkdirAll(filepath.Dir(orig), dirPerm))
-	require.NoError(t, os.WriteFile(orig, b, 0o600))
-	cat.put(p)
-
-	require.ErrorIs(t, s.warm(ctx, p.SHA256, allSpecs), ErrBroken)
-	require.NotEmpty(t, s.failed)
-
-	require.NoError(t, s.Retry(ctx, p.SHA256))
-	require.Empty(t, s.failed, "the failures are forgotten")
-
-	st, err := s.Status(ctx, p.SHA256)
-	require.NoError(t, err)
-	require.Equal(t, StateQueued, st.State)
-
-	sha, q, ok := s.next()
-	require.True(t, ok)
-	require.Equal(t, tierFirst, q)
-	require.Equal(t, p.SHA256, sha)
-
-	require.ErrorIs(t, s.Retry(ctx, strings.Repeat("f", 64)), ErrNotFound)
 }
 
 func TestAdminURLs(t *testing.T) {

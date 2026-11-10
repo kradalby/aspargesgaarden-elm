@@ -120,7 +120,7 @@ func (v *vips) buildMaster(ctx context.Context, path, out, prefix string) (Ref, 
 	}
 
 	if len(missing) > 0 {
-		if err := v.build(ctx, p, path, gs[0], missing, dst, nil); err != nil {
+		if err := v.build(ctx, p, path, gs[0], missing, dst); err != nil {
 			return Ref{}, nil, err
 		}
 	}

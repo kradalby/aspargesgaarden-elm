@@ -13,8 +13,7 @@ import (
 // It decodes the original once (stage 1), cuts the crop window (stage 2) and
 // encodes each file from that small master (stage 3). Every file is checked,
 // synced and renamed into place, so a reader never sees a partial file.
-// landed, if set, hears of each file as soon as it is in place or failed.
-func (v *vips) build(ctx context.Context, p Photo, orig string, g group, specs []VariantSpec, dst func(VariantSpec) string, landed func(VariantSpec, error)) error {
+func (v *vips) build(ctx context.Context, p Photo, orig string, g group, specs []VariantSpec, dst func(VariantSpec) string) error {
 	hdr, err := v.preflight(ctx, orig, p.MIME)
 	if err != nil {
 		return fmt.Errorf("preflight: %w", err)
@@ -81,15 +80,7 @@ func (v *vips) build(ctx context.Context, p Photo, orig string, g group, specs [
 		out := dst(s)
 		err := v.encodeOne(ctx, master, dir, s, float64(hmax)*float64(s.Width)/float64(wmax), out)
 		if err != nil {
-			err = fmt.Errorf("%s: %w", s.Name(), err)
-			errs = append(errs, err)
-		}
-
-		if landed != nil {
-			landed(s, err)
-		}
-
-		if err != nil {
+			errs = append(errs, fmt.Errorf("%s: %w", s.Name(), err))
 			continue
 		}
 

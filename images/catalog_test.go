@@ -125,20 +125,8 @@ func TestRefForPhotoBetweenRungs(t *testing.T) {
 	require.Equal(t, 1024, ref.Height)
 	require.Len(t, ref.Variants, 6)
 
-	// The queue's first pass and the crop tool take it too.
+	// The crop tool takes it too.
 	require.Contains(t, PreviewURL(p), "-768.jpg")
-
-	g := groups(p)[0]
-	require.Equal(t, []string{"avif/768"}, specNames(firstPass(p, g)[1:]))
-}
-
-func specNames(specs []VariantSpec) []string {
-	out := make([]string, len(specs))
-	for i, s := range specs {
-		out[i] = fmt.Sprintf("%s/%d", s.Format, s.Width)
-	}
-
-	return out
 }
 
 func ladder(ws ...int) []string {

@@ -2,7 +2,6 @@ package images
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"log/slog"
 	"os"
@@ -13,13 +12,10 @@ import (
 )
 
 const (
-	// defaultJobs is how many groups build at once. Each runs one vips
-	// process at a time with vipsThreads threads, and every child counts
-	// against the unit's MemoryMax.
-	defaultJobs = 2
-	// failTTL is how long a failed variant is not retried, so a broken photo
-	// cannot start a build on every request.
-	failTTL = 10 * time.Minute
+	// jobs is how many groups build at once: the worker's and an upload's.
+	// Each runs one vips process at a time with vipsThreads threads, and
+	// every child counts against the unit's MemoryMax.
+	jobs    = 2
 	dirPerm = 0o750
 )
 
@@ -33,28 +29,18 @@ type Store struct {
 	cat       Catalog
 	log       *slog.Logger
 	vips      *vips
-	now       func() time.Time
 	maxUpload int64
-	jobs      chan struct{}
-	builds    atomic.Int64 // group builds started; tests read it
+	slots     chan struct{} // see jobs
+	builds    atomic.Int64  // group builds started; tests read it
 
-	mu       sync.Mutex
-	inflight map[string]*flight // by variant path
-	failed   map[string]failure // by variant path
-
-	qmu    sync.Mutex
-	queues [tiers]fifo // see Enqueue
-	wake   chan struct{}
-}
-
-type flight struct {
-	done chan struct{}
-	err  error
-}
-
-type failure struct {
-	err   error
-	until time.Time
+	mu      sync.Mutex
+	queue   []string // photos for the worker, next first; see Enqueue
+	asked   int      // how many at the front of queue someone asked for
+	running string   // the photo the worker is on
+	// runningAsked says whether someone asked for running; see yield.
+	runningAsked bool
+	failed       map[string]error // a photo's last failure, until a success or Enqueue
+	wake         chan struct{}
 }
 
 // Option configures a Store.
@@ -65,24 +51,6 @@ func WithLogger(l *slog.Logger) Option {
 	return func(s *Store) error { s.log = l; return nil }
 }
 
-// WithClock replaces time.Now for the negative cache and the grace periods.
-func WithClock(now func() time.Time) Option {
-	return func(s *Store) error { s.now = now; return nil }
-}
-
-// WithJobs sets how many variant groups may build at once.
-func WithJobs(n int) Option {
-	return func(s *Store) error {
-		if n < 1 {
-			return fmt.Errorf("jobs must be at least 1, got %d", n)
-		}
-
-		s.jobs = make(chan struct{}, n)
-
-		return nil
-	}
-}
-
 // New opens the store at root, creating its folders. It fails when the vips
 // CLI is missing, so a broken deploy stops at start rather than on the first
 // photo.
@@ -91,11 +59,9 @@ func New(root string, cat Catalog, opts ...Option) (*Store, error) {
 		root:      root,
 		cat:       cat,
 		log:       slog.New(slog.DiscardHandler),
-		now:       time.Now,
 		maxUpload: MaxUpload,
-		jobs:      make(chan struct{}, defaultJobs),
-		inflight:  map[string]*flight{},
-		failed:    map[string]failure{},
+		slots:     make(chan struct{}, jobs),
+		failed:    map[string]error{},
 		wake:      make(chan struct{}, 1),
 	}
 
@@ -160,148 +126,20 @@ func exists(path string) bool {
 	return err == nil
 }
 
-// ensure builds whichever of specs (all of group g) are missing. A spec
-// already being built is waited for instead of built twice, and one that
-// failed within failTTL is not tried again.
-func (s *Store) ensure(ctx context.Context, p Photo, g group, specs []VariantSpec) error {
-	var missing []VariantSpec
-	for _, sp := range specs {
-		if !exists(s.path(sp)) {
-			missing = append(missing, sp)
-		}
-	}
-
-	if len(missing) == 0 {
-		return nil
-	}
-
-	var (
-		mine  []VariantSpec
-		waits []*flight
-		errs  []error
-		now   = s.now()
-	)
-
-	// One flight per file, ended as each file lands, so a request waiting
-	// for one file does not wait for the rest of a group the queue builds.
-	flights := map[string]*flight{}
-
-	s.mu.Lock()
-	for _, sp := range missing {
-		path := s.path(sp)
-		if o := s.inflight[path]; o != nil {
-			waits = append(waits, o)
-			continue
-		}
-
-		// Landed since the check above: land ends a flight under mu, after
-		// the file is in place.
-		if exists(path) {
-			continue
-		}
-
-		if fl, ok := s.failed[path]; ok && now.Before(fl.until) {
-			errs = append(errs, fmt.Errorf("failed recently, retry after %s: %w", fl.until.Format(time.TimeOnly), fl.err))
-			continue
-		}
-
-		flights[path] = &flight{done: make(chan struct{})}
-		s.inflight[path] = flights[path]
-		mine = append(mine, sp)
-	}
-
-	for path, fl := range s.failed {
-		if now.After(fl.until) {
-			delete(s.failed, path)
-		}
-	}
-	s.mu.Unlock()
-
-	if len(mine) > 0 {
-		land := func(sp VariantSpec, err error) { s.land(sp, flights[s.path(sp)], err, ctx.Err() != nil) }
-		err := s.buildGroup(ctx, p, g, mine, land)
-
-		// Files the build never reached: it failed before encoding.
-		for _, sp := range mine {
-			land(sp, err)
-		}
-
-		errs = append(errs, err)
-	}
-
-	for _, w := range waits {
-		select {
-		case <-w.done:
-			errs = append(errs, w.err)
-		case <-ctx.Done():
-			return ctx.Err()
-		}
-	}
-
-	n := 0
-	for _, sp := range missing {
-		if !exists(s.path(sp)) {
-			n++
-		}
-	}
-
-	if n > 0 {
-		return fmt.Errorf("%d of %d %s variants of %s not built: %w", n, len(missing), g.kind, p.SHA256, errors.Join(errs...))
-	}
-
-	return nil
-}
-
-// land ends f, the flight of sp, once: it records a failure for a file
-// that is not there and wakes whoever waits for it. A build stopped by its
-// context is no failure: the next caller builds the file.
-func (s *Store) land(sp VariantSpec, f *flight, err error, stopped bool) {
-	path := s.path(sp)
-
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	if s.inflight[path] != f {
-		return
-	}
-
-	delete(s.inflight, path)
-	defer close(f.done)
-
-	switch {
-	case exists(path):
-		delete(s.failed, path)
-		return
-	case err == nil:
-		err = errors.New("build left no file")
-	}
-
-	f.err = err
-	if !stopped {
-		s.failed[path] = failure{err: err, until: s.now().Add(failTTL)}
-	}
-}
-
-// buildGroup runs one build in a job slot.
-func (s *Store) buildGroup(ctx context.Context, p Photo, g group, specs []VariantSpec, landed func(VariantSpec, error)) error {
+// buildGroup builds specs, all of group g of photo p, from the original at
+// orig, in a job slot.
+func (s *Store) buildGroup(ctx context.Context, p Photo, orig string, g group, specs []VariantSpec) error {
 	select {
-	case s.jobs <- struct{}{}:
+	case s.slots <- struct{}{}:
 	case <-ctx.Done():
 		return ctx.Err()
 	}
-	defer func() { <-s.jobs }()
+	defer func() { <-s.slots }()
 
 	s.builds.Add(1)
 	start := time.Now()
-	log := s.log.With("photo", p.SHA256, "kind", g.kind, "crop", g.rect, "variants", len(specs))
 
-	orig := s.originalPath(p.SHA256, p.MIME)
-	_, err := os.Stat(orig)
-	if err != nil {
-		err = fmt.Errorf("original of %s: %w", p.SHA256, err)
-	} else {
-		err = s.vips.build(ctx, p, orig, g, specs, s.path, landed)
-	}
+	err := s.vips.build(ctx, p, orig, g, specs, s.path)
 
 	metricBuildSeconds.WithLabelValues(string(g.kind)).Observe(time.Since(start).Seconds())
 
@@ -311,21 +149,11 @@ func (s *Store) buildGroup(ctx context.Context, p Photo, g group, specs []Varian
 		}
 	}
 
-	// A shutdown or an interrupted warm kills vips mid-build; that says
-	// nothing about the photo, whatever vips's last words were.
-	if err != nil && ctx.Err() != nil {
-		log.Debug("image build stopped", "err", err)
-		return ctx.Err()
-	}
-
-	if err != nil {
+	if err != nil && ctx.Err() == nil {
 		metricBuildErrors.WithLabelValues(string(g.kind)).Inc()
-		log.Error("image build failed", "orig", orig, "mime", p.MIME, "size", fmt.Sprintf("%dx%d", p.Width, p.Height), "err", err)
-
-		return err
 	}
 
-	log.Debug("image build done", "took", time.Since(start))
+	s.log.Debug("images: group built", "photo", p.SHA256, "kind", g.kind, "variants", len(specs), "took", time.Since(start), "err", err)
 
-	return nil
+	return err
 }

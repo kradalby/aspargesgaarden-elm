@@ -42,7 +42,7 @@ func buildAll(t *testing.T, v *vips, p Photo, orig, out string, only ...Kind) []
 		}
 
 		dst := func(s VariantSpec) string { return filepath.Join(out, s.Path()) }
-		require.NoError(t, v.build(context.Background(), p, orig, g, g.specs, dst, nil), g.kind)
+		require.NoError(t, v.build(context.Background(), p, orig, g, g.specs, dst), g.kind)
 
 		for _, s := range g.specs {
 			require.FileExists(t, dst(s))
@@ -181,7 +181,7 @@ func TestBuildLeavesNothingOnFailure(t *testing.T) {
 	require.Equal(t, Card, g.kind)
 
 	err := v.build(context.Background(), p, fixture(t, "truncated.jpg"), g, g.specs,
-		func(s VariantSpec) string { return filepath.Join(out, s.Path()) }, nil)
+		func(s VariantSpec) string { return filepath.Join(out, s.Path()) })
 	require.ErrorIs(t, err, ErrBroken)
 
 	entries, err := os.ReadDir(out)

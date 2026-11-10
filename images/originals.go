@@ -10,6 +10,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"time"
 )
 
 // MaxUpload is the largest original Intake accepts.
@@ -96,10 +97,16 @@ func (s *Store) Intake(ctx context.Context, r io.Reader) (Original, error) {
 	}
 
 	// The preview is the full decode that proves the file is sound, and what
-	// the admin shows next. Its row does not exist yet, so build it directly.
+	// the admin shows next, with the thumb its lists show. The row does not
+	// exist yet, so they are built here, not by the worker.
 	p := Photo{SHA256: o.SHA256, MIME: o.MIME, Width: o.Width, Height: o.Height}
 	pv, _ := previewSpec(p)
-	if err := s.ensure(ctx, p, groups(p)[0], []VariantSpec{pv}); err != nil {
+	specs := []VariantSpec{pv}
+	if th, ok := thumbSpec(p); ok && th != pv {
+		specs = append(specs, th)
+	}
+
+	if err := s.buildGroup(ctx, p, s.originalPath(o.SHA256, o.MIME), groups(p)[0], specs); err != nil {
 		if created {
 			orig := s.originalPath(o.SHA256, o.MIME)
 			_ = os.Remove(orig)
@@ -120,7 +127,7 @@ func (s *Store) storeOriginal(tmp string, o Original) (bool, error) {
 	dst := s.originalPath(o.SHA256, o.MIME)
 	if exists(dst) {
 		// Restart the grace period: the caller is about to write a row for it.
-		now := s.now()
+		now := time.Now()
 		if err := os.Chtimes(dst, now, now); err != nil {
 			return false, fmt.Errorf("touch original: %w", err)
 		}

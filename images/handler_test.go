@@ -47,7 +47,7 @@ func TestHandler(t *testing.T) {
 	require.Equal(t, "no-store", hdr.Get("Cache-Control"))
 	require.NoFileExists(t, s.path(card))
 
-	require.NoError(t, s.warm(t.Context(), p.SHA256, allSpecs))
+	require.NoError(t, s.prepare(t.Context(), p.SHA256))
 
 	code, hdr, body := do(http.MethodGet, card.URL())
 	require.Equal(t, http.StatusOK, code)

@@ -4,106 +4,53 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
 	"slices"
+	"time"
 )
 
-const (
-	// previewWidth is the crop tool's picture: sharp enough to place a crop,
-	// small enough to load at once.
-	previewWidth = 1200
-	// firstPassWidth is the size the admin's page preview most likely asks
-	// for, built before the rest.
-	firstPassWidth = 800
-)
+// previewWidth is the crop tool's picture: sharp enough to place a crop,
+// small enough to load at once.
+const previewWidth = 1200
 
-// tier is one of the worker's queues; a lower tier is always taken first.
-type tier int
+// Enqueue asks the worker to bring a photo's files in line with the
+// catalogue: build what is missing, after an upload, a crop change or a
+// publish. Someone is waiting for it, so it goes ahead of the backlog Run
+// queued at start, behind what others asked for before, and a backlog photo
+// being built steps aside after its current group (see yield). Its last
+// failure is forgotten: asking again is the retry.
+func (s *Store) Enqueue(sha string) { s.push(sha, true) }
 
-const (
-	tierFirst   tier = iota // a photo's first pass after Enqueue
-	tierSecond              // the rest of a photo someone just changed
-	tierBacklog             // everything Run finds missing at start
-	tiers
-)
-
-// fifo is a queue of photos without duplicates.
-type fifo struct {
-	items []string
-	in    map[string]bool
-}
-
-func (q *fifo) push(sha string) {
-	if q.in == nil {
-		q.in = map[string]bool{}
-	}
-
-	if !q.in[sha] {
-		q.in[sha] = true
-		q.items = append(q.items, sha)
-	}
-}
-
-// resume puts back a photo whose build stopped to let another tier go
-// first, so it carries on before anything that queued after it.
-func (q *fifo) resume(sha string) {
-	if q.in == nil {
-		q.in = map[string]bool{}
-	}
-
-	if !q.in[sha] {
-		q.in[sha] = true
-		q.items = append([]string{sha}, q.items...)
-	}
-}
-
-func (q *fifo) pop() (string, bool) {
-	if len(q.items) == 0 {
-		return "", false
-	}
-
-	sha := q.items[0]
-	q.items = q.items[1:]
-	// Off before the build, so a crop change during it queues again.
-	delete(q.in, sha)
-
-	return sha, true
-}
-
-// Enqueue asks for every variant of a photo to be built in the background.
-// Call it after an upload, a crop change and a publish. Only missing files
-// are built, so after a crop change that is the changed kind alone.
-//
-// The photo goes to the first pass: what someone is waiting to look at (see
-// firstPass) is built for it before the long tail of any earlier photo.
-// Its own tail follows ahead of Run's backlog, so its status keeps moving.
-func (s *Store) Enqueue(sha string) {
-	s.enqueue(sha, tierFirst)
-}
-
-// Retry forgets the photo's recent build failures and queues it again: the
-// admin's answer to StateFailed, for a cause that has gone away since.
-func (s *Store) Retry(ctx context.Context, sha string) error {
-	p, err := s.cat.Photo(ctx, sha)
-	if err != nil {
-		return fmt.Errorf("retry: %w", err)
-	}
-
-	s.mu.Lock()
-	for _, sp := range Expected(p) {
-		delete(s.failed, s.path(sp))
-	}
-	s.mu.Unlock()
-
+// Retry is Enqueue, for the admin's "Prøv igjen" on StateFailed.
+func (s *Store) Retry(_ context.Context, sha string) error {
 	s.Enqueue(sha)
-
 	return nil
 }
 
-func (s *Store) enqueue(sha string, t tier) {
-	s.qmu.Lock()
-	s.queues[t].push(sha)
-	s.queued()
-	s.qmu.Unlock()
+func (s *Store) push(sha string, asked bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if asked {
+		delete(s.failed, sha)
+	}
+
+	if i := slices.Index(s.queue, sha); i >= 0 {
+		if !asked || i < s.asked {
+			return
+		}
+
+		s.queue = slices.Delete(s.queue, i, i+1)
+	}
+
+	if asked {
+		s.queue = slices.Insert(s.queue, s.asked, sha)
+		s.asked++
+	} else {
+		s.queue = append(s.queue, sha)
+	}
+
+	metricQueue.Set(float64(len(s.queue)))
 
 	select {
 	case s.wake <- struct{}{}:
@@ -111,85 +58,81 @@ func (s *Store) enqueue(sha string, t tier) {
 	}
 }
 
-// queued updates the gauge; qmu is held.
-func (s *Store) queued() {
-	n := 0
-	for _, q := range s.queues {
-		n += len(q.items)
+// next takes the photo at the front of the queue and marks it running.
+func (s *Store) next() (string, bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if len(s.queue) == 0 {
+		return "", false
 	}
 
-	metricQueue.Set(float64(n))
+	s.running, s.runningAsked = s.queue[0], s.asked > 0
+	s.queue = s.queue[1:]
+	s.asked = max(s.asked-1, 0)
+	metricQueue.Set(float64(len(s.queue)))
+
+	return s.running, true
 }
 
-func (s *Store) next() (string, tier, bool) {
-	s.qmu.Lock()
-	defer s.qmu.Unlock()
-	defer s.queued()
+// yield puts the running photo back at the head of the backlog when it came
+// from there and someone has asked for a photo since: a whole photo takes
+// several group builds, and they wait for one at most.
+func (s *Store) yield(sha string) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 
-	for t := range s.queues {
-		if sha, ok := s.queues[t].pop(); ok {
-			return sha, tier(t), true
-		}
-	}
-
-	return "", 0, false
-}
-
-// ahead reports whether a photo waits in a tier before t.
-func (s *Store) ahead(t tier) bool {
-	s.qmu.Lock()
-	defer s.qmu.Unlock()
-
-	for _, q := range s.queues[:t] {
-		if len(q.items) > 0 {
-			return true
-		}
-	}
-
-	return false
-}
-
-// step does the worker's next unit of work and reports whether there was
-// any. A tail stops between groups when an earlier tier has work and
-// resumes from the front of its tier, so whatever the backlog, a changed
-// photo waits for at most one group build.
-func (s *Store) step(ctx context.Context) bool {
-	sha, t, ok := s.next()
-	if !ok {
+	if s.runningAsked || s.asked == 0 {
 		return false
 	}
 
-	// Failures are logged and counted by the build, and show in Status.
-	if t == tierFirst {
-		_, _ = s.warmUntil(ctx, sha, firstPass, nil)
-		s.enqueue(sha, tierSecond)
-
-		return true
-	}
-
-	stopped, _ := s.warmUntil(ctx, sha, allSpecs, func() bool { return s.ahead(t) })
-	if stopped {
-		s.qmu.Lock()
-		s.queues[t].resume(sha)
-		s.queued()
-		s.qmu.Unlock()
+	if !slices.Contains(s.queue, sha) {
+		s.queue = slices.Insert(s.queue, s.asked, sha)
+		metricQueue.Set(float64(len(s.queue)))
 	}
 
 	return true
 }
 
-// Run works the queue until ctx ends, one build at a time, so Intake keeps
-// the other job slots. At start it queues every photo behind any upload, so
-// work lost in a restart, a new pipeline version or a restore is rebuilt
-// without anyone asking.
+// step builds the next photo in the queue, if there is one, and remembers
+// how it went for Status.
+func (s *Store) step(ctx context.Context) bool {
+	sha, ok := s.next()
+	if !ok {
+		return false
+	}
+
+	err := s.prepare(ctx, sha)
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	s.running = ""
+
+	switch {
+	case err == nil:
+		delete(s.failed, sha)
+	case ctx.Err() != nil:
+		// Shutdown killed vips; that says nothing about the photo.
+	default:
+		s.failed[sha] = err
+		s.log.Error("images: photo not prepared", "photo", sha, "reason", ReasonOf(err), "err", err)
+	}
+
+	return true
+}
+
+// Run works the queue until ctx ends, one photo at a time. At start it
+// queues every photo, so sizes lost to a restart, a new pipeline version or
+// a restore without variants/ are built without anyone asking.
 func (s *Store) Run(ctx context.Context) error {
 	photos, err := s.cat.Photos(ctx)
 	if err != nil {
-		s.log.Error("images: list photos to warm", "err", err)
+		s.log.Error("images: list photos to prepare", "err", err)
 	}
 
 	for _, p := range photos {
-		s.enqueue(p.SHA256, tierBacklog)
+		s.push(p.SHA256, false)
 	}
 
 	for {
@@ -207,35 +150,71 @@ func (s *Store) Run(ctx context.Context) error {
 	}
 }
 
-// firstPass is what the admin is waiting for: the crop tool's preview, the
-// share image, and one AVIF per kind at the page preview's size.
-func firstPass(p Photo, g group) []VariantSpec {
-	if g.kind == Share {
-		return g.specs
+// prepare builds every missing variant of a photo, a group at a time in
+// groups order, so the crop tool's picture comes first.
+func (s *Store) prepare(ctx context.Context, sha string) error {
+	p, err := s.cat.Photo(ctx, sha)
+	if errors.Is(err, ErrNotFound) {
+		return nil
 	}
 
-	var out []VariantSpec
-	if pv, ok := previewSpec(p); ok && g.kind == Full {
-		out = append(out, pv)
+	if err != nil {
+		return fmt.Errorf("prepare %s: %w", sha, err)
 	}
 
-	w := 0
-	for _, s := range g.specs {
-		if s.Format == AVIF && s.Width <= firstPassWidth {
-			w = max(w, s.Width)
+	type work struct {
+		g     group
+		specs []VariantSpec
+	}
+
+	var todo []work
+
+	for _, g := range groups(p) {
+		var missing []VariantSpec
+		for _, sp := range g.specs {
+			if !exists(s.path(sp)) {
+				missing = append(missing, sp)
+			}
+		}
+
+		if len(missing) > 0 {
+			todo = append(todo, work{g, missing})
 		}
 	}
 
-	for _, s := range g.specs {
-		if s.Format == AVIF && s.Width == w {
-			out = append(out, s)
+	if len(todo) == 0 {
+		return nil
+	}
+
+	orig := s.originalPath(p.SHA256, p.MIME)
+	if _, err := os.Stat(orig); err != nil {
+		return fmt.Errorf("original of %s: %w", sha, err)
+	}
+
+	var (
+		errs  []error
+		n     int
+		start = time.Now()
+	)
+
+	for i, w := range todo {
+		// A group that failed so far is tried again, and reported, on resume.
+		if i > 0 && s.yield(sha) {
+			return nil
+		}
+
+		n += len(w.specs)
+		if err := s.buildGroup(ctx, p, orig, w.g, w.specs); err != nil {
+			errs = append(errs, fmt.Errorf("%s: %w", w.g.kind, err))
 		}
 	}
 
-	return out
+	if len(errs) == 0 {
+		s.log.Info("images: photo prepared", "photo", sha, "variants", n, "took", time.Since(start))
+	}
+
+	return errors.Join(errs...)
 }
-
-func allSpecs(_ Photo, g group) []VariantSpec { return g.specs }
 
 // previewSpec is the Full JPEG the crop tool shows. JPEG because the
 // cropper draws it on a canvas in any browser.
@@ -255,10 +234,25 @@ func previewSpec(p Photo) (VariantSpec, bool) {
 	return best, best.Width > 0
 }
 
+// thumbSpec is the Full JPEG at the ladder's first width.
+func thumbSpec(p Photo) (VariantSpec, bool) {
+	gs := groups(p)
+	if len(gs) == 0 || gs[0].kind != Full {
+		return VariantSpec{}, false
+	}
+
+	i := slices.IndexFunc(gs[0].specs, func(s VariantSpec) bool { return s.Format == JPEG && s.Width == widths[0] })
+	if i < 0 {
+		return VariantSpec{}, false
+	}
+
+	return gs[0].specs[i], true
+}
+
 // PreviewURL is the address of the crop tool's picture of p, and ThumbURL
 // of p whole at the smallest width, for the admin's lists. Both are "" for
-// a photo with no variants. Status tells when the preview is built; the
-// thumb comes with the rest.
+// a photo with no variants. Intake builds both; Status tells when the
+// preview exists.
 func PreviewURL(p Photo) string {
 	pv, ok := previewSpec(p)
 	if !ok {
@@ -270,75 +264,28 @@ func PreviewURL(p Photo) string {
 
 // ThumbURL: see PreviewURL.
 func ThumbURL(p Photo) string {
-	gs := groups(p)
-	if len(gs) == 0 || gs[0].kind != Full {
+	th, ok := thumbSpec(p)
+	if !ok {
 		return ""
 	}
 
-	for _, s := range gs[0].specs {
-		if s.Format == JPEG && s.Width == widths[0] {
-			return s.URL()
-		}
-	}
-
-	return ""
-}
-
-// warm builds the missing variants pick chooses from each group of a photo.
-func (s *Store) warm(ctx context.Context, sha string, pick func(Photo, group) []VariantSpec) error {
-	_, err := s.warmUntil(ctx, sha, pick, nil)
-	return err
-}
-
-// warmUntil is warm that stops before a further group build once stop
-// says so; stopped tells whether it did.
-func (s *Store) warmUntil(ctx context.Context, sha string, pick func(Photo, group) []VariantSpec, stop func() bool) (stopped bool, err error) {
-	p, err := s.cat.Photo(ctx, sha)
-	if errors.Is(err, ErrNotFound) {
-		return false, nil // deleted since it was queued
-	}
-
-	if err != nil {
-		return false, fmt.Errorf("warm %s: %w", sha, err)
-	}
-
-	var (
-		errs  []error
-		built bool
-	)
-
-	for _, g := range groups(p) {
-		specs := pick(p, g)
-		if !slices.ContainsFunc(specs, func(sp VariantSpec) bool { return !exists(s.path(sp)) }) {
-			continue
-		}
-
-		if built && stop != nil && stop() {
-			return true, errors.Join(errs...)
-		}
-
-		built = true
-
-		errs = append(errs, s.ensure(ctx, p, g, specs))
-	}
-
-	return false, errors.Join(errs...)
+	return th.URL()
 }
 
 // State is where a photo's variants are.
 type State string
 
 const (
-	StateQueued    State = "queued"    // waiting for the queue
-	StatePreparing State = "preparing" // a build for it is running
+	StateQueued    State = "queued"    // waiting for the worker
+	StatePreparing State = "preparing" // the worker is on it
 	StateReady     State = "ready"     // every variant exists
-	StateFailed    State = "failed"    // a build failed; not retried for failTTL
+	StateFailed    State = "failed"    // files are missing and nothing is building them
 )
 
 // Status is what the admin polls while a photo is prepared. It shows
 // "Bildene klargjøres …" until State is StateReady, and on StateFailed turns
-// Reason into a sentence. Publishing need not wait: a size not built yet is
-// missing on the page until the queue gets to it.
+// Reason into a sentence and offers Retry. Publishing need not wait: a size
+// not built yet is missing on the page until the worker gets to it.
 type Status struct {
 	State        State
 	Ready, Total int    // variant files present and expected
@@ -349,8 +296,8 @@ type Status struct {
 	Width, Height int
 }
 
-// Status reports how far a photo's variants are. It reads memory and file
-// metadata only, so it is cheap to poll.
+// Status reports how far a photo's variants are, from one catalogue lookup,
+// file metadata and memory, so it is cheap to poll.
 func (s *Store) Status(ctx context.Context, sha string) (Status, error) {
 	p, err := s.cat.Photo(ctx, sha)
 	if err != nil {
@@ -362,40 +309,31 @@ func (s *Store) Status(ctx context.Context, sha string) (Status, error) {
 		st.Preview = pv.URL()
 	}
 
-	var (
-		now      = s.now()
-		building bool
-		failed   error
-	)
-
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
 	for _, sp := range Expected(p) {
 		st.Total++
-
-		path := s.path(sp)
-		f, ok := s.failed[path]
-
-		switch {
-		case exists(path):
+		if exists(s.path(sp)) {
 			st.Ready++
-		case s.inflight[path] != nil:
-			building = true
-		case ok && now.Before(f.until):
-			failed = f.err
 		}
 	}
+
+	s.mu.Lock()
+	running, queued, failed := s.running == sha, slices.Contains(s.queue, sha), s.failed[sha]
+	s.mu.Unlock()
 
 	switch {
 	case st.Ready == st.Total:
 		st.State = StateReady
-	case failed != nil:
-		st.State, st.Reason = StateFailed, ReasonOf(failed)
-	case building:
+	case running:
 		st.State = StatePreparing
-	default:
+	case queued:
 		st.State = StateQueued
+	default:
+		// Missing with nobody on it: a failure, or anything that left files
+		// missing; either way the answer is a retry.
+		st.State, st.Reason = StateFailed, ReasonOf(failed)
+		if st.Reason == ReasonNone {
+			st.Reason = ReasonInternal
+		}
 	}
 
 	return st, nil

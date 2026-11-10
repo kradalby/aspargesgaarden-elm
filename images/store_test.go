@@ -1,44 +1,18 @@
 package images
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 	"image"
 	"image/color"
 	"image/png"
-	"log/slog"
 	"os"
 	"os/exec"
 	"path/filepath"
-	"slices"
-	"sync"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/require"
 )
-
-// fakeClock is the injected clock for the negative cache and grace periods.
-type fakeClock struct {
-	mu sync.Mutex
-	t  time.Time
-}
-
-func newFakeClock() *fakeClock { return &fakeClock{t: time.Now()} }
-
-func (c *fakeClock) now() time.Time {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-
-	return c.t
-}
-
-func (c *fakeClock) advance(d time.Duration) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	c.t = c.t.Add(d)
-}
 
 func fixture(t *testing.T, name string) string {
 	t.Helper()
@@ -165,37 +139,4 @@ func TestNewCleansUp(t *testing.T) {
 	tmp, err := os.ReadDir(filepath.Join(root, "tmp"))
 	require.NoError(t, err)
 	require.Empty(t, tmp)
-}
-
-// A build stopped by shutdown is no failure: not logged as one, and not
-// remembered against the photo.
-func TestBuildStoppedIsNoFailure(t *testing.T) {
-	logs := &bytes.Buffer{}
-	cat := newFakeCatalog()
-	s := newTestStore(t, cat, WithLogger(slog.New(slog.NewTextHandler(logs, nil))))
-	p := photoOf(intake(t, s, "upright.jpg"))
-	cat.put(p)
-
-	spec := VariantSpec{Photo: p.SHA256, Kind: Card, Crop: exampleCrop.ID(), Width: 480, Format: JPEG}
-	g := groups(p)[slices.IndexFunc(groups(p), func(g group) bool { return g.kind == Card })]
-
-	ctx, cancel := context.WithCancel(context.Background())
-	cancel()
-	require.ErrorIs(t, s.ensure(ctx, p, g, []VariantSpec{spec}), context.Canceled)
-
-	require.NoError(t, s.warm(context.Background(), p.SHA256, allSpecs))
-	require.FileExists(t, s.path(spec))
-	require.NotContains(t, logs.String(), "level=ERROR")
-}
-
-func TestBuildRejectsReplacedOriginal(t *testing.T) {
-	cat := newFakeCatalog()
-	s := newTestStore(t, cat)
-	p := photoOf(intake(t, s, "upright.jpg"))
-	// The catalogue remembers another size: the crop would land elsewhere.
-	p.Width, p.Height = 1600, 1000
-	cat.put(p)
-
-	err := s.warm(context.Background(), p.SHA256, allSpecs)
-	require.ErrorContains(t, err, "the catalogue says 1600x1000")
 }

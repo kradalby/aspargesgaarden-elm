@@ -42,8 +42,11 @@ func TestIntakeAccepts(t *testing.T) {
 			require.NoError(t, err)
 			require.Equal(t, want, got)
 
-			// The preview is there before the row is.
+			// The preview and the thumb are there before the row is.
+			thumb := pv
+			thumb.Width = 480
 			require.FileExists(t, filepath.Join(s.root, pv.Path()))
+			require.FileExists(t, filepath.Join(s.root, thumb.Path()))
 
 			// Stored byte for byte, under its content address.
 			stored, err := os.ReadFile(filepath.Join(s.root, "originals", want.SHA256[:2], want.SHA256+"."+tt.ext))
@@ -124,22 +127,20 @@ func TestIntakeLimits(t *testing.T) {
 
 func TestIntakeDedup(t *testing.T) {
 	t.Parallel()
-	clock := newFakeClock()
-	s := newTestStore(t, newFakeCatalog(), WithClock(clock.now))
+	s := newTestStore(t, newFakeCatalog())
 
 	a := intake(t, s, "upright.jpg")
 	path := s.originalPath(a.SHA256, a.MIME)
-	old := clock.now().Add(-6 * 24 * time.Hour)
+	old := time.Now().Add(-6 * 24 * time.Hour)
 	require.NoError(t, os.Chtimes(path, old, old))
 
-	clock.advance(time.Hour)
 	b := intake(t, s, "upright.jpg")
 	require.Equal(t, a, b)
 
-	// The second upload restarts the grace period for the row to come.
+	// The second upload marks the original fresh for the row to come.
 	st, err := os.Stat(path)
 	require.NoError(t, err)
-	require.WithinDuration(t, clock.now(), st.ModTime(), time.Second)
+	require.WithinDuration(t, time.Now(), st.ModTime(), time.Minute)
 
 	entries, err := os.ReadDir(filepath.Dir(path))
 	require.NoError(t, err)
