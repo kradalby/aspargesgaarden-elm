@@ -179,11 +179,13 @@
           # db/db.go embeds schema.sql; flake-checks' source filter keeps only
           # .go files, so the schema has to be added by hand. cmd/asparges'
           # tests read the module, to keep every serve flag settable there;
-          # ui's read the lightbox's widest photo.
+          # ui's read the lightbox's widest photo; server's, the API contract
+          # every code it sends must be in.
           extraSrc = [
             ./db/schema.sql
             ./nix/module.nix
             ./elm/gallery/src/Lightbox.elm
+            ./docs/admin-api.md
           ];
           # Committed embedded files; static/dist comes from withStatic.
           embedDirs = [ ./static/files ];
