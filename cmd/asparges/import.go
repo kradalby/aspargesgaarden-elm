@@ -181,15 +181,13 @@ func (im importer) event(ctx context.Context, file string, have map[string]bool)
 		e.ExtraPhotos = append(e.ExtraPhotos, p)
 	}
 
-	e, err = im.store.CreateEvent(ctx, e)
-	if err != nil {
-		return err
+	create := im.store.CreateEvent
+	if publish {
+		create = im.store.CreatePublished
 	}
 
-	if publish {
-		if e, err = im.store.Publish(ctx, e.ID, e.UpdatedAt); err != nil {
-			return err
-		}
+	if e, err = create(ctx, e); err != nil {
+		return err
 	}
 
 	have[e.Path()] = true

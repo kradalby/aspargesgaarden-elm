@@ -119,6 +119,16 @@ func (s *Store) NewestPublishedEvent(ctx context.Context, slug string) (Event, e
 
 // CreateEvent stores e as a new draft; see Revise for the rules.
 func (s *Store) CreateEvent(ctx context.Context, e Event) (Event, error) {
+	return s.create(ctx, e, false)
+}
+
+// CreatePublished stores e and publishes it in one step, so an event that
+// cannot be published leaves no draft behind. The import uses it.
+func (s *Store) CreatePublished(ctx context.Context, e Event) (Event, error) {
+	return s.create(ctx, e, true)
+}
+
+func (s *Store) create(ctx context.Context, e Event, publish bool) (Event, error) {
 	next, err := Revise(nil, e)
 	if err != nil {
 		return Event{}, err
@@ -135,6 +145,20 @@ func (s *Store) CreateEvent(ctx context.Context, e Event) (Event, error) {
 
 		if err := writeEventChildren(ctx, q, id, next); err != nil {
 			return Event{}, err
+		}
+
+		stored, err := event(ctx, q, id)
+		if err != nil || !publish {
+			return stored, err
+		}
+
+		pub, err := stored.Publish(now)
+		if err != nil {
+			return Event{}, err
+		}
+
+		if err := q.UpdateEvent(ctx, updateParams(pub)); err != nil {
+			return Event{}, eventWriteErr(err, pub)
 		}
 
 		return event(ctx, q, id)

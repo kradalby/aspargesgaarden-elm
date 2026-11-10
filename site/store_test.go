@@ -237,6 +237,31 @@ func TestStoreCopyAndEvergreen(t *testing.T) {
 	require.Equal(t, []int64{e.ID}, ids(past))
 }
 
+// The import publishes what the old site showed in the same step as it
+// stores it: a failure leaves nothing, so a second run imports it whole
+// instead of skipping a draft left behind.
+func TestStoreCreatePublished(t *testing.T) {
+	s, clock := newTestStore(t, oslo("2026-10-10 12:00"))
+	ctx := t.Context()
+
+	_, err := s.CreatePublished(ctx, Event{Title: "Julemarked", Start: d("2026-11-14")})
+	require.ErrorIs(t, err, ErrMainPhotoRequired)
+
+	events, err := s.Events(ctx)
+	require.NoError(t, err)
+	require.Empty(t, events, "nothing is left behind")
+
+	p := addPhoto(t, s, 'a', "Boder")
+	e, err := s.CreatePublished(ctx, Event{Title: "Julemarked", Start: d("2026-11-14"), MainPhoto: &p})
+	require.NoError(t, err)
+	require.Equal(t, Published, e.Status)
+	require.Equal(t, clock.t.UTC(), e.PublishedAt)
+
+	got, err := s.PublishedEvent(ctx, 2026, "julemarked")
+	require.NoError(t, err)
+	require.Equal(t, e, got)
+}
+
 func TestStoreEventPhotoErrors(t *testing.T) {
 	s, _ := newTestStore(t, oslo("2026-10-10 12:00"))
 	ctx := t.Context()
