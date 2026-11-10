@@ -41,7 +41,7 @@ func TestHeaderMarksCurrentSection(t *testing.T) {
 				return
 			}
 
-			require.Equal(t, 1, strings.Count(got, `aria-current="page"`))
+			require.Equal(t, 2, strings.Count(got, `aria-current="page"`), "once in each copy of the menu")
 			require.Contains(t, got, `aria-current="page" class="font-bold text-sm text-sort uppercase hover:text-brown-link" href=`)
 			require.Contains(t, got, ">"+tt.want+"</a>")
 		})
@@ -60,12 +60,21 @@ func TestHeaderMarksEventInMenu(t *testing.T) {
 	} {
 		got := Header(menu, current).Render()
 
-		require.Equal(t, 1, strings.Count(got, `aria-current="page"`), current)
+		require.Equal(t, 2, strings.Count(got, `aria-current="page"`), current)
 		require.Contains(t, got, `aria-current="page" class="font-bold text-sm text-sort uppercase hover:text-brown-link" `+want, current)
 	}
 }
 
-// The old header gave the menu div and its list the same id.
-func TestHeaderIDsAreUnique(t *testing.T) {
-	require.Equal(t, 1, strings.Count(Header(testMenu, "/").Render(), ` id="`))
+// The old site's menu was a hidden checkbox no keyboard could reach. The
+// menu now comes twice, and each copy must be display: none at the other's
+// widths, so a screen reader meets one.
+func TestHeaderMenuIsReachable(t *testing.T) {
+	got := Header(testMenu, "/").Render()
+
+	require.NotContains(t, got, "<input")
+	require.NotContains(t, got, " id=\"")
+	require.Equal(t, 2, strings.Count(got, `<nav aria-label="Hovedmeny"`))
+	require.Contains(t, got, `<details class="w-full lg:hidden"><summary `)
+	require.Contains(t, got, `<nav aria-label="Hovedmeny" class="hidden lg:flex lg:items-center">`)
+	require.Contains(t, got, `<span class="sr-only">Meny</span></summary>`)
 }

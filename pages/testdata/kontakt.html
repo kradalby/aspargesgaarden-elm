@@ -31,21 +31,20 @@
 </head>
 <body>
 <div class="antialiased flex flex-col h-screen justify-start">
-<header class="flex flex-wrap items-center px-4 py-0 border-b border-brown-border lg:px-16 lg:py-2">
-<div class="flex flex-1 justify-between items-center">
+<header class="relative flex flex-wrap items-center px-4 py-0 border-b border-brown-border lg:px-16 lg:py-2">
+<div class="flex flex-auto mr-5 justify-between items-center lg:flex-1 lg:mr-0">
 <a href="/">
 <img alt="Aspargesgården" class="h-28" src="/static/Aspargesgaarden_HOVEDLOGO_bredde_DempetSort.png?v=HASH">
 </a>
 </div>
-<label class="block cursor-pointer lg:hidden" for="menu-toggle">
-<svg class="fill-current text-brown-link" width="20" height="20" viewBox="0 0 20 20">
-<title>Meny</title>
+<details class="w-full lg:hidden">
+<summary class="absolute top-0 right-4 h-28 flex items-center cursor-pointer list-none [&amp;::-webkit-details-marker]:hidden">
+<svg class="fill-current text-brown-link" width="20" height="20" viewBox="0 0 20 20" aria-hidden="true">
 <path d="M0 3h20v2H0V3zm0 6h20v2H0V9zm0 6h20v2H0v-2z">
 </path>
 </svg>
-</label>
-<input class="peer hidden" id="menu-toggle" type="checkbox">
-<div class="hidden w-full peer-checked:block lg:flex lg:items-center lg:w-auto">
+<span class="sr-only">Meny</span>
+</summary>
 <nav aria-label="Hovedmeny">
 <ul class="items-center justify-between text-base text-brown-link lg:flex">
 <li class="block py-3 px-0 lg:p-4 lg:px-6">
@@ -68,7 +67,29 @@
 </li>
 </ul>
 </nav>
-</div>
+</details>
+<nav aria-label="Hovedmeny" class="hidden lg:flex lg:items-center">
+<ul class="items-center justify-between text-base text-brown-link lg:flex">
+<li class="block py-3 px-0 lg:p-4 lg:px-6">
+<a class="font-bold text-sm text-sort uppercase hover:text-mork-eukalyptus" href="/lokaler">Muligheter</a>
+</li>
+<li class="block py-3 px-0 lg:p-4 lg:px-6">
+<a class="font-bold text-sm text-sort uppercase hover:text-mork-eukalyptus" href="/arrangementer">Arrangementer</a>
+</li>
+<li class="block py-3 px-0 lg:p-4 lg:px-6">
+<a class="font-bold text-sm text-sort uppercase hover:text-mork-eukalyptus" href="/arrangementer/2026/julemarked">Julemarked</a>
+</li>
+<li class="block py-3 px-0 lg:p-4 lg:px-6">
+<a class="font-bold text-sm text-sort uppercase hover:text-mork-eukalyptus" href="/galleri">Galleri</a>
+</li>
+<li class="block py-3 px-0 lg:p-4 lg:px-6">
+<a class="font-bold text-sm text-sort uppercase hover:text-mork-eukalyptus" href="/om-oss">Om gården</a>
+</li>
+<li class="block py-3 px-0 lg:p-4 lg:px-6">
+<a aria-current="page" class="font-bold text-sm text-sort uppercase hover:text-brown-link" href="/kontakt">Kontakt</a>
+</li>
+</ul>
+</nav>
 </header>
 <main class="contents">
 <div class="flex flex-col md:px-24">
