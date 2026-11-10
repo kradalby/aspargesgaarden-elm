@@ -57,6 +57,15 @@ func (q *Queries) DeleteGallery(ctx context.Context) error {
 	return err
 }
 
+const deleteGalleryPhoto = `-- name: DeleteGalleryPhoto :exec
+DELETE FROM gallery_photos WHERE photo_id = ?
+`
+
+func (q *Queries) DeleteGalleryPhoto(ctx context.Context, photoID int64) error {
+	_, err := q.db.ExecContext(ctx, deleteGalleryPhoto, photoID)
+	return err
+}
+
 const deletePhoto = `-- name: DeletePhoto :execrows
 DELETE FROM photos WHERE id = ?
 `
@@ -67,6 +76,40 @@ func (q *Queries) DeletePhoto(ctx context.Context, id int64) (int64, error) {
 		return 0, err
 	}
 	return result.RowsAffected()
+}
+
+const deleteUnusedPhotos = `-- name: DeleteUnusedPhotos :many
+DELETE FROM photos
+WHERE photos.updated_at < ?
+    AND NOT EXISTS (SELECT 1 FROM event_photos WHERE event_photos.photo_id = photos.id)
+    AND NOT EXISTS (SELECT 1 FROM gallery_photos WHERE gallery_photos.photo_id = photos.id)
+RETURNING sha256
+`
+
+// Uploads no event or gallery took up, untouched since the cutoff. The
+// check and the delete are one statement, so a save that links one of them
+// either lands first and keeps it, or fails on the foreign key.
+func (q *Queries) DeleteUnusedPhotos(ctx context.Context, updatedAt int64) ([]string, error) {
+	rows, err := q.db.QueryContext(ctx, deleteUnusedPhotos, updatedAt)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []string
+	for rows.Next() {
+		var sha256 string
+		if err := rows.Scan(&sha256); err != nil {
+			return nil, err
+		}
+		items = append(items, sha256)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const galleryUpdatedAt = `-- name: GalleryUpdatedAt :one
@@ -89,6 +132,27 @@ SELECT id, sha256, mime, width, height, alt, photographer_id, created_at, update
 
 func (q *Queries) GetPhoto(ctx context.Context, id int64) (Photo, error) {
 	row := q.db.QueryRowContext(ctx, getPhoto, id)
+	var i Photo
+	err := row.Scan(
+		&i.ID,
+		&i.Sha256,
+		&i.Mime,
+		&i.Width,
+		&i.Height,
+		&i.Alt,
+		&i.PhotographerID,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const getPhotoBySha256 = `-- name: GetPhotoBySha256 :one
+SELECT id, sha256, mime, width, height, alt, photographer_id, created_at, updated_at FROM photos WHERE sha256 = ?
+`
+
+func (q *Queries) GetPhotoBySha256(ctx context.Context, sha256 string) (Photo, error) {
+	row := q.db.QueryRowContext(ctx, getPhotoBySha256, sha256)
 	var i Photo
 	err := row.Scan(
 		&i.ID,
@@ -213,6 +277,42 @@ func (q *Queries) ListPhotoCrops(ctx context.Context, photoID int64) ([]PhotoCro
 			&i.W,
 			&i.H,
 		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listPhotoEvents = `-- name: ListPhotoEvents :many
+SELECT events.id, events.title FROM events
+JOIN event_photos ON event_photos.event_id = events.id
+WHERE event_photos.photo_id = ?
+ORDER BY events.id
+`
+
+type ListPhotoEventsRow struct {
+	ID    int64  `db:"id"`
+	Title string `db:"title"`
+}
+
+// The events that show a photo, which keep it from being deleted.
+func (q *Queries) ListPhotoEvents(ctx context.Context, photoID int64) ([]ListPhotoEventsRow, error) {
+	rows, err := q.db.QueryContext(ctx, listPhotoEvents, photoID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListPhotoEventsRow
+	for rows.Next() {
+		var i ListPhotoEventsRow
+		if err := rows.Scan(&i.ID, &i.Title); err != nil {
 			return nil, err
 		}
 		items = append(items, i)
