@@ -80,7 +80,11 @@ func (v *vips) run(ctx context.Context, untrusted bool, bin string, args ...stri
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout, cmd.Stderr = &stdout, &stderr
 
-	err := cmd.Run()
+	err := start(cmd)
+	if err == nil {
+		err = cmd.Wait()
+	}
+
 	if err != nil {
 		if ctx.Err() != nil {
 			err = fmt.Errorf("%w (%w)", err, ctx.Err())
