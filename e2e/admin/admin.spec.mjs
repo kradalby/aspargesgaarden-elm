@@ -410,8 +410,20 @@ test("two editors: hers is not lost and she chooses", async ({
     name: "Noen andre har endret arrangementet",
   });
   await expect(conflict).toBeVisible();
+  // Escape chooses neither: her text stays, unsaved, and the page is hers
+  // again (a dialog the browser closed but the page still held would leave
+  // her stuck).
   await page.keyboard.press("Escape");
+  await expect(conflict).toBeHidden();
+  await expect(page.getByLabel("Pris")).toHaveValue("Kr 1700,-");
+  await expect(page.getByText("Ikke lagret").first()).toBeVisible();
+  await page.getByLabel("Pris").fill("Kr 1750,-");
+  await page.getByRole("button", { name: "Lagre endringene" }).click();
   await expect(conflict).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(conflict).toBeHidden();
+  await page.getByLabel("Pris").fill("Kr 1700,-");
+  await page.getByRole("button", { name: "Lagre endringene" }).click();
   await conflict.getByRole("button", { name: "Lagre min versjon" }).click();
   await expect(page.getByText("Endringene er lagret").first()).toBeVisible();
   await expect(page.getByLabel("Pris")).toHaveValue("Kr 1700,-");
@@ -419,6 +431,61 @@ test("two editors: hers is not lost and she chooses", async ({
     await publicText(request, "/arrangementer/2026/takkebakstkurs")
   ).text;
   expect(course).toContain("Kr 1700,-");
+});
+
+test("two editors: «Lagre min versjon» publishes hers, not theirs", async ({
+  page,
+  seed,
+  request,
+}) => {
+  const input = {
+    updatedAt: "",
+    slug: "",
+    title: "Høstmarked",
+    summary: "Hennes tekst.",
+    body: "",
+    start: "2026-11-21",
+    startTime: "",
+    end: "",
+    endTime: "",
+    extraDates: [],
+    priceText: "",
+    ticketUrl: "",
+    showInMenu: false,
+    menuLabel: "",
+    cancelled: false,
+    mainPhoto: { id: seed.landskap, alt: "Boder", photographerId: null },
+    extraPhotos: [],
+  };
+  const draft = await (
+    await request.post("/admin/api/events", { data: input })
+  ).json();
+  await page.goto(`/admin/arrangementer/${draft.id}`);
+  await expect(page.getByLabel("Kort tekst")).toHaveValue("Hennes tekst.");
+
+  // Someone else saves their text while her page is open (the touch moves
+  // the clock on, as stamps are whole seconds).
+  await request.post(`/__touch/${draft.id}`);
+  const seen = await (
+    await request.get(`/admin/api/events/${draft.id}`)
+  ).json();
+  const other = await request.put(`/admin/api/events/${draft.id}`, {
+    data: { ...input, updatedAt: seen.updatedAt, summary: "Deres tekst." },
+  });
+  expect(other.ok()).toBe(true);
+
+  await page.getByRole("button", { name: "Publiser" }).click();
+  const conflict = page.getByRole("dialog", {
+    name: "Noen andre har endret arrangementet",
+  });
+  await conflict.getByRole("button", { name: "Lagre min versjon" }).click();
+  await expect(
+    page.getByText("Publisert! Arrangementet er nå på nettsiden.").first(),
+  ).toBeVisible();
+  const live = await publicText(request, "/arrangementer/2026/hostmarked");
+  expect(live.status).toBe(200);
+  expect(live.text).toContain("Hennes tekst.");
+  expect(live.text).not.toContain("Deres tekst.");
 });
 
 test("someone without the grant is told so, plainly", async ({ page }) => {

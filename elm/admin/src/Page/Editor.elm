@@ -1,4 +1,4 @@
-module Page.Editor exposing (Model, Msg, Out(..), eventId, init, isDirty, subscriptions, update, view)
+module Page.Editor exposing (Action(..), Field(..), Model, Msg(..), Out(..), Request(..), eventId, init, isDirty, nextRequest, subscriptions, update, view)
 
 {-| "Endre arrangement": the form, the crop dialog and the live preview. The
 preview is the server's own rendering of the unsaved form, so what she sees
@@ -178,6 +178,7 @@ type Msg
     | Done Action (Result Api.Error Event)
     | KeepMine
     | TakeTheirs
+    | CloseConflict
     | FocusField String
     | OpenCrop
     | CropKind String
@@ -298,10 +299,16 @@ update msg model =
         KeepMine ->
             case model.conflict of
                 Just ( action, current ) ->
-                    run action { model | event = Just current, conflict = Nothing }
+                    -- Theirs is what is stored now, so hers must be saved
+                    -- over it before a publish, even if she typed nothing.
+                    run action { model | event = Just current, saved = Form.fromEvent current, conflict = Nothing }
 
                 Nothing ->
                     ( model, Cmd.none, Nothing )
+
+        CloseConflict ->
+            -- Neither: her text stays, unsaved, and the next save asks again.
+            ( { model | conflict = Nothing }, Cmd.none, Nothing )
 
         TakeTheirs ->
             case model.conflict of
@@ -493,8 +500,32 @@ afterSave e model =
     }
 
 
-{-| Saves first when there is anything to save, then publishes or hides.
+{-| The first request of an action: a save when there is anything to save
+(a publish or hide follows it), else the publish or hide itself.
 -}
+type Request
+    = Create
+    | Update Int
+    | PublishOnly Int
+    | UnpublishOnly Int
+
+
+nextRequest : Action -> Model -> Request
+nextRequest action model =
+    case ( model.id, action, model.form == model.saved ) of
+        ( Nothing, _, _ ) ->
+            Create
+
+        ( Just id, Publish, True ) ->
+            PublishOnly id
+
+        ( Just id, Unpublish, True ) ->
+            UnpublishOnly id
+
+        ( Just id, _, _ ) ->
+            Update id
+
+
 run : Action -> Model -> ( Model, Cmd Msg, Maybe Out )
 run action model =
     let
@@ -507,18 +538,21 @@ run action model =
         busy =
             { model | busy = Just action, sending = model.form, announce = busyText action }
     in
-    case ( model.id, action, model.form == model.saved ) of
-        ( Nothing, _, _ ) ->
-            ( busy, Api.createEvent input (Saved action), Nothing )
+    ( busy
+    , case nextRequest action model of
+        Create ->
+            Api.createEvent input (Saved action)
 
-        ( Just id, Publish, True ) ->
-            ( busy, Api.publish id updatedAt (Done action), Nothing )
+        Update id ->
+            Api.updateEvent id input (Saved action)
 
-        ( Just id, Unpublish, True ) ->
-            ( busy, Api.unpublish id updatedAt (Done action), Nothing )
+        PublishOnly id ->
+            Api.publish id updatedAt (Done action)
 
-        ( Just id, _, _ ) ->
-            ( busy, Api.updateEvent id input (Saved action), Nothing )
+        UnpublishOnly id ->
+            Api.unpublish id updatedAt (Done action)
+    , Nothing
+    )
 
 
 busyText : Action -> String
@@ -1525,7 +1559,7 @@ conflictDialog : Model -> Html Msg
 conflictDialog model =
     case model.conflict of
         Just _ ->
-            Ui.modal { id = "konflikt-dialog", title = "Noen andre har endret arrangementet", onClose = Ignored, wide = False }
+            Ui.modal { id = "konflikt-dialog", title = "Noen andre har endret arrangementet", onClose = CloseConflict, wide = False }
                 [ p [ class "text-lg" ] [ text "Mens du skrev, har noen andre lagret endringer i dette arrangementet. Det du har skrevet er ikke lagret ennå, men det er ikke borte." ]
                 , p [ class "text-lg" ] [ text "Vil du lagre din versjon over deres, eller hente deres versjon og la din være?" ]
                 , div [ class "flex flex-col sm:flex-row gap-3 justify-end" ]

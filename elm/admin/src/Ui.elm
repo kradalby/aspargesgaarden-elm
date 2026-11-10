@@ -371,7 +371,8 @@ moveId i delta =
 
 
 {-| A modal dialog. asp-modal opens it with showModal(), so the page behind
-is inert and focus stays inside; Escape asks to close through onClose. Put
+is inert and focus stays inside; Escape, or the browser closing it, asks to
+close through onClose, which must take it away. Put
 `autofocus` on the control that should get focus first.
 -}
 modal : { id : String, title : String, onClose : msg, wide : Bool } -> List (Html msg) -> Html msg
@@ -382,6 +383,10 @@ modal m content =
             [ A.id m.id
             , A.attribute "aria-labelledby" (m.id ++ "-tittel")
             , preventDefaultOn "cancel" (D.succeed ( m.onClose, True ))
+
+            -- The browser may close it without asking (Chromium does on a
+            -- second Escape); the page must then close it too.
+            , Html.Events.on "close" (D.succeed m.onClose)
             , class "m-auto p-0 rounded-2xl bg-white text-sort backdrop:bg-sort/60 max-h-[calc(100dvh-1rem)] overflow-auto [scrollbar-gutter:stable]"
             , class
                 (if m.wide then
