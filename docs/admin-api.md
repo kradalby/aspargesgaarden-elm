@@ -326,7 +326,9 @@ Event (now `draft`; the address stays frozen). `409 conflict` on a stale
 made by `site.Event.Copy` (same text, photos and menu setting; no dates).
 
 `DELETE /admin/api/events/{id}` → `204`, or `404`. Works for drafts and
-published events; the app asks first. The photos stay.
+published events; the app asks first. The photos stay: one that no other
+event or the gallery uses is deleted a week later, unless an event or the
+gallery takes it up again within that week.
 
 Every successful write drops the render store (the public pages change).
 
@@ -390,7 +392,10 @@ its upright size read and its preview made, so the answer has
 `previewReady: true`; the other sizes are built in the background, so its
 `state` is normally `preparing` (or `ready`, if they are still on disk). A
 new photo is used by nothing until an event save or a gallery change refers
-to it; one nothing uses is deleted after a week. Upload errors, all without
+to it. A photo nothing uses is deleted a week after it was last uploaded,
+edited or taken out of use (by an event save, a gallery change or an event
+delete), so a photo removed by mistake can be put back within the week.
+Upload errors, all without
 `field`:
 
 | `code`             | Status | Meaning for the user                              |
@@ -510,8 +515,9 @@ in display order.
 route adds (after an upload), removes and reorders. A body without
 `photoIds` is `400 bad_request` (it must not empty the gallery by accident);
 `404 not_found` with `photoId` for an unknown id, `422 duplicate_photo` with
-`photoId` for an id listed twice. No precondition: the last order saved wins, which is harmless
-for a list of photos.
+`photoId` for an id listed twice. No precondition: the last order saved
+wins. A photo the saved list leaves out that nothing else uses is deleted a
+week later, so a list that lost a photo can be put right within the week.
 
 ## The admin page
 

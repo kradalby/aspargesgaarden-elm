@@ -267,8 +267,9 @@ func serve(ctx context.Context, log *slog.Logger, cfg serveConfig) error {
 }
 
 // unusedPhotoAge is how long a photo no event or gallery uses is kept after
-// its last upload, crop or description: a form left unsaved over a week's
-// break still finds its photos.
+// its last upload or edit, or after it was taken out of use: a form left
+// unsaved over a week's break still finds its photos, and a photo removed
+// by mistake can be put back.
 const unusedPhotoAge = 7 * 24 * time.Hour
 
 // sweepUnusedPhotos runs before each reconcile, so the photo store removes

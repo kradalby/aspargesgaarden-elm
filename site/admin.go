@@ -106,9 +106,9 @@ func (s *Store) RemovePhoto(ctx context.Context, id int64) ([]Event, error) {
 }
 
 // DeleteUnusedPhotos deletes the photos no event and no gallery uses that
-// nobody uploaded, cropped or described for age: uploads for a form that was
-// never saved, and photos an event no longer shows. It returns their
-// sha256s; images/ removes their files on its next reconcile.
+// nobody uploaded, cropped, described or took out of use for age: uploads
+// for a form that was never saved, and photos an event or the gallery no
+// longer shows. It returns their sha256s; images/ removes their files.
 func (s *Store) DeleteUnusedPhotos(ctx context.Context, age time.Duration) ([]string, error) {
 	shas, err := s.db.Queries().DeleteUnusedPhotos(ctx, s.now().Add(-age).Unix())
 	if err != nil {

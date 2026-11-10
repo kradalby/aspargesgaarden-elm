@@ -174,16 +174,39 @@ func (s *Store) CopyEvent(ctx context.Context, id int64) (Event, error) {
 	return s.CreateEvent(ctx, src.Copy())
 }
 
-// DeleteEvent removes an event with its dates and photo links; the photos
-// themselves stay.
+// DeleteEvent removes an event with its dates and photo links. Its photos
+// stay; those nothing else uses are deleted a week later (DeleteUnusedPhotos)
+// unless something takes them up again.
 func (s *Store) DeleteEvent(ctx context.Context, id int64) error {
-	n, err := s.db.Queries().DeleteEvent(ctx, id)
-	if err != nil {
-		return fmt.Errorf("deleting event %d: %w", id, err)
+	return s.db.InTx(ctx, func(q *dbsqlc.Queries) error {
+		photoIDs, err := q.ListEventPhotoIDs(ctx, id)
+		if err != nil {
+			return fmt.Errorf("photos of event %d: %w", id, err)
+		}
+
+		n, err := q.DeleteEvent(ctx, id)
+		if err != nil {
+			return fmt.Errorf("deleting event %d: %w", id, err)
+		}
+
+		if n == 0 {
+			return fmt.Errorf("event %d: %w", id, ErrNotFound)
+		}
+
+		return releasePhotos(ctx, q, photoIDs, s.now())
+	})
+}
+
+// releasePhotos starts the unused grace period of those of ids that nothing
+// uses any more, in the transaction that took them out of use: the week
+// counts from then, not from the photo's last edit.
+func releasePhotos(ctx context.Context, q *dbsqlc.Queries, ids []int64, now time.Time) error {
+	if len(ids) == 0 {
+		return nil
 	}
 
-	if n == 0 {
-		return fmt.Errorf("event %d: %w", id, ErrNotFound)
+	if err := q.ReleasePhotos(ctx, dbsqlc.ReleasePhotosParams{UpdatedAt: now.Unix(), Ids: ids}); err != nil {
+		return fmt.Errorf("releasing photos %v: %w", ids, err)
 	}
 
 	return nil
@@ -228,6 +251,11 @@ func (s *Store) modify(ctx context.Context, id int64, seen time.Time, change fun
 
 // writeEventChildren replaces the event's extra dates and photo links.
 func writeEventChildren(ctx context.Context, q *dbsqlc.Queries, id int64, e Event) error {
+	before, err := q.ListEventPhotoIDs(ctx, id)
+	if err != nil {
+		return fmt.Errorf("photos of event %d: %w", id, err)
+	}
+
 	if err := q.DeleteEventDates(ctx, id); err != nil {
 		return fmt.Errorf("clearing dates of event %d: %w", id, err)
 	}
@@ -263,7 +291,7 @@ func writeEventChildren(ctx context.Context, q *dbsqlc.Queries, id int64, e Even
 		}
 	}
 
-	return nil
+	return releasePhotos(ctx, q, before, e.UpdatedAt)
 }
 
 // writePhotoMeta stores the alt text and credit the event form edits with
@@ -618,17 +646,24 @@ func (s *Store) Gallery(ctx context.Context) ([]Photo, error) {
 	})
 }
 
-// SetGallery replaces the gallery with photoIDs, in that order.
+// SetGallery replaces the gallery with photoIDs, in that order. A photo it
+// leaves out that nothing else uses is deleted a week later
+// (DeleteUnusedPhotos) unless something takes it up again.
 func (s *Store) SetGallery(ctx context.Context, photoIDs []int64) error {
-	now := s.now().Unix()
+	now := s.now()
 
 	return s.db.InTx(ctx, func(q *dbsqlc.Queries) error {
+		before, err := q.ListGalleryPhotoIDs(ctx)
+		if err != nil {
+			return fmt.Errorf("listing gallery: %w", err)
+		}
+
 		if err := q.DeleteGallery(ctx); err != nil {
 			return fmt.Errorf("clearing gallery: %w", err)
 		}
 
 		for i, id := range photoIDs {
-			err := q.InsertGalleryPhoto(ctx, dbsqlc.InsertGalleryPhotoParams{PhotoID: id, Position: int64(i), UpdatedAt: now})
+			err := q.InsertGalleryPhoto(ctx, dbsqlc.InsertGalleryPhotoParams{PhotoID: id, Position: int64(i), UpdatedAt: now.Unix()})
 			switch {
 			case db.IsForeignKeyViolation(err):
 				return fmt.Errorf("photo %d: %w", id, ErrNotFound)
@@ -639,7 +674,7 @@ func (s *Store) SetGallery(ctx context.Context, photoIDs []int64) error {
 			}
 		}
 
-		return nil
+		return releasePhotos(ctx, q, before, now)
 	})
 }
 

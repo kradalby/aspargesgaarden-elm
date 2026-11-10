@@ -183,6 +183,50 @@ func TestStoreDeleteUnusedPhotos(t *testing.T) {
 	require.Equal(t, []string{renewed.SHA256}, gone)
 }
 
+// A photo taken out of use gets its whole week from that moment, however
+// old it is, so a slip in the gallery or an event can still be undone.
+func TestStoreUnusedGraceStartsWhenTakenOutOfUse(t *testing.T) {
+	const grace = 7 * 24 * time.Hour
+
+	start := oslo("2026-09-01 12:00")
+	s, clock := newTestStore(t, start)
+	ctx := t.Context()
+
+	fromGallery := addPhoto(t, s, 'a', "Hagen")
+	replaced := addPhoto(t, s, 'b', "Boder")
+	ofDeleted := addPhoto(t, s, 'c', "Låven")
+	shared := addPhoto(t, s, 'd', "Tunet")
+	newer := addPhoto(t, s, 'e', "Fjøset")
+
+	require.NoError(t, s.SetGallery(ctx, []int64{fromGallery.ID, shared.ID}))
+	kept, err := s.CreateEvent(ctx, Event{Title: "Kurs", MainPhoto: &replaced})
+	require.NoError(t, err)
+	deleted, err := s.CreateEvent(ctx, Event{Title: "Konsert", MainPhoto: &ofDeleted, ExtraPhotos: []Photo{shared}})
+	require.NoError(t, err)
+
+	released := start.Add(30 * 24 * time.Hour)
+	clock.t = released
+	require.NoError(t, s.SetGallery(ctx, []int64{shared.ID}))
+	kept.MainPhoto = &newer
+	_, err = s.UpdateEvent(ctx, kept, kept.UpdatedAt)
+	require.NoError(t, err)
+	require.NoError(t, s.DeleteEvent(ctx, deleted.ID))
+
+	clock.t = released.Add(grace - time.Second)
+	gone, err := s.DeleteUnusedPhotos(ctx, grace)
+	require.NoError(t, err)
+	require.Empty(t, gone, "a week to undo it")
+
+	still, err := s.Photo(ctx, shared.ID)
+	require.NoError(t, err)
+	require.Equal(t, shared.UpdatedAt, still.UpdatedAt, "a photo still in use is not touched: its pages' lastmod stays")
+
+	clock.t = released.Add(grace + time.Second)
+	gone, err = s.DeleteUnusedPhotos(ctx, grace)
+	require.NoError(t, err)
+	require.ElementsMatch(t, []string{fromGallery.SHA256, replaced.SHA256, ofDeleted.SHA256}, gone)
+}
+
 // An upload is stored with its centred crops in one step, so no photo is
 // ever without them; the same bytes again are the photo already there.
 func TestStoreAddPhoto(t *testing.T) {
