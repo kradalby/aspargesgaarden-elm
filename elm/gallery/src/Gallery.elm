@@ -175,11 +175,14 @@ nextId model =
     model.id ++ "-next"
 
 
+{-| The window size is followed while closed too: a phone turned between
+two photos must not open the next one fitted to the old window.
+-}
 subscriptions : Model -> Sub Msg
 subscriptions model =
     case model.current of
         Nothing ->
-            open Opened
+            Sub.batch [ open Opened, Browser.Events.onResize Resized ]
 
         Just _ ->
             Sub.batch
@@ -239,7 +242,11 @@ view model =
                 [ Attr.id model.id
                 , Attr.attribute "role" "dialog"
                 , Attr.attribute "aria-modal" "true"
-                , Attr.attribute "aria-label" ("Bilde " ++ String.fromInt (index + 1) ++ " av " ++ String.fromInt count)
+                , Attr.attribute "aria-label" (position index count)
+
+                -- A click on the photo focuses the dialog rather than the
+                -- page under it, so Tab stays inside (trapTab).
+                , Attr.tabindex -1
                 , Attr.attribute "data-lightbox" ""
 
                 -- Only a click on the backdrop itself closes; the photo and
@@ -256,7 +263,11 @@ view model =
                 , Events.on "pointercancel" (Decode.succeed PointerCancel)
                 , Attr.class "fixed inset-0 z-50 flex flex-col items-center justify-center bg-brown/60 touch-pinch-zoom motion-safe:transition-opacity motion-safe:duration-200 starting:opacity-0"
                 ]
-                ([ button (closeId model) "Lukk" "✕" (Did Close) "top-2 right-2"
+                ([ -- First, so the same node stays and its new text is read
+                   -- out: focus stays on the arrow while the photo changes.
+                   Html.p [ Attr.class "sr-only", Attr.attribute "aria-live" "polite" ]
+                    [ Html.text (position index count ++ ": " ++ photo.alt) ]
+                 , button (closeId model) "Lukk" "✕" (Did Close) "top-2 right-2"
                  , figure model photo
                  ]
                     ++ (if several then
@@ -271,12 +282,18 @@ view model =
                 )
 
 
+position : Int -> Int -> String
+position index count =
+    "Bilde " ++ String.fromInt (index + 1) ++ " av " ++ String.fromInt count
+
+
 {-| The first and last control in tab order: Close, then the credit link,
 then the arrows.
 -}
 focusEnds : Model -> Photo -> Lightbox.Ends
 focusEnds model photo =
-    { first = closeId model
+    { dialog = model.id
+    , first = closeId model
     , last =
         if Array.length model.photos > 1 then
             nextId model

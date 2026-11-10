@@ -248,11 +248,13 @@ widest =
     992
 
 
-{-| The ids of the first and last focusable control of the lightbox.
+{-| The ids of the first and last focusable control of the lightbox, and of
+the dialog itself, which takes focus when the photo is clicked.
 -}
 type alias Ends =
     { first : String
     , last : String
+    , dialog : String
     }
 
 
@@ -266,12 +268,22 @@ type alias Tab =
 
 
 {-| Where focus goes instead when Tab would leave the lightbox: round to the
-other end. Nothing lets the browser move it as usual.
+other end, or from the dialog itself to the end Tab points at. Nothing lets
+the browser move it as usual.
 -}
 wrapFocus : Ends -> Tab -> Maybe String
 wrapFocus ends { key, shift, target } =
     if key /= "Tab" then
         Nothing
+
+    else if target == ends.dialog then
+        Just
+            (if shift then
+                ends.last
+
+             else
+                ends.first
+            )
 
     else if shift && target == ends.first then
         Just ends.last

@@ -217,6 +217,44 @@ def test_focus_stays_in_the_lightbox(desktop):
         assert page.evaluate(inside), key
 
 
+def test_focus_stays_in_the_lightbox_after_clicking_the_photo(desktop):
+    page = desktop.page("/galleri")
+    link(page, 0).click()
+    page.locator(SHOWN).click()
+    inside = "document.activeElement.closest('[role=dialog]') !== null"
+    assert page.evaluate(inside), "a click on the photo keeps focus in the dialog"
+    page.keyboard.press("Tab")
+    expect(page.get_by_role("button", name="Lukk")).to_be_focused()
+    page.locator(SHOWN).click()
+    page.keyboard.press("Shift+Tab")
+    expect(page.get_by_role("button", name="Neste bilde")).to_be_focused()
+
+
+def test_announces_the_photo_it_moves_to(desktop):
+    page = desktop.page("/galleri")
+    photos = galleries(page)[0]
+    link(page, 0).click()
+    live = page.locator("[role=dialog] [aria-live=polite]")
+    expect(live).to_have_text(f"Bilde 1 av {PHOTOS}: {photos[0]['alt']}")
+    page.get_by_role("button", name="Neste bilde").click()
+    expect(live).to_have_text(f"Bilde 2 av {PHOTOS}: {photos[1]['alt']}")
+    # The same node, changed: a live region read out, not a new one.
+    assert live.evaluate("p => p === document.querySelector('[role=dialog]').firstElementChild")
+
+
+def test_fits_the_window_it_opens_in(desktop):
+    """A phone turned while the lightbox is closed: the next photo fits the new window."""
+    page = desktop.page("/galleri")
+    link(page, 0).click()
+    wide = page.locator(SHOWN).evaluate("i => [i.width, i.height]")
+    page.keyboard.press("Escape")
+    page.set_viewport_size({"width": 390, "height": 844})
+    page.wait_for_function("() => innerWidth === 390")
+    link(page, 0).click()
+    narrow = page.locator(SHOWN).evaluate("i => [i.width, i.height]")
+    assert narrow[0] <= 390 - 16 < wide[0], (wide, narrow)
+
+
 def test_two_galleries_on_one_page(desktop):
     page = desktop.page("/e2e/two")
     first, second = galleries(page)
