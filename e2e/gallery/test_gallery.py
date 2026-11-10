@@ -106,7 +106,8 @@ def expect_shown(page, photo):
 def test_csp_is_enforced_and_listened_to(desktop):
     page = desktop.page("/galleri")
     csp = page.request.get(BASE + "/galleri").headers["content-security-policy"]
-    assert "script-src 'self' " in csp and "style-src 'self';" in csp
+    # The harness sets no analytics, so scripts are the site's own only.
+    assert "script-src 'self';" in csp and "style-src 'self';" in csp
     # An inline script must be refused, and the listener must see it; then
     # forget it so the fixture's own check covers the gallery alone.
     page.evaluate(
@@ -257,9 +258,10 @@ def test_lightbox_fetches_the_size_the_viewport_needs(desktop, phone):
         page.wait_for_function(
             "() => document.querySelector('[role=dialog] figure img')?.complete && document.querySelector('[role=dialog] figure img').currentSrc !== ''"
         )
-        shown, src, dpr = img.evaluate("i => [i.width, i.currentSrc, devicePixelRatio]")
+        shown, src, dpr, srcset = img.evaluate("i => [i.width, i.currentSrc, devicePixelRatio, i.srcset]")
         width = int(src.rsplit("-", 1)[1].split(".")[0])
-        widths = [480, 800, 1200, 1600, 2000]
+        # The photo's own rungs: a crop between ladder steps adds its width.
+        widths = sorted(int(s.rsplit(" ", 1)[1][:-1]) for s in srcset.split(", "))
         want = next(w for w in widths if w >= shown * dpr)
         assert width == want, (shown, dpr, src)
         assert not src.endswith(".jpg"), src  # AVIF or WebP where supported
