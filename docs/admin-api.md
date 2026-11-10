@@ -72,7 +72,7 @@ Any `4xx`/`5xx` from `/admin/api/` has this body:
 | `start_required`                                                           | 422         | `ErrStartRequired`     | `start`                              |                                                                                                                                                                                              |
 | `main_photo_required`                                                      | 422         | `ErrMainPhotoRequired` | `mainPhoto`                          |                                                                                                                                                                                              |
 | `alt_required`                                                             | 422         | `ErrAltRequired`       | `mainPhoto`, `extraPhotos` or `alt`  | With `photoId`. One entry per photo. `alt` on the photo route.                                                                                                                               |
-| `duplicate_photo`                                                          | 422         | `ErrDuplicatePhoto`    | `mainPhoto`, `extraPhotos` or —      | With `photoId`. No field for the gallery.                                                                                                                                                    |
+| `duplicate_photo`                                                          | 422         | `ErrDuplicatePhoto`    | `extraPhotos` or —                   | With `photoId`, on its second use. No field for the gallery.                                                                                                                                 |
 | `photographer_name_required`                                               | 422         | `ErrPhotographerName`  | `name`                               | Empty name on a photographer create or update.                                                                                                                                               |
 | `photographer_name_taken`                                                  | 409         | `ErrPhotographerTaken` | `name`                               | Another photographer has that name. Body also has `existing`: that Photographer, so the app can pick it instead.                                                                             |
 | `photographer_url`                                                         | 422         | `ErrPhotographerURL`   | `url`                                | A non-empty link that is not an `http`/`https` address with a host (same rule as `ticket_url`).                                                                                              |
@@ -362,7 +362,9 @@ Event (now `draft`; the address stays frozen). `409 conflict` on a stale
 `updatedAt`.
 
 `POST /admin/api/events/{id}/copy` (no body) → `201` Event: the new draft
-made by `site.Event.Copy` (same text, photos and menu setting; no dates).
+made by `site.Event.Copy`: everything but the dates, the same address
+included (as a chosen slug), and not cancelled. A copy given a date in the
+original's year is `slug_taken` until its address changes.
 
 `DELETE /admin/api/events/{id}` → `204`, or `404`. Works for drafts and
 published events; the app asks first. The photos stay: one that no other
@@ -428,7 +430,8 @@ database row.
   whenever the event has been saved. An unknown id is `404`.
 - Rendering never fails on the publish rules: no title, no date and no photo
   render as empty text and a neutral placeholder. Only a body that is not
-  valid JSON is a `400`, and an unknown photo id a `404`.
+  valid JSON or a `view` other than `page` or `list` is a `400`, and an
+  unknown photo or photographer id a `404`.
 - Photos are drawn with their **stored** crops, so a crop is visible in the
   preview once it is saved (crops save on their own, see below).
 - Asset URLs in the HTML are root-relative (`/static/…`, `/img/…`), and the
@@ -453,8 +456,8 @@ new photo is used by nothing until an event save or a gallery change refers
 to it. A photo nothing uses is deleted a week after it was last uploaded,
 edited or taken out of use (by an event save, a gallery change or an event
 delete), so a photo removed by mistake can be put back within the week.
-Upload errors, all without
-`field`:
+A body that is not `multipart/form-data` with a `file` part is
+`400 bad_request`. Upload errors, all without `field`:
 
 | `code`             | Status | Meaning for the user                                    |
 | ------------------ | ------ | ------------------------------------------------------- |
@@ -479,8 +482,9 @@ request (discard the partial file in `tmp/`).
 { "statuses": { "12": PhotoStatus, "13": PhotoStatus } }
 ```
 
-Cheap: no crops, no URLs, no database joins beyond the ids. Unknown ids are
-left out. Up to 100 ids per call. The app polls it every 2 s while at least one
+Cheap: one photo lookup per id and file metadata, no crops or URLs. Unknown
+ids are left out. Up to 100 ids per call; more, or an id that is not a
+number, is `400 bad_request`. The app polls it every 2 s while at least one
 photo it shows is `preparing` (or has `previewReady: false`), with every such
 id in one call, and stops when none is. The URLs and crops in the Photo it
 already has stay valid, so a status change needs no further request.
@@ -584,11 +588,11 @@ the server, and leaves out one someone else took out.
 ## The admin page
 
 `pages.AdminHandler()` serves the document the app runs in (built with
-elem-go in `pages/admin.go`); `serve` passes it as `server.AdminConfig.App`.
-It is mounted at `/admin/` on the tailnet listener (in `--dev`, the local one):
-it answers `GET` and `HEAD` of every path under it with the same document,
-so a deep link such as `/admin/arrangementer/12` loads the app, which reads
-the address itself; other methods get `405`. The pattern carries no method,
+elem-go in `pages/admin.go`); `server.Admin` mounts it at `/admin/`, on the
+tailnet listener (in `--dev`, the local one). It answers `GET` and `HEAD` of
+every path under it with the same document, so a deep link such as
+`/admin/arrangementer/12` loads the app, which reads the address itself;
+other methods get `405`. The pattern carries no method,
 because `GET /admin/` would conflict with a method-less `/admin/api/`.
 
 The document names `/static/admin.css` and `/static/admin.js` (with the
