@@ -17,12 +17,17 @@ import (
 	"github.com/kradalby/asparges/site"
 )
 
-// e2eClock is the wall clock plus a shift the touch hook moves on. Saves are
-// stamped in whole seconds, so a "second editor" in the same second as the
-// first would go unseen; the browser tests' fake server has strictly
-// increasing stamps, and this gives the real one the same.
+// e2eEpoch is where the browser tests' clock starts: their events are dated
+// against it, so the suite gives the same answer on every day it runs.
+var e2eEpoch = time.Date(2026, time.November, 10, 10, 0, 0, 0, site.Oslo)
+
+// e2eClock runs from e2eEpoch at wall-clock speed, plus a shift the touch
+// hook moves on. Saves are stamped in whole seconds, so a "second editor" in
+// the same second as the first would go unseen; the shift makes every touch
+// a later stamp.
 type e2eClock struct {
 	mu    sync.Mutex
+	start time.Time
 	shift time.Duration
 }
 
@@ -30,7 +35,11 @@ func (c *e2eClock) now() time.Time {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	return time.Now().Add(c.shift)
+	if c.start.IsZero() {
+		c.start = time.Now()
+	}
+
+	return e2eEpoch.Add(time.Since(c.start) + c.shift)
 }
 
 func (c *e2eClock) advance(d time.Duration) {

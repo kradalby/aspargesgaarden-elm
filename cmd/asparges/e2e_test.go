@@ -93,3 +93,15 @@ func TestE2EHooks(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, images.Rect{X: 0, Y: 0, W: 700, H: 394}, p.Crops[images.Banner])
 }
+
+// Every day the suite runs is the same day to the server: its events are
+// dated against e2eEpoch.
+func TestE2EClockStartsAtEpoch(t *testing.T) {
+	c := &e2eClock{}
+	first := c.now()
+	require.False(t, first.Before(e2eEpoch))
+	require.Less(t, first.Sub(e2eEpoch), time.Minute)
+
+	c.advance(time.Second)
+	require.GreaterOrEqual(t, c.now().Sub(first), time.Second)
+}
