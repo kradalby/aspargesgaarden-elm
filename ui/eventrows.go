@@ -13,10 +13,12 @@ type EventItem struct {
 	Href  string
 	Title string
 	// DateLabel and DateLine are the event's "Dato:" sentence; Date is the
-	// short form for the quiet past list.
+	// short form for the quiet past list, and Day the same as YYYY-MM-DD
+	// for machines (<time datetime>).
 	DateLabel string
 	DateLine  string
 	Date      string
+	Day       string
 	Summary   string
 	Cancelled bool
 	Photo     images.Ref

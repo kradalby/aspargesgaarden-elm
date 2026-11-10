@@ -21,7 +21,7 @@ func EventCards(items ...EventItem) elem.Node {
 			// rust has 5.7 on white, the headings' tre only 3.5.
 			elem.H3(attrs.Props{attrs.Class: "pt-2 font-display text-xl text-rust break-words hyphens-auto"},
 				elem.A(attrs.Props{attrs.Href: it.Href, attrs.Class: "hover:text-sort"}, elem.Text(it.Title))),
-			elem.P(attrs.Props{attrs.Class: "text-sm text-brown-text"}, elem.Text(it.Date)),
+			elem.P(attrs.Props{attrs.Class: "text-sm text-brown-text"}, cardDate(it)),
 		}
 		if it.Cancelled {
 			kids = append(kids, cancelledBadge())
@@ -32,4 +32,13 @@ func EventCards(items ...EventItem) elem.Node {
 	}
 
 	return elem.Ul(attrs.Props{attrs.Class: "grid grid-cols-2 gap-4 px-4 pb-8 md:grid-cols-3 md:gap-6 md:px-0 lg:grid-cols-4"}, cards...)
+}
+
+// cardDate is the day as written, with its machine-readable form when known.
+func cardDate(it EventItem) elem.Node {
+	if it.Day == "" {
+		return elem.Text(it.Date)
+	}
+
+	return elem.Time(attrs.Props{attrs.Datetime: it.Day}, elem.Text(it.Date))
 }

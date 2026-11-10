@@ -16,6 +16,7 @@ func testEventItem() EventItem {
 		DateLabel: "Dato:",
 		DateLine:  "14. november kl. 12.00 – 15. november 2026 kl. 16.00 på Aspargesgården",
 		Date:      "14. november 2026",
+		Day:       "2026-11-14",
 		Summary:   "Mer enn 30 utstillere, kafé og bålfat.",
 		Photo:     testPhoto(),
 		Alt:       "Bålfat på gårdsplassen",

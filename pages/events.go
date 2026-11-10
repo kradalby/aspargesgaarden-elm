@@ -58,7 +58,7 @@ func eventItems(events []site.Event) []ui.EventItem {
 		}
 
 		if !e.Start.IsZero() {
-			items[i].Date = site.NorwegianDate(e.Start)
+			items[i].Date, items[i].Day = site.NorwegianDate(e.Start), e.Start.String()
 		}
 
 		// A draft in the admin's preview may have no photo yet; the list
