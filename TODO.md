@@ -39,8 +39,25 @@ yet.
 
 - [ ] The `kra` web library mounts `/debug`, `/who` and `/quitquitquit` on
       tsnet nodes without the capability check the admin has; any tailnet
-      peer that reaches the node (monitoring) can call them. Fix in `kra`:
-      gate them like `HandleTSOnly` or behind a capability.
+      peer that reaches the node (monitoring) can call them. Any website can
+      too, through a tailnet user's browser: a no-cors POST to
+      `/quitquitquit` exits the service, and `/debug` is readable through
+      DNS rebinding. Fix in `kra`: gate them like `HandleTSOnly` or behind a
+      capability, with cross-origin protection and a check of its own Host.
+- [ ] `kra`'s `Handle` mounts a handler on the local and the tsnet listener
+      alike; there is no local-only registration. `adminFilesOnTailnet`
+      (`cmd/asparges`) stands in by Tailscale address range. Fix in `kra`
+      (a local-only `Handle`), then drop it.
+
+## Hardening
+
+- [ ] vips children run as the service user: a compromised decoder reaches
+      the database, `originals/` and the tsnet state. Run them as a user of
+      their own, or in a sandbox that sees only their input and output.
+- [ ] The binary is built with cgo (`CGO_ENABLED=1`, the nixpkgs default),
+      which rules out dropping ambient capabilities process-wide
+      (`syscall.AllThreadsSyscall`); `images` drops them per child instead.
+      Decide whether the build needs cgo.
 - [ ] Move to a new repository with fresh history (this one carries the old
       site's photos in its history), then rename the Go module's GitHub
       repository to match `github.com/kradalby/asparges`.
