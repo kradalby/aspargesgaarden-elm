@@ -10,6 +10,7 @@ import (
 	"net/http/httptest"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strings"
 	"testing"
 
@@ -238,6 +239,56 @@ func TestPagesBuildNoRawImages(t *testing.T) {
 			return true
 		})
 	}
+}
+
+// The same rule on the rendered pages, which also covers ui/: every photo is
+// an <img> in a <picture> with its sources, whichever component drew it.
+func TestEveryPhotoIsAPicture(t *testing.T) {
+	isPhoto := func(src string) bool {
+		return strings.HasPrefix(src, "/img/") || strings.HasPrefix(src, static.Prefix+"photos/")
+	}
+
+	photos := 0
+
+	for path, page := range rendered(t, testSite) {
+		doc, err := html.Parse(strings.NewReader(page))
+		require.NoError(t, err)
+
+		for n := range doc.Descendants() {
+			if n.Type != html.ElementNode || n.Data != "img" || !isPhoto(attr(n, "src")) {
+				continue
+			}
+
+			photos++
+			src := attr(n, "src")
+
+			require.Equal(t, "picture", n.Parent.Data, "%s: %s is not in a <picture>", path, src)
+
+			for _, key := range []string{"srcset", "sizes", "width", "height"} {
+				require.NotEmpty(t, attr(n, key), "%s: %s has no %s", path, src, key)
+			}
+
+			require.True(t, slices.ContainsFunc(n.Attr, func(a html.Attribute) bool { return a.Key == "alt" }), "%s: %s has no alt", path, src)
+
+			sources := 0
+
+			for c := range n.Parent.ChildNodes() {
+				if c.Type != html.ElementNode || c.Data != "source" {
+					continue
+				}
+
+				sources++
+
+				for _, key := range []string{"type", "srcset", "sizes"} {
+					require.NotEmpty(t, attr(c, key), "%s: a <source> of %s has no %s", path, src, key)
+				}
+			}
+
+			require.Positive(t, sources, "%s: %s has no <source>", path, src)
+		}
+	}
+
+	require.Positive(t, photos, "the pages show photos, or this checks nothing")
 }
 
 // Everything a page loads is built into the binary, apart from the named
