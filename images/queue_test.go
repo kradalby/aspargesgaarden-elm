@@ -122,7 +122,6 @@ func TestStatus(t *testing.T) {
 	o := intake(t, s, "upright.jpg")
 	p := photoOf(o)
 	cat.put(p)
-	s.Changed()
 
 	st, err := s.Status(ctx, p.SHA256)
 	require.NoError(t, err)
@@ -141,7 +140,6 @@ func TestStatus(t *testing.T) {
 	// A crop change: only the card is rebuilt, and status says so.
 	p.Crops = map[Kind]Rect{Card: {X: 0, Y: 0, W: 480, H: 600}}
 	cat.put(p)
-	s.Changed()
 
 	st, err = s.Status(ctx, p.SHA256)
 	require.NoError(t, err)

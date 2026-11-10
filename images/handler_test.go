@@ -41,6 +41,14 @@ func TestHandler(t *testing.T) {
 		return res.StatusCode, res.Header, b
 	}
 
+	// Not built yet: a 404 nobody keeps, and the request builds nothing.
+	code, hdr, _ := do(http.MethodGet, card.URL())
+	require.Equal(t, http.StatusNotFound, code)
+	require.Equal(t, "no-store", hdr.Get("Cache-Control"))
+	require.NoFileExists(t, s.path(card))
+
+	require.NoError(t, s.warm(t.Context(), p.SHA256, allSpecs))
+
 	code, hdr, body := do(http.MethodGet, card.URL())
 	require.Equal(t, http.StatusOK, code)
 	require.Equal(t, "image/avif", hdr.Get("Content-Type"))
@@ -52,6 +60,10 @@ func TestHandler(t *testing.T) {
 
 	code, _, _ = do(http.MethodGet, card.URL(), "If-None-Match", etag)
 	require.Equal(t, http.StatusNotModified, code)
+
+	code, _, part := do(http.MethodGet, card.URL(), "Range", "bytes=0-9")
+	require.Equal(t, http.StatusPartialContent, code)
+	require.Equal(t, body[:10], part)
 
 	jpeg := card
 	jpeg.Format = JPEG
@@ -68,10 +80,4 @@ func TestHandler(t *testing.T) {
 		code, _, _ := do(http.MethodGet, path)
 		require.Equal(t, http.StatusNotFound, code, path)
 	}
-
-	// Deleted from the database: the file on disk is no longer served.
-	cat.remove(p.SHA256)
-	s.Changed()
-	code, _, _ = do(http.MethodGet, card.URL())
-	require.Equal(t, http.StatusNotFound, code)
 }

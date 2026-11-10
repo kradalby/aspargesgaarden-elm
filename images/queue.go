@@ -12,7 +12,7 @@ const (
 	// small enough to load at once.
 	previewWidth = 1200
 	// firstPassWidth is the size the admin's page preview most likely asks
-	// for; the request path builds anything else it wants.
+	// for, built before the rest.
 	firstPassWidth = 800
 )
 
@@ -69,23 +69,21 @@ func (q *fifo) pop() (string, bool) {
 	return sha, true
 }
 
-// Enqueue asks for every variant of a photo to be built in the background,
-// and marks the catalogue view stale. Call it after an upload, a crop change
-// and a publish. Only missing files are built, so after a crop change that
-// is the changed kind alone.
+// Enqueue asks for every variant of a photo to be built in the background.
+// Call it after an upload, a crop change and a publish. Only missing files
+// are built, so after a crop change that is the changed kind alone.
 //
 // The photo goes to the first pass: what someone is waiting to look at (see
 // firstPass) is built for it before the long tail of any earlier photo.
 // Its own tail follows ahead of Run's backlog, so its status keeps moving.
 func (s *Store) Enqueue(sha string) {
-	s.Changed()
 	s.enqueue(sha, tierFirst)
 }
 
 // Retry forgets the photo's recent build failures and queues it again: the
 // admin's answer to StateFailed, for a cause that has gone away since.
 func (s *Store) Retry(ctx context.Context, sha string) error {
-	p, err := s.photo(ctx, sha)
+	p, err := s.cat.Photo(ctx, sha)
 	if err != nil {
 		return fmt.Errorf("retry: %w", err)
 	}
@@ -180,7 +178,7 @@ func (s *Store) step(ctx context.Context) bool {
 	return true
 }
 
-// Run works the queue until ctx ends, one build at a time, so requests keep
+// Run works the queue until ctx ends, one build at a time, so Intake keeps
 // the other job slots. At start it queues every photo behind any upload, so
 // work lost in a restart, a new pipeline version or a restore is rebuilt
 // without anyone asking.
@@ -260,7 +258,7 @@ func previewSpec(p Photo) (VariantSpec, bool) {
 // PreviewURL is the address of the crop tool's picture of p, and ThumbURL
 // of p whole at the smallest width, for the admin's lists. Both are "" for
 // a photo with no variants. Status tells when the preview is built; the
-// thumb is built on its first request if the queue has not got to it.
+// thumb comes with the rest.
 func PreviewURL(p Photo) string {
 	pv, ok := previewSpec(p)
 	if !ok {
@@ -339,8 +337,8 @@ const (
 
 // Status is what the admin polls while a photo is prepared. It shows
 // "Bildene klargjøres …" until State is StateReady, and on StateFailed turns
-// Reason into a sentence. Publishing need not wait: the request path builds
-// whatever a visitor asks for first.
+// Reason into a sentence. Publishing need not wait: a size not built yet is
+// missing on the page until the queue gets to it.
 type Status struct {
 	State        State
 	Ready, Total int    // variant files present and expected
@@ -354,7 +352,7 @@ type Status struct {
 // Status reports how far a photo's variants are. It reads memory and file
 // metadata only, so it is cheap to poll.
 func (s *Store) Status(ctx context.Context, sha string) (Status, error) {
-	p, err := s.photo(ctx, sha)
+	p, err := s.cat.Photo(ctx, sha)
 	if err != nil {
 		return Status{}, fmt.Errorf("status: %w", err)
 	}

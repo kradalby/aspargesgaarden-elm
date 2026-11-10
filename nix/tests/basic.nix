@@ -208,8 +208,9 @@ in
         found = {}
         for url in urls:
             ext = url.rsplit(".", 1)[1]
-            # Built on request when the start-up queue has not got there yet.
-            code, h, _ = get(m, url, "--max-time", "120", body=False)
+            # A 404 until the unit's start-up queue has built it.
+            m.wait_until_succeeds("curl -sf -o /dev/null " + shlex.quote("http://127.0.0.1:8090" + url), timeout=600)
+            code, h, _ = get(m, url, body=False)
             assert code == 200, (url, code)
             assert h["cache-control"] == "public, max-age=31536000, immutable", (url, h)
             ctype = {"avif": "image/avif", "webp": "image/webp", "jpg": "image/jpeg"}[ext]

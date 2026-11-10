@@ -3,7 +3,6 @@ package images
 import (
 	"bytes"
 	"context"
-	"errors"
 	"fmt"
 	"image"
 	"image/color"
@@ -13,9 +12,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"slices"
-	"strings"
 	"sync"
-	"sync/atomic"
 	"testing"
 	"time"
 
@@ -170,181 +167,9 @@ func TestNewCleansUp(t *testing.T) {
 	require.Empty(t, tmp)
 }
 
-func TestEnsureOnlyCurrent(t *testing.T) {
-	cat := newFakeCatalog()
-	s := newTestStore(t, cat)
-	p := photoOf(intake(t, s, "upright.jpg"))
-	cat.put(p)
-
-	ctx := context.Background()
-	spec := VariantSpec{Photo: p.SHA256, Kind: Card, Crop: exampleCrop.ID(), Width: 480, Format: AVIF}
-
-	path, err := s.Ensure(ctx, spec)
-	require.NoError(t, err)
-	require.Equal(t, filepath.Join(s.root, spec.Path()), path)
-	require.FileExists(t, path)
-
-	notCurrent := []VariantSpec{
-		{Photo: p.SHA256, Kind: Card, Crop: Rect{X: 0, Y: 0, W: 480, H: 600}.ID(), Width: 480, Format: AVIF},
-		{Photo: p.SHA256, Kind: Card, Crop: exampleCrop.ID(), Width: 800, Format: AVIF}, // wider than the crop
-		{Photo: p.SHA256, Kind: Share, Crop: exampleCrop.ID(), Width: 1200, Format: JPEG},
-		{Photo: p.SHA256, Kind: Full, Crop: Rect{W: 1200, H: 800}.ID(), Width: 1600, Format: WebP},
-		{Photo: testSHA, Kind: Card, Crop: exampleCrop.ID(), Width: 480, Format: AVIF},
-	}
-	for _, sp := range notCurrent {
-		_, err := s.Ensure(ctx, sp)
-		require.ErrorIs(t, err, ErrNotFound, sp.Name())
-		require.NoFileExists(t, filepath.Join(s.root, sp.Path()))
-	}
-
-	// A new crop retires the old names.
-	p.Crops = map[Kind]Rect{Card: {X: 0, Y: 0, W: 480, H: 600}}
-	cat.put(p)
-	s.Changed()
-
-	_, err = s.Ensure(ctx, spec)
-	require.ErrorIs(t, err, ErrNotFound)
-}
-
-func TestEnsureBuildsOnce(t *testing.T) {
-	cat := newFakeCatalog()
-	s := newTestStore(t, cat)
-	p := photoOf(intake(t, s, "upright.jpg"))
-	cat.put(p)
-
-	spec := VariantSpec{Photo: p.SHA256, Kind: Card, Crop: exampleCrop.ID(), Width: 480, Format: WebP}
-	before := s.builds.Load() // Intake built the preview
-
-	var wg sync.WaitGroup
-	for range 8 {
-		wg.Go(func() {
-			_, err := s.Ensure(context.Background(), spec)
-			require.NoError(t, err)
-		})
-	}
-
-	wg.Wait()
-
-	require.Equal(t, before+1, s.builds.Load())
-}
-
-// A caller that found the file missing just before another build landed it
-// must not build it again.
-func TestEnsureAfterLandingBuildsOnce(t *testing.T) {
-	var hold atomic.Bool
-
-	paused, resume := make(chan struct{}), make(chan struct{})
-	// ensure reads the clock between its unlocked look for the files and
-	// taking the lock, so holding it there opens that gap.
-	clock := func() time.Time {
-		if hold.CompareAndSwap(true, false) {
-			close(paused)
-			<-resume
-		}
-
-		return time.Now()
-	}
-
-	cat := newFakeCatalog()
-	s := newTestStore(t, cat, WithClock(clock))
-	p := photoOf(intake(t, s, "upright.jpg"))
-	cat.put(p)
-
-	ctx := context.Background()
-	spec := VariantSpec{Photo: p.SHA256, Kind: Card, Crop: exampleCrop.ID(), Width: 480, Format: WebP}
-	g := groups(p)[slices.IndexFunc(groups(p), func(g group) bool { return g.kind == Card })]
-	before := s.builds.Load()
-
-	hold.Store(true)
-
-	done := make(chan error, 1)
-
-	go func() { done <- s.ensure(ctx, p, g, []VariantSpec{spec}) }()
-
-	<-paused
-
-	_, err := s.Ensure(ctx, spec)
-	require.NoError(t, err)
-	close(resume)
-
-	require.NoError(t, <-done)
-	require.Equal(t, before+1, s.builds.Load())
-}
-
-// A visitor asking for a file the queue is building waits for that file,
-// not for the rest of its group.
-func TestEnsureWaitsOnlyForItsFile(t *testing.T) {
-	t.Parallel()
-	cat := newFakeCatalog()
-	s := newTestStore(t, cat)
-	ctx := context.Background()
-
-	p := photoOf(intake(t, s, "upright.jpg"))
-	cat.put(p)
-
-	g := groups(p)[0]
-	// The very last is the preview, which Intake built.
-	first, last := g.specs[0], g.specs[len(g.specs)-2]
-	require.NoFileExists(t, s.path(last))
-	before := s.builds.Load()
-
-	done := make(chan error, 1)
-
-	go func() { done <- s.warm(ctx, p.SHA256, allSpecs) }()
-
-	require.Eventually(t, func() bool {
-		s.mu.Lock()
-		defer s.mu.Unlock()
-
-		return s.inflight[s.path(first)] != nil
-	}, time.Minute, time.Millisecond)
-
-	_, err := s.Ensure(ctx, first)
-	require.NoError(t, err)
-	require.NoFileExists(t, s.path(last), "the visitor waited for the whole group")
-
-	require.NoError(t, <-done)
-	require.Equal(t, before+int64(len(groups(p))), s.builds.Load(), "nothing built twice")
-}
-
-func TestEnsureRemembersFailures(t *testing.T) {
-	clock := newFakeClock()
-	cat := newFakeCatalog()
-	s := newTestStore(t, cat, WithClock(clock.now))
-
-	// A truncated original that skipped Intake, as a bad restore would leave.
-	b, err := os.ReadFile(fixture(t, "truncated.jpg"))
-	require.NoError(t, err)
-
-	p := Photo{SHA256: testSHA, MIME: "image/jpeg", Width: 1200, Height: 800, Crops: map[Kind]Rect{Card: exampleCrop}}
-	orig := s.originalPath(p.SHA256, p.MIME)
-	require.NoError(t, os.MkdirAll(filepath.Dir(orig), dirPerm))
-	require.NoError(t, os.WriteFile(orig, b, 0o600))
-	cat.put(p)
-
-	spec := VariantSpec{Photo: p.SHA256, Kind: Card, Crop: exampleCrop.ID(), Width: 480, Format: JPEG}
-	_, err = s.Ensure(context.Background(), spec)
-	require.ErrorIs(t, err, ErrBroken)
-	require.Equal(t, int64(1), s.builds.Load())
-
-	_, err = s.Ensure(context.Background(), spec)
-	require.ErrorContains(t, err, "failed recently")
-	require.Equal(t, int64(1), s.builds.Load(), "no second build inside the TTL")
-
-	st, err := s.Status(context.Background(), p.SHA256)
-	require.NoError(t, err)
-	require.Equal(t, StateFailed, st.State)
-
-	clock.advance(failTTL + time.Second)
-
-	_, err = s.Ensure(context.Background(), spec)
-	require.ErrorIs(t, err, ErrBroken)
-	require.Equal(t, int64(2), s.builds.Load())
-}
-
 // A build stopped by shutdown is no failure: not logged as one, and not
 // remembered against the photo.
-func TestEnsureStoppedIsNoFailure(t *testing.T) {
+func TestBuildStoppedIsNoFailure(t *testing.T) {
 	logs := &bytes.Buffer{}
 	cat := newFakeCatalog()
 	s := newTestStore(t, cat, WithLogger(slog.New(slog.NewTextHandler(logs, nil))))
@@ -358,12 +183,12 @@ func TestEnsureStoppedIsNoFailure(t *testing.T) {
 	cancel()
 	require.ErrorIs(t, s.ensure(ctx, p, g, []VariantSpec{spec}), context.Canceled)
 
-	_, err := s.Ensure(context.Background(), spec)
-	require.NoError(t, err)
+	require.NoError(t, s.warm(context.Background(), p.SHA256, allSpecs))
+	require.FileExists(t, s.path(spec))
 	require.NotContains(t, logs.String(), "level=ERROR")
 }
 
-func TestEnsureRejectsReplacedOriginal(t *testing.T) {
+func TestBuildRejectsReplacedOriginal(t *testing.T) {
 	cat := newFakeCatalog()
 	s := newTestStore(t, cat)
 	p := photoOf(intake(t, s, "upright.jpg"))
@@ -371,59 +196,6 @@ func TestEnsureRejectsReplacedOriginal(t *testing.T) {
 	p.Width, p.Height = 1600, 1000
 	cat.put(p)
 
-	_, err := s.Ensure(context.Background(), VariantSpec{Photo: p.SHA256, Kind: Card, Crop: exampleCrop.ID(), Width: 480, Format: JPEG})
+	err := s.warm(context.Background(), p.SHA256, allSpecs)
 	require.ErrorContains(t, err, "the catalogue says 1600x1000")
-}
-
-func TestStoreRef(t *testing.T) {
-	cat := newFakeCatalog()
-	s := newTestStore(t, cat)
-	p := Photo{SHA256: testSHA, MIME: "image/jpeg", Width: 1200, Height: 800, Crops: map[Kind]Rect{Card: exampleCrop}}
-	cat.put(p)
-
-	ref, err := s.Ref(context.Background(), testSHA, Card)
-	require.NoError(t, err)
-
-	want, err := RefFor(p, Card)
-	require.NoError(t, err)
-	require.Equal(t, want, ref)
-
-	_, err = s.Ref(context.Background(), strings.Repeat("0", 64), Card)
-	require.ErrorIs(t, err, ErrNotFound)
-}
-
-func TestCatalogueView(t *testing.T) {
-	clock := newFakeClock()
-	cat := newFakeCatalog()
-	s := newTestStore(t, cat, WithClock(clock.now))
-	ctx := context.Background()
-
-	a := Photo{SHA256: testSHA, MIME: "image/jpeg", Width: 1200, Height: 800}
-	cat.put(a)
-	_, err := s.Ref(ctx, a.SHA256, Full)
-	require.NoError(t, err)
-
-	// Not told: the view is kept, so serving costs no query...
-	b := a
-	b.SHA256 = strings.Repeat("ab", 32)
-	cat.put(b)
-	_, err = s.Ref(ctx, b.SHA256, Full)
-	require.ErrorIs(t, err, ErrNotFound)
-
-	// ...until it ages out,
-	clock.advance(viewMaxAge + time.Second)
-	_, err = s.Ref(ctx, b.SHA256, Full)
-	require.NoError(t, err)
-
-	// or Changed says so.
-	cat.remove(a.SHA256)
-	s.Changed()
-	_, err = s.Ref(ctx, a.SHA256, Full)
-	require.ErrorIs(t, err, ErrNotFound)
-
-	// A failing reload keeps serving the last good view.
-	cat.err = errors.New("database is locked")
-	s.Changed()
-	_, err = s.Ref(ctx, b.SHA256, Full)
-	require.NoError(t, err)
 }

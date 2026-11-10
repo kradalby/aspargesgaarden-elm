@@ -104,7 +104,7 @@ pkgs.writeShellApplication {
     trap 'systemctl stop asparges-smoke.service; journalctl -u asparges-smoke.service --no-pager | tail -n 50' EXIT
     curl -fsS --retry 30 --retry-delay 1 --retry-all-errors -o /dev/null http://127.0.0.1:8099/
     # serve builds every size at start; each gallery picture answers once built.
-    for u in $(curl -fsS http://127.0.0.1:8099/galleri | grep -o '/img/[^" ,]*' | sort -u); do
+    for u in $(curl -fsS http://127.0.0.1:8099/galleri | grep -o '/img/[^"&, ]*' | sort -u); do
       curl -fsS --retry 120 --retry-delay 1 --retry-all-errors -o /dev/null "http://127.0.0.1:8099$u"
     done
     systemctl is-active --quiet asparges-smoke.service

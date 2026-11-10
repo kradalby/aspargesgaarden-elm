@@ -6,9 +6,9 @@
 #
 # Builds static/dist (go generate), runs `asparges import` of the import
 # tests' miniature old site (cmd/asparges/testdata/oldsite) into $DATA, a
-# fresh directory unless set, then serves it with the harness (serve's wiring
-# plus a two-gallery page) and runs test_gallery.py. Screenshots go to $OUT.
-# BROWSERS narrows the browsers ("chromium webkit").
+# fresh directory unless set, serves it with `asparges serve --dev`, waits
+# for the pictures the tested pages show, and runs test_gallery.py.
+# Screenshots go to $OUT. BROWSERS narrows the browsers ("chromium webkit").
 set -euo pipefail
 
 root=$(cd "$(dirname "$0")/../.." && pwd)
@@ -47,17 +47,23 @@ go build -o "$work/asparges" ./cmd/asparges
   exit 1
 }
 
-go build -o "$work/server" ./e2e/gallery/server
-"$work/server" -addr "127.0.0.1:$port" -data-dir "$data" >"$work/log" 2>&1 &
+"$work/asparges" serve --dev --listen-addr "127.0.0.1:$port" --base-url "http://127.0.0.1:$port" \
+  --data-dir "$data" >"$work/log" 2>&1 &
 server=$!
-# The server builds every gallery variant with vips before it is ready.
-until grep -q '^ready' "$work/log"; do
+base=http://127.0.0.1:$port
+until curl -sf -o /dev/null "$base/galleri"; do
   if ! kill -0 "$server" 2>/dev/null; then
     cat "$work/log" >&2
     exit 1
   fi
-  sleep 0.5
+  sleep 0.2
 done
 
-photos=$(awk '/^ready/ { print $2; exit }' "$work/log")
-BASE=http://127.0.0.1:$port OUT=$out PHOTOS=$photos "$py" -I -m pytest -p no:cacheprovider "$here/test_gallery.py" "$@"
+# serve builds every size in the background; a picture is a 404 until then.
+pages=$(curl -sf "$base/galleri" "$base/arrangementer/2026/julemarked")
+for u in $(grep -o '/img/[^"&, ]*' <<<"$pages" | sort -u); do
+  curl -sf --retry 300 --retry-delay 1 --retry-all-errors -o /dev/null "$base$u"
+done
+
+photos=$(curl -sf "$base/galleri" | grep -o 'data-index="[0-9]*"' | sort -u | wc -l)
+BASE=$base OUT=$out PHOTOS=$photos "$py" -I -m pytest -p no:cacheprovider "$here/test_gallery.py" "$@"

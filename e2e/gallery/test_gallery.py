@@ -1,9 +1,9 @@
 """Browser checks of the gallery: ui.Gallery's grid and the elm/gallery lightbox.
 
 run.sh imports the import tests' miniature old site and serves it at $BASE:
-/galleri with its $PHOTOS photos, the 2026 Christmas market with four more,
-and /e2e/two, a page with two galleries. Every test runs with the site's Content-Security-Policy and
-fails on a violation or a page error.
+/galleri with its $PHOTOS photos and the 2026 Christmas market with four
+more. Every test runs with the site's Content-Security-Policy and fails on a
+violation or a page error.
 """
 
 import os
@@ -253,25 +253,6 @@ def test_fits_the_window_it_opens_in(desktop):
     link(page, 0).click()
     narrow = page.locator(SHOWN).evaluate("i => [i.width, i.height]")
     assert narrow[0] <= 390 - 16 < wide[0], (wide, narrow)
-
-
-def test_two_galleries_on_one_page(desktop):
-    page = desktop.page("/e2e/two")
-    first, second = galleries(page)
-    assert page.locator("script[src*='/static/gallery.js']").count() == 1
-
-    link(page, 0, gallery=1).click()
-    expect_shown(page, second[0])
-    expect(page.locator(DIALOG)).to_have_attribute("aria-label", f"Bilde 1 av {len(second)}")
-    for _ in second:  # a full round stays in this gallery
-        page.keyboard.press("ArrowRight")
-    expect_shown(page, second[0])
-    page.keyboard.press("Escape")
-    expect(link(page, 0, gallery=1)).to_be_focused()
-
-    link(page, 2, gallery=0).click()
-    expect_shown(page, first[2])
-    expect(page.locator(DIALOG)).to_have_count(1)
 
 
 def test_event_page_gallery(desktop):

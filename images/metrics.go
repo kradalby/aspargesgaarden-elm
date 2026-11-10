@@ -16,11 +16,6 @@ var (
 		Help:    "Time to build one group: one photo, one kind, its missing files.",
 		Buckets: prometheus.ExponentialBuckets(0.25, 2, 10),
 	}, []string{"kind"}))
-	metricServeSeconds = register(prometheus.NewHistogramVec(prometheus.HistogramOpts{
-		Name:    "asparges_images_serve_seconds",
-		Help:    "Time to serve one variant: hit = file on disk, built = built for this request.",
-		Buckets: prometheus.ExponentialBuckets(0.0005, 4, 10),
-	}, []string{"result"}))
 	metricQueue = register(prometheus.NewGauge(prometheus.GaugeOpts{
 		Name: "asparges_images_queue_length",
 		Help: "Photos waiting for their variants to be built.",

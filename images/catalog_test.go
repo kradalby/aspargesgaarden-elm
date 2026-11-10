@@ -30,12 +30,6 @@ func (c *fakeCatalog) put(p Photo) {
 	c.photos[p.SHA256] = p
 }
 
-func (c *fakeCatalog) remove(sha string) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	delete(c.photos, sha)
-}
-
 func (c *fakeCatalog) Photo(_ context.Context, sha string) (Photo, error) {
 	c.mu.Lock()
 	hook := c.onPhoto

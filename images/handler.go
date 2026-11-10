@@ -3,15 +3,17 @@ package images
 import (
 	"errors"
 	"fmt"
+	"io/fs"
 	"net/http"
-	"time"
+	"os"
 )
 
 var contentTypes = map[Format]string{AVIF: "image/avif", WebP: "image/webp", JPEG: "image/jpeg"}
 
-// Handler serves /img/… : only variants the catalogue currently expects,
-// built on first request if the queue has not got to them. Names change with
-// every crop and pipeline version, so responses are cached forever.
+// Handler serves /img/… : the variant files that exist. One the queue has
+// not built yet is a 404, never a build, so no request causes work. Names
+// change with every crop and pipeline version, so responses are cached
+// forever.
 func (s *Store) Handler() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet && r.Method != http.MethodHead {
@@ -21,22 +23,24 @@ func (s *Store) Handler() http.Handler {
 			return
 		}
 
+		// Only a well-formed variant name reaches the filesystem.
 		spec, err := ParseURL(r.URL.Path)
 		if err != nil {
 			http.NotFound(w, r)
 			return
 		}
 
-		start := time.Now()
-
-		f, built, err := s.open(r.Context(), spec)
-		if errors.Is(err, ErrNotFound) {
+		f, err := os.Open(s.path(spec))
+		if errors.Is(err, fs.ErrNotExist) {
+			// The file may land in a moment; nobody may keep this answer.
+			w.Header().Set("Cache-Control", "no-store")
 			http.NotFound(w, r)
+
 			return
 		}
 
 		if err != nil {
-			s.log.Error("images: serve variant", "url", r.URL.Path, "err", err)
+			s.log.Error("images: open variant", "url", r.URL.Path, "err", err)
 			http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 
 			return
@@ -58,12 +62,5 @@ func (s *Store) Handler() http.Handler {
 		h.Set("ETag", fmt.Sprintf(`"%x-%x"`, st.ModTime().UnixNano(), st.Size()))
 		// ServeContent does ranges and conditionals; the page cache does the rest.
 		http.ServeContent(w, r, "", st.ModTime(), f)
-
-		result := "hit"
-		if built {
-			result = "built"
-		}
-
-		metricServeSeconds.WithLabelValues(result).Observe(time.Since(start).Seconds())
 	})
 }

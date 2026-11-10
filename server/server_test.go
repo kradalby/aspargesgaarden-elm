@@ -47,7 +47,6 @@ func oslo(s string) time.Time {
 
 // fakeImages records what the server tells the photo store.
 type fakeImages struct {
-	changed  int
 	enqueued []string
 }
 
@@ -55,7 +54,6 @@ func (*fakeImages) Handler() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { _, _ = w.Write([]byte("photo")) })
 }
 
-func (f *fakeImages) Changed()              { f.changed++ }
 func (f *fakeImages) Enqueue(sha256 string) { f.enqueued = append(f.enqueued, sha256) }
 
 type fixture struct {
@@ -295,7 +293,6 @@ func TestPagesAreKeptUntilChanged(t *testing.T) {
 	require.NotEqual(t, etag, changed.Header().Get("ETag"))
 
 	// The photo store hears of the change too, and builds the new photo.
-	require.Equal(t, 1, f.images.changed)
 	require.Equal(t, []string{e.MainPhoto.SHA256}, f.images.enqueued)
 }
 

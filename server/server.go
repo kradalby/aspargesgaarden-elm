@@ -71,9 +71,8 @@ type Config struct {
 type Images interface {
 	// Handler serves the variants under /img/.
 	Handler() http.Handler
-	// Changed and Enqueue tell it the database's photos or crops changed,
-	// and which photos need their variants built.
-	Changed()
+	// Enqueue tells it a photo was added, recropped, published or deleted,
+	// so its files are built or removed.
 	Enqueue(sha256 string)
 }
 
@@ -114,13 +113,11 @@ func New(cfg Config) *Server {
 
 // Changed is the one call every admin write makes once it has committed:
 // events, photos, crops, photographers, the gallery. It names the photos
-// that were uploaded, recropped or newly published, so their variants are
-// built now rather than on first view; every kept page is dropped and
-// renders afresh on its next request. Search engines hear of the pages
-// that changed.
+// that were uploaded, recropped, published or deleted, so the photo store
+// builds or removes their files; every kept page is dropped and renders
+// afresh on its next request. Search engines hear of the pages that
+// changed.
 func (s *Server) Changed(photos ...string) {
-	s.cfg.Images.Changed()
-
 	for _, sha := range photos {
 		s.cfg.Images.Enqueue(sha)
 	}
