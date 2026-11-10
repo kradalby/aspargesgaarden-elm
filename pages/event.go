@@ -29,7 +29,7 @@ func Event(s Site, e site.Event, now time.Time) *elem.Element {
 	}
 
 	if p := e.MainPhoto; p != nil {
-		kids = append(kids, ui.EventBanner(photoRef(*p, images.Banner), p.Alt, credit(p.Photographer)))
+		kids = append(kids, ui.EventBanner(photoRef(*p, images.Banner), altOf(*p), credit(p.Photographer)))
 	}
 
 	facts := ui.EventFactsProps{DateLabel: e.DateLabel(), DateLine: e.DateLine(), Price: e.PriceText}
@@ -59,11 +59,18 @@ const descriptionRunes = 160
 // its title, and opens the description with when and where.
 func eventMeta(s Site, e site.Event, ticketURL string) ui.Meta {
 	m := ui.Meta{
-		Title: e.Title + " – " + site.NorwegianDate(e.Start),
-		Description: seo.Clip(fmt.Sprintf("%s på %s i %s, %s: %s",
-			site.NorwegianDate(e.Start), seo.Venue.Name, seo.Venue.Area, seo.Venue.Municipality, teaser(e)), descriptionRunes),
-		Path:   e.Path(),
-		JSONLD: seo.EventNodes(s.BaseURL, seo.EventInput{Event: e, Description: teaser(e), TicketURL: ticketURL}),
+		Title:       e.Title,
+		Description: seo.Clip(teaser(e), descriptionRunes),
+		Path:        e.Path(),
+		JSONLD:      seo.EventNodes(s.BaseURL, seo.EventInput{Event: e, Description: teaser(e), TicketURL: ticketURL}),
+	}
+
+	// Only a draft in the admin's preview has no date yet.
+	if !e.Start.IsZero() {
+		day := site.NorwegianDate(e.Start)
+		m.Title += " – " + day
+		m.Description = seo.Clip(fmt.Sprintf("%s på %s i %s, %s: %s",
+			day, seo.Venue.Name, seo.Venue.Area, seo.Venue.Municipality, teaser(e)), descriptionRunes)
 	}
 
 	if e.MainPhoto != nil {

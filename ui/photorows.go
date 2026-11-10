@@ -59,7 +59,7 @@ func PhotoRows(kind RowKind, rows ...Row) elem.Node {
 			priority = Hero
 		}
 
-		pic := Picture(PictureProps{Photo: r.Photo, Alt: r.Alt, Layout: LayoutRowPhoto, Priority: priority, Class: photoClass})
+		pic := pictureOrPlaceholder(PictureProps{Photo: r.Photo, Alt: r.Alt, Layout: LayoutRowPhoto, Priority: priority, Class: photoClass})
 		if r.Href != "" {
 			pic = hiddenLink(r.Href, pic)
 		}

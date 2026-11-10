@@ -39,18 +39,43 @@ var loadOrigins = map[string][]string{
 // CSP is the Content-Security-Policy of every public response. It enforces
 // what the tests check: own files only, plus loadOrigins.
 func CSP() string {
+	return csp(loadOrigins, false, "'self'")
+}
+
+// AdminCSP is the policy of the admin app and its API: own files only, no
+// outside origin at all, own frames for the page preview, and nothing may
+// frame the admin, rebase it or post a form from it. The preview frame
+// inherits it, so a public page must render under it too, which own files
+// only (the public pages' rule) guarantees.
+func AdminCSP() string {
+	return csp(nil, true, "'none'")
+}
+
+// csp builds a policy from the outside origins per directive. Frames are
+// only what origins lists unless ownFrames; lock fills base-uri,
+// form-action and frame-ancestors.
+func csp(origins map[string][]string, ownFrames bool, lock string) string {
+	src := func(directive string, self bool) string {
+		v := origins[directive]
+		if self {
+			v = append([]string{"'self'"}, v...)
+		}
+
+		return directive + " " + strings.Join(v, " ")
+	}
+
 	directives := []string{
 		"default-src 'self'",
-		"script-src 'self' " + strings.Join(loadOrigins["script-src"], " "),
-		"connect-src 'self' " + strings.Join(loadOrigins["connect-src"], " "),
-		"frame-src " + strings.Join(loadOrigins["frame-src"], " "),
+		src("script-src", true),
+		src("connect-src", true),
+		src("frame-src", ownFrames),
 		"img-src 'self'",
 		"font-src 'self'",
 		"style-src 'self'",
 		"object-src 'none'",
-		"base-uri 'self'",
-		"form-action 'self'",
-		"frame-ancestors 'self'",
+		"base-uri " + lock,
+		"form-action " + lock,
+		"frame-ancestors " + lock,
 	}
 
 	return strings.Join(directives, "; ")

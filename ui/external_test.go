@@ -14,6 +14,15 @@ func TestCSP(t *testing.T) {
 		CSP())
 }
 
+func TestAdminCSP(t *testing.T) {
+	// The policy docs/admin-api.md gives the admin app, which its browser
+	// tests run under.
+	require.Equal(t,
+		"default-src 'self'; script-src 'self'; connect-src 'self'; frame-src 'self'; img-src 'self'; "+
+			"font-src 'self'; style-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'",
+		AdminCSP())
+}
+
 func TestExternalLoadAllowed(t *testing.T) {
 	tests := []struct {
 		directive, ref string

@@ -10,7 +10,7 @@ import (
 func EventCards(items ...EventItem) elem.Node {
 	cards := make([]elem.Node, len(items))
 	for i, it := range items {
-		pic := Picture(PictureProps{
+		pic := pictureOrPlaceholder(PictureProps{
 			Photo: it.Photo, Alt: it.Alt, Layout: LayoutCardGrid,
 			Class: "w-full aspect-4/5 object-cover",
 		})

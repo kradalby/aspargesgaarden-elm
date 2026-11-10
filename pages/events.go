@@ -1,6 +1,7 @@
 package pages
 
 import (
+	"strings"
 	"time"
 
 	"github.com/chasefleming/elem-go"
@@ -17,8 +18,8 @@ import (
 const teaserRunes = 200
 
 // Events is the event list (old /events): what is coming, big, each leading
-// to its own page, then what has been, quietly. events must all have a
-// main photo, as published ones do.
+// to its own page, then what has been, quietly. The admin previews a draft
+// in it, which may lack a title, a date or a photo.
 func Events(s Site, events []site.Event, now time.Time) *elem.Element {
 	upcoming, past := site.Split(events, now)
 
@@ -54,16 +55,32 @@ func eventItems(events []site.Event) []ui.EventItem {
 			Title:     e.Title,
 			DateLabel: e.DateLabel(),
 			DateLine:  e.DateLine(),
-			Date:      site.NorwegianDate(e.Start),
 			Summary:   teaser(e),
 			Cancelled: e.Cancelled,
-			Photo:     photoRef(*e.MainPhoto, images.Card),
-			Alt:       e.MainPhoto.Alt,
-			By:        credit(e.MainPhoto.Photographer),
+		}
+
+		if !e.Start.IsZero() {
+			items[i].Date = site.NorwegianDate(e.Start)
+		}
+
+		// A draft in the admin's preview may have no photo yet; the list
+		// then holds its place.
+		if p := e.MainPhoto; p != nil {
+			items[i].Photo, items[i].Alt, items[i].By = photoRef(*p, images.Card), altOf(*p), credit(p.Photographer)
 		}
 	}
 
 	return items
+}
+
+// altOf is a photo's description. Of an event's photos only a draft's can lack one (the
+// publish rules require it), and the admin's preview must still render it.
+func altOf(p site.Photo) string {
+	if strings.TrimSpace(p.Alt) == "" {
+		return fallbackAlt
+	}
+
+	return p.Alt
 }
 
 // teaser is the event's gist: its summary, or for an event written without

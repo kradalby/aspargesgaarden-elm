@@ -109,6 +109,19 @@ func TestEventsTeaserFallsBackToTheText(t *testing.T) {
 	require.Contains(t, got, ">Invitasjon til takkebakstkurs på Aspargesgården i Tjølling. Sted: Bryggerhuset på Aspargesgården.</p>")
 }
 
+// The admin's "i listen" preview: a fresh draft has no title, date or
+// photo yet, and is shown first among what is coming.
+func TestEventsDraftPreview(t *testing.T) {
+	draft := site.Event{ID: 99, Summary: "Ny kladd uten noe annet"}
+
+	got := Events(testSite, append(testEvents(), draft), testNow).Render()
+
+	upcoming, _, ok := strings.Cut(got, "Tidligere arrangementer")
+	require.True(t, ok)
+	require.Less(t, strings.Index(upcoming, "Ny kladd uten noe annet"), strings.Index(upcoming, "Julemarked på"))
+	require.Contains(t, upcoming, `aspect-4/5 bg-brown/20`, "a placeholder holds the photo's place")
+}
+
 func TestEventsWithNothingComing(t *testing.T) {
 	past := testEvents()[2:]
 

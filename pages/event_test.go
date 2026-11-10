@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/kradalby/asparges/golden"
+	"github.com/kradalby/asparges/site"
 )
 
 func TestEvent(t *testing.T) {
@@ -58,6 +59,17 @@ func TestEventOver(t *testing.T) {
 	require.Contains(t, after, "Arrangementet er over.")
 	require.NotContains(t, after, "fabnite.com/julemarked")
 	require.Contains(t, after, "Gratis inngang", "the price stays for the record")
+}
+
+// The admin previews drafts that break every publish rule.
+func TestEventDraftPreview(t *testing.T) {
+	empty := Event(testSite, site.Event{}, testNow).Render()
+	require.Contains(t, empty, "<h1")
+	require.NotContains(t, empty, "<picture>")
+
+	undescribed := testPhoto('a', "")
+	got := Event(testSite, site.Event{Title: "Kladd", MainPhoto: &undescribed, ExtraPhotos: []site.Photo{undescribed}}, testNow).Render()
+	require.Equal(t, 2, strings.Count(got, `alt="`+fallbackAlt+`"`))
 }
 
 func TestEventCancelled(t *testing.T) {
