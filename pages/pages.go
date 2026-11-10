@@ -66,7 +66,3 @@ var Fixed = map[string]func(Site) *elem.Element{
 	"/om-oss":  OmOss,
 	"/kontakt": Kontakt,
 }
-
-// description is the old site's one description for every page.
-// shortcut: shared by all pages until the SEO phase writes one per page.
-const description = "Aspargesgården byr på sjarmerende og unike lokaler i landlige omgivelser, ved kysten i Vestfold."

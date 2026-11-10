@@ -4,13 +4,25 @@ import (
 	"github.com/chasefleming/elem-go"
 
 	"github.com/kradalby/asparges/images"
+	"github.com/kradalby/asparges/seo"
 	"github.com/kradalby/asparges/site"
 	"github.com/kradalby/asparges/ui"
 )
 
 // Galleri is the photo gallery (old /gallery), photos in the admin's order.
 func Galleri(s Site, photos []site.Photo) *elem.Element {
-	return s.page(ui.Meta{Title: "Galleri", Description: description, Path: "/galleri"},
+	meta := ui.Meta{
+		Title:       "Galleri – bilder fra gården i Tjølling",
+		Description: "Bilder fra Aspargesgården i Tjølling, Larvik: låven og fjøset pyntet til fest, det engelske lysthuset og hagen.",
+		Path:        "/galleri",
+	}
+
+	// The first photo is the one the owner put first: the link preview.
+	if len(photos) > 0 {
+		meta.Image, _ = seo.PhotoImage(photos[0])
+	}
+
+	return s.page(meta,
 		ui.Container(
 			elem.Div(nil, ui.Headline("Galleri")),
 			ui.Gallery(ui.GalleryPage, galleryPhotos(photos)...),

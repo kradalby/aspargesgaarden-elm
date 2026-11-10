@@ -231,7 +231,7 @@ func TestEmptyDatabase(t *testing.T) {
 	rec := f.get(t, "/arrangementer")
 	require.Equal(t, http.StatusOK, rec.Code)
 	require.Contains(t, rec.Body.String(), ">Ingen kommende arrangementer for øyeblikket.</p>")
-	require.NotContains(t, rec.Body.String(), "Julemarked")
+	require.NotContains(t, rec.Body.String(), ">Julemarked</a>")
 }
 
 // The menu shows an event marked "Vis i menyen" until it is over.

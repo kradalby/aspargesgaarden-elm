@@ -1,9 +1,12 @@
 package pages
 
 import (
+	"fmt"
+
 	"github.com/chasefleming/elem-go"
 
 	"github.com/kradalby/asparges/markdown"
+	"github.com/kradalby/asparges/seo"
 	"github.com/kradalby/asparges/static"
 	"github.com/kradalby/asparges/ui"
 )
@@ -24,25 +27,25 @@ var facilities = []struct {
 		photo: "loven",
 		alt:   "Bordplassering på staffeli i den pyntede låven",
 		by:    marianneOus,
-		text: `# Låven
+		text: fmt.Sprintf(`# Låven
 
-Drømmer du om låvebryllup så er «høyloftet» perfekt med bøttevis av sjarm. Låven er fra 1906 og har en nydelig patina. Det er høyt under taket, og lyslenker skaper den rette stemningen. Runde bord og gamle spisestuestoler med plass til 100 personer, men kan gjøres intim ned til ca 45 personer. Om du liker det elegangt eller rustikt, så er begge deler mulig.
+Drømmer du om låvebryllup så er «høyloftet» perfekt med bøttevis av sjarm. Låven er fra 1906 og har en nydelig patina. Det er høyt under taket, og lyslenker skaper den rette stemningen. Runde bord og gamle spisestuestoler med plass til %d personer, men kan gjøres intim ned til ca 45 personer. Om du liker det elegangt eller rustikt, så er begge deler mulig.
 
 Det er bar, scene, dansegulv, musikkanlegg / mikrofon, prosjektor og lerret, samt belysning som kan dempes etter behov. Toaletter i tilknytning ved låvebrua.
-`,
+`, seo.Venue.Guests("Låven")),
 	},
 	{
 		photo: "fjoset",
 		alt:   "Langbord dekket til fest i fjøset",
 		by:    hanneGulliksen,
-		text: `# Fjøset
+		text: fmt.Sprintf(`# Fjøset
 
-I ”fjøset” er det spisestue med plassbygde langbord hvor man kan dekke til 68 personer. «Møkkarennene» er i dag fyllt med gamle minner, skatter og bruksredskaper. Hvitmalte murvegger sammen med orginale smijernsvinduer, skaper en nydelig atmosfære.
+I ”fjøset” er det spisestue med plassbygde langbord hvor man kan dekke til %d personer. «Møkkarennene» er i dag fyllt med gamle minner, skatter og bruksredskaper. Hvitmalte murvegger sammen med orginale smijernsvinduer, skaper en nydelig atmosfære.
 
 Det finnes både musikkanlegg og flere skjermer for lysbildeshow. Den tidligere stallen er gjort om til en intim salong, med bar og scene/ dansegulv. Det finnes også et salongflygel på scenen.
 
 Flott terrasse utenfor, hvor det er sol fra morgen til kveld.
-`,
+`, seo.Venue.Guests("Fjøset")),
 	},
 	{
 		photo: "kjokken",
@@ -88,7 +91,12 @@ func Lokaler(s Site) *elem.Element {
 		rows[i] = ui.Row{Photo: static.Photo(f.photo), Alt: f.alt, By: f.by, Body: markdown.Render(f.text)}
 	}
 
-	return s.page(ui.Meta{Title: "Muligheter", Description: description, Path: "/lokaler"},
+	return s.page(ui.Meta{
+		Title: "Selskapslokaler: låven, fjøset og hagen",
+		Description: fmt.Sprintf("Låven fra 1906 tar %d gjester ved runde bord, fjøset %d ved langbord. Storkjøkken, engelsk lysthus for vielser og alt til festbordet.",
+			seo.Venue.Guests("Låven"), seo.Venue.Guests("Fjøset")),
+		Path: "/lokaler",
+	},
 		ui.Container(elem.Div(nil, ui.Headline("Muligheter"))),
 		ui.PhotoRows(ui.RowFacility, rows...),
 	)

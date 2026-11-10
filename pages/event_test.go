@@ -15,7 +15,7 @@ func TestEvent(t *testing.T) {
 
 	golden.HTML(t, "event", got)
 	require.Contains(t, got, `<link href="https://aspargesgaarden.no/arrangementer/2026/julemarked" rel="canonical">`)
-	require.Contains(t, got, `<meta content="Mer enn 30 utstillere, kafé med hjemmebakst og bålfat på tunet." name="description">`)
+	require.Contains(t, got, `<meta content="14. november 2026 på Aspargesgården i Tjølling, Larvik: Mer enn 30 utstillere, kafé med hjemmebakst og bålfat på tunet." name="description">`)
 	require.Contains(t, got, `href="https://fabnite.com/julemarked"`)
 	require.Contains(t, got, "/"+strings.Repeat("a", 64)+"/banner-")
 	require.Contains(t, got, "/"+strings.Repeat("b", 64)+"/full-")
@@ -42,7 +42,7 @@ func TestEventWithoutSummaryHasNoLead(t *testing.T) {
 	got := Event(testSite, testEvents()[1], testNow).Render()
 
 	require.NotContains(t, got, "text-xl")
-	require.Contains(t, got, `<meta content="Invitasjon til takkebakstkurs`)
+	require.Contains(t, got, `<meta content="31. oktober 2026 på Aspargesgården i Tjølling, Larvik: Invitasjon til takkebakstkurs`)
 	require.Contains(t, got, "<strong class=\"font-bold\">Datoer:</strong> 31. oktober 2026, 28. november 2026, 29. november 2026 kl 10:00 - 15:00")
 }
 

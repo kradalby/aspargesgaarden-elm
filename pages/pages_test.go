@@ -1,6 +1,8 @@
 package pages
 
 import (
+	"encoding/json"
+	"fmt"
 	"go/ast"
 	"go/parser"
 	"go/token"
@@ -69,6 +71,125 @@ func TestFixedPagesAreCanonicalAtTheirAddress(t *testing.T) {
 func TestEveryPageHasOneH1(t *testing.T) {
 	for path, page := range rendered(t) {
 		require.Equal(t, 1, strings.Count(page, "<h1"), "%s must have exactly one <h1>", path)
+	}
+}
+
+// head is what a page's <head> says about it.
+type head struct {
+	titles   []string
+	meta     map[string][]string // by name or property
+	links    map[string]string   // by rel
+	ldTypes  []string
+	ldBlocks int
+}
+
+func readHead(t *testing.T, page string) head {
+	t.Helper()
+
+	doc, err := html.Parse(strings.NewReader(page))
+	require.NoError(t, err)
+
+	h := head{meta: map[string][]string{}, links: map[string]string{}}
+
+	for n := range doc.Descendants() {
+		if n.Type != html.ElementNode || n.Parent == nil || n.Parent.Data != "head" {
+			continue
+		}
+
+		switch n.Data {
+		case "title":
+			h.titles = append(h.titles, n.FirstChild.Data)
+		case "meta":
+			key := attr(n, "name") + attr(n, "property")
+			h.meta[key] = append(h.meta[key], attr(n, "content"))
+		case "link":
+			h.links[attr(n, "rel")] = attr(n, "href")
+		case "script":
+			if attr(n, "type") != "application/ld+json" {
+				continue
+			}
+
+			h.ldBlocks++
+
+			var ld struct {
+				Graph []struct {
+					Type any `json:"@type"`
+				} `json:"@graph"`
+			}
+			require.NoError(t, json.Unmarshal([]byte(n.FirstChild.Data), &ld))
+
+			for _, g := range ld.Graph {
+				h.ldTypes = append(h.ldTypes, fmt.Sprint(g.Type))
+			}
+		}
+	}
+
+	return h
+}
+
+// The SEO checklist, page by page: a page that forgets its title, its
+// description or its share image fails here.
+func TestEveryPageDescribesItself(t *testing.T) {
+	titles, descriptions := map[string]string{}, map[string]string{}
+
+	for path, page := range rendered(t) {
+		h := readHead(t, page)
+
+		require.Len(t, h.titles, 1, "%s: one <title>", path)
+		title := h.titles[0]
+		require.True(t, strings.HasSuffix(title, " | Aspargesgården"), "%s: %q names the site last", path, title)
+
+		for _, key := range []string{
+			"description", "og:type", "og:site_name", "og:locale", "og:title", "og:description",
+			"og:image", "og:image:type", "og:image:width", "og:image:height", "og:image:alt", "twitter:card",
+		} {
+			require.Len(t, h.meta[key], 1, "%s: one %s", path, key)
+			require.NotEmpty(t, h.meta[key][0], "%s: empty %s", path, key)
+		}
+
+		require.Equal(t, "nb_NO", h.meta["og:locale"][0])
+		require.Equal(t, "summary_large_image", h.meta["twitter:card"][0])
+		require.Regexp(t, `^`+testBase+`/(static|img)/`, h.meta["og:image"][0], "%s: share images are ours", path)
+		require.LessOrEqual(t, h.ldBlocks, 1, "%s: one JSON-LD block", path)
+
+		if path == "404" {
+			require.Empty(t, h.links["canonical"])
+			continue
+		}
+
+		require.Equal(t, testBase+strings.TrimSuffix(path, " (empty)"), h.links["canonical"], path)
+		require.Equal(t, h.links["canonical"], h.meta["og:url"][0], path)
+
+		description := h.meta["description"][0]
+		require.LessOrEqual(t, len([]rune(description)), 160, "%s: %q is cut in results", path, description)
+
+		if strings.HasSuffix(path, " (empty)") {
+			continue
+		}
+
+		// An event's words are the editor's; the other pages' are ours.
+		if _, fixed := Fixed[path]; fixed || path == "/arrangementer" {
+			require.LessOrEqual(t, len([]rune(title)), 65, "%s: %q is cut in results", path, title)
+			require.GreaterOrEqual(t, len([]rune(description)), 70, "%s: %q says too little", path, description)
+		}
+
+		require.NotContains(t, titles, title, "%s has the title of %s", path, titles[title])
+		require.NotContains(t, descriptions, description, "%s has the description of %s", path, descriptions[description])
+		titles[title], descriptions[description] = path, path
+	}
+}
+
+func TestStructuredData(t *testing.T) {
+	pages := rendered(t)
+
+	for _, path := range []string{"/", "/kontakt"} {
+		require.Contains(t, readHead(t, pages[path]).ldTypes, "[LocalBusiness EventVenue]", path)
+	}
+
+	require.Contains(t, readHead(t, pages["/"]).ldTypes, "WebSite")
+
+	for _, e := range testEvents() {
+		require.Contains(t, readHead(t, pages[e.Path()]).ldTypes, "Event", e.Path())
 	}
 }
 

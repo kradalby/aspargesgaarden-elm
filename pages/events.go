@@ -39,7 +39,11 @@ func Events(s Site, events []site.Event, now time.Time) *elem.Element {
 		body = append(body, ui.Container(ui.SectionHeading("Tidligere arrangementer"), ui.EventCards(eventItems(past)...)))
 	}
 
-	return s.page(ui.Meta{Title: "Arrangementer", Description: description, Path: "/arrangementer"}, body...)
+	return s.page(ui.Meta{
+		Title:       "Arrangementer i Tjølling, Larvik",
+		Description: "Julemarked, kurs, konserter og andre arrangementer på Aspargesgården i Tjølling, Larvik. Se hva som skjer, og hva som har vært.",
+		Path:        "/arrangementer",
+	}, body...)
 }
 
 func eventItems(events []site.Event) []ui.EventItem {

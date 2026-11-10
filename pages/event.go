@@ -1,12 +1,14 @@
 package pages
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/chasefleming/elem-go"
 
 	"github.com/kradalby/asparges/images"
 	"github.com/kradalby/asparges/markdown"
+	"github.com/kradalby/asparges/seo"
 	"github.com/kradalby/asparges/site"
 	"github.com/kradalby/asparges/ui"
 )
@@ -47,5 +49,26 @@ func Event(s Site, e site.Event, now time.Time) *elem.Element {
 	// when there are none.
 	kids = append(kids, ui.Gallery(ui.GalleryColumn, galleryPhotos(e.ExtraPhotos)...))
 
-	return s.page(ui.Meta{Title: e.Title, Description: teaser(e), Path: e.Path()}, ui.EventColumn(kids...))
+	return s.page(eventMeta(s, e, facts.TicketURL), ui.EventColumn(kids...))
+}
+
+// descriptionRunes is about what search results show of a description.
+const descriptionRunes = 160
+
+// eventMeta names the event with its first day, since a yearly event keeps
+// its title, and opens the description with when and where.
+func eventMeta(s Site, e site.Event, ticketURL string) ui.Meta {
+	m := ui.Meta{
+		Title: e.Title + " – " + site.NorwegianDate(e.Start),
+		Description: seo.Clip(fmt.Sprintf("%s på %s i %s, %s: %s",
+			site.NorwegianDate(e.Start), seo.Venue.Name, seo.Venue.Area, seo.Venue.Municipality, teaser(e)), descriptionRunes),
+		Path:   e.Path(),
+		JSONLD: seo.EventNodes(s.BaseURL, seo.EventInput{Event: e, Description: teaser(e), TicketURL: ticketURL}),
+	}
+
+	if e.MainPhoto != nil {
+		m.Image, _ = seo.PhotoImage(*e.MainPhoto)
+	}
+
+	return m
 }

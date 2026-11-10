@@ -4,6 +4,7 @@ import (
 	"github.com/chasefleming/elem-go"
 	"github.com/chasefleming/elem-go/attrs"
 
+	"github.com/kradalby/asparges/seo"
 	"github.com/kradalby/asparges/static"
 )
 
@@ -11,8 +12,8 @@ import (
 func Footer() elem.Node {
 	return elem.Footer(attrs.Props{attrs.Class: "w-full text-center p-4"},
 		elem.Div(nil,
-			ContactPoint("https://facebook.com/aspargesgaarden", "fb.png", "Facebook"),
-			ContactPoint("https://instagram.com/aspargesgaarden", "insta.png", "Instagram"),
+			ContactPoint(seo.Venue.Facebook, "fb.png", "Facebook"),
+			ContactPoint(seo.Venue.Instagram, "insta.png", "Instagram"),
 		))
 }
 

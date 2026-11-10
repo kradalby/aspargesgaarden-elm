@@ -60,7 +60,11 @@ func OmOss(s Site) *elem.Element {
 		icons[i] = ui.IconImage(o.icon, o.name)
 	}
 
-	return s.page(ui.Meta{Title: "Om gården", Description: description, Path: "/om-oss"},
+	return s.page(ui.Meta{
+		Title:       "Om gården og vertskapet",
+		Description: "Kristine og Anders driver Aspargesgården i Tjølling, Larvik, der låvebryllup er spesialiteten. Les om gården, vertskapet og selskapene vi tar imot.",
+		Path:        "/om-oss",
+	},
 		ui.Container(
 			elem.Div(nil, ui.Headline("Om gården")),
 			elem.Div(attrs.Props{attrs.Class: "flex flex-row flex-wrap"},

@@ -4,23 +4,12 @@ import (
 	"github.com/chasefleming/elem-go"
 	"github.com/chasefleming/elem-go/attrs"
 
+	"github.com/kradalby/asparges/seo"
 	"github.com/kradalby/asparges/static"
 )
 
-// siteName prefixes every <title>, as on the old site.
-const siteName = "Aspargesgården"
-
-// Meta is what a page says about itself to browsers and search engines. The
-// SEO layer extends this struct (Open Graph, JSON-LD) without touching pages
-// that do not need more.
-type Meta struct {
-	// Title is the page's own part of <title>: "Aspargesgården | <Title>".
-	Title       string
-	Description string
-	// Path is the canonical path, e.g. "/lokaler". Empty for pages that have
-	// no address of their own (404), which then get no canonical link.
-	Path string
-}
+// Meta is what a page says about itself; the seo package owns its tags.
+type Meta = seo.Meta
 
 // PageProps configures a Page.
 type PageProps struct {
@@ -34,16 +23,10 @@ type PageProps struct {
 // Page is a whole HTML document: head, header, the body nodes, footer and
 // analytics. Every public page goes through it.
 func Page(p PageProps, body ...elem.Node) *elem.Element {
-	head := []elem.Node{
+	head := append([]elem.Node{
 		elem.Meta(attrs.Props{attrs.Charset: "utf-8"}),
 		elem.Meta(attrs.Props{attrs.Name: "viewport", attrs.Content: "width=device-width, initial-scale=1"}),
-		elem.Title(nil, elem.Text(siteName+" | "+p.Meta.Title)),
-		elem.Meta(attrs.Props{attrs.Name: "description", attrs.Content: p.Meta.Description}),
-	}
-
-	if p.Meta.Path != "" {
-		head = append(head, elem.Link(attrs.Props{attrs.Rel: "canonical", attrs.Href: p.BaseURL + p.Meta.Path}))
-	}
+	}, seo.Tags(p.BaseURL, p.Meta)...)
 
 	head = append(head,
 		elem.Link(attrs.Props{attrs.Rel: "icon", attrs.Href: static.URL("favicon.ico"), attrs.Sizes: "any"}),
