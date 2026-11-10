@@ -21,13 +21,18 @@ var testGallery = []GalleryPhoto{
 }
 
 func TestGallery(t *testing.T) {
-	golden.HTML(t, "gallery", Gallery(testGallery...).Render())
+	golden.HTML(t, "gallery", Gallery(GalleryPage, testGallery...).Render())
+	golden.HTML(t, "gallery-column", Gallery(GalleryColumn, testGallery[:2]...).Render())
+}
+
+func TestGalleryRefusesNoLayout(t *testing.T) {
+	require.Panics(t, func() { Gallery(0, testGallery...) })
 }
 
 // The lightbox (Lightbox.elm photoDecoder) reads data-gallery; this pins the
 // shape LightboxTest.elm decodes.
 func TestGalleryData(t *testing.T) {
-	doc, err := html.Parse(strings.NewReader(Gallery(testGallery...).Render()))
+	doc, err := html.Parse(strings.NewReader(Gallery(GalleryPage, testGallery...).Render()))
 	require.NoError(t, err)
 
 	var (
@@ -80,15 +85,15 @@ func TestGalleryData(t *testing.T) {
 // Without JavaScript the photo link is the gallery: it must lead to the
 // largest photo in the format every browser shows.
 func TestGalleryLinksToLargestPhoto(t *testing.T) {
-	require.Contains(t, Gallery(testGallery[0]).Render(), `<a class="block" data-index="0" href="/img/x-1600.jpeg">`)
+	require.Contains(t, Gallery(GalleryPage, testGallery[0]).Render(), `<a class="block" data-index="0" href="/img/x-1600.jpeg">`)
 }
 
 func TestEmptyGalleryRendersNothing(t *testing.T) {
-	require.Empty(t, Gallery().Render())
+	require.Empty(t, Gallery(GalleryPage).Render())
 }
 
 func TestHoldsGallery(t *testing.T) {
-	g := Gallery(testGallery...)
+	g := Gallery(GalleryPage, testGallery...)
 
 	tests := []struct {
 		name  string
@@ -96,7 +101,7 @@ func TestHoldsGallery(t *testing.T) {
 		want  bool
 	}{
 		{name: "none", nodes: []elem.Node{Container(Headline("x"))}},
-		{name: "empty-gallery", nodes: []elem.Node{Gallery()}},
+		{name: "empty-gallery", nodes: []elem.Node{Gallery(GalleryPage)}},
 		{name: "top-level", nodes: []elem.Node{g}, want: true},
 		{name: "nested", nodes: []elem.Node{Container(elem.Div(nil, elem.Text("x"), g))}, want: true},
 	}

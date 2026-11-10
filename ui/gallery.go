@@ -23,6 +23,31 @@ type GalleryPhoto struct {
 // holds one, and the lightbox's boot.js finds the grids by it.
 const galleryAttr = "data-gallery"
 
+// GalleryLayout is where a Gallery sits; it decides the grid and the sizes
+// hint of the thumbnails. The zero value is invalid.
+type GalleryLayout int
+
+// The gallery layouts.
+const (
+	_ GalleryLayout = iota
+	// GalleryPage fills a page, as the old /gallery did: photos full width
+	// on a phone, 20rem from md and 27rem from lg, wrapping.
+	GalleryPage
+	// GalleryColumn closes an EventColumn: two columns of photos.
+	GalleryColumn
+)
+
+func (l GalleryLayout) classes() (grid, item string, picture Layout) {
+	switch l {
+	case GalleryPage:
+		return "w-full flex flex-row flex-wrap", "md:w-80 md:mr-6 md:mb-6 lg:w-108", LayoutGallery
+	case GalleryColumn:
+		return "grid grid-cols-2 gap-4 my-12 md:gap-6", "", LayoutHalfColumn
+	}
+
+	panic("ui: Gallery needs a GalleryLayout")
+}
+
 // Gallery is a grid of photos, each a link to the large photo, so it works
 // with JavaScript off. On a page that shows one, Page loads the lightbox
 // (elm/gallery), which opens over the grid instead of following the link.
@@ -31,7 +56,9 @@ const galleryAttr = "data-gallery"
 // The lightbox's contract: the grid carries data-gallery, a JSON list of
 // the photos (lightboxPhoto) in grid order, and every photo link carries
 // data-index, its place in that list.
-func Gallery(photos ...GalleryPhoto) elem.Node {
+func Gallery(layout GalleryLayout, photos ...GalleryPhoto) elem.Node {
+	grid, item, pictureLayout := layout.classes()
+
 	if len(photos) == 0 {
 		return elem.None()
 	}
@@ -44,8 +71,11 @@ func Gallery(photos ...GalleryPhoto) elem.Node {
 		largest := slices.MaxFunc(img.variants, func(a, b images.Variant) int { return a.Width - b.Width })
 
 		link := elem.A(attrs.Props{attrs.Href: largest.URL, "data-index": strconv.Itoa(i), attrs.Class: "block"},
-			Picture(PictureProps{Photo: p.Photo, Alt: p.Alt, Layout: LayoutGallery, Class: "w-full"}))
-		items[i] = elem.Div(attrs.Props{attrs.Class: "md:w-80 md:mr-6 md:mb-6 lg:w-108"}, PhotoCredit(p.By, link))
+			Picture(PictureProps{Photo: p.Photo, Alt: p.Alt, Layout: pictureLayout, Class: "w-full"}))
+		items[i] = PhotoCredit(p.By, link)
+		if item != "" {
+			items[i] = elem.Div(attrs.Props{attrs.Class: item}, items[i])
+		}
 
 		// Never nil: the decoder wants a list, not null.
 		srcs := make([]lightboxSource, len(sources))
@@ -71,7 +101,7 @@ func Gallery(photos ...GalleryPhoto) elem.Node {
 		panic("ui: gallery data: " + err.Error())
 	}
 
-	return elem.Div(attrs.Props{attrs.Class: "w-full flex flex-row flex-wrap", galleryAttr: string(js)}, items...)
+	return elem.Div(attrs.Props{attrs.Class: grid, galleryAttr: string(js)}, items...)
 }
 
 // lightboxPhoto is what the lightbox knows of a photo; Lightbox.elm's

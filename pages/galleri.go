@@ -13,7 +13,7 @@ func Galleri(s Site, photos []site.Photo) *elem.Element {
 	return s.page(ui.Meta{Title: "Galleri", Description: description, Path: "/galleri"},
 		ui.Container(
 			elem.Div(nil, ui.Headline("Galleri")),
-			ui.Gallery(galleryPhotos(photos)...),
+			ui.Gallery(ui.GalleryPage, galleryPhotos(photos)...),
 		),
 	)
 }

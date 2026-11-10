@@ -37,8 +37,8 @@ func TestPageLoadsLightboxOnlyWithGallery(t *testing.T) {
 	}
 
 	require.NotContains(t, testPage("/"), "gallery.js")
-	require.NotContains(t, page(Gallery()), "gallery.js", "an empty gallery has nothing to open")
-	require.Equal(t, 1, strings.Count(page(Container(Gallery(testGallery...), Gallery(testGallery[:1]...))), script))
+	require.NotContains(t, page(Gallery(GalleryPage)), "gallery.js", "an empty gallery has nothing to open")
+	require.Equal(t, 1, strings.Count(page(Container(Gallery(GalleryPage, testGallery...), Gallery(GalleryColumn, testGallery[:1]...))), script))
 }
 
 // The old site rendered the Umami tag as an empty <p>, so it never loaded.
