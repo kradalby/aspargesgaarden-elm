@@ -259,10 +259,22 @@
         });
       in
       {
-        packages.default = asparges;
-        packages.vips = vips;
-        packages.imagesbuild = imagesbuild;
-        packages.photo-variants = staticPhotos;
+        packages = {
+          default = asparges;
+          inherit vips imagesbuild;
+          photo-variants = staticPhotos;
+        }
+        # The NixOS module and systemd-run need a Linux system.
+        // lib.optionalAttrs pkgs.stdenv.hostPlatform.isLinux {
+          hardening-smoke = import ./nix/hardening-smoke.nix {
+            inherit
+              pkgs
+              self
+              nixpkgs
+              system
+              ;
+          };
+        };
         formatter = fc.formatter common;
         devShells.default = pkgs.mkShell {
           packages = [
