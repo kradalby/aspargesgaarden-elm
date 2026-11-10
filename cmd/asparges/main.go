@@ -52,7 +52,11 @@ func run() int {
 	a := &app{log: log, lvl: lvl}
 	cmd := newRootCmd(a)
 
-	err := cmd.ParseAndRun(ctx, os.Args[1:], ff.WithEnvVarPrefix(envPrefix))
+	err := parse(cmd, os.Args[1:])
+	if err == nil {
+		err = cmd.Run(ctx)
+	}
+
 	switch {
 	case err == nil:
 		return 0
@@ -66,6 +70,28 @@ func run() int {
 		log.Error("asparges failed", "err", err)
 		return 1
 	}
+}
+
+// devOnlyFlags are for local work and the browser tests, never a deploy:
+// the NixOS module does not pass them and the environment cannot set them,
+// so an EnvironmentFile line cannot put the admin on the listener nginx
+// exposes.
+var devOnlyFlags = map[string]bool{
+	"dev":          true, // no Tailscale, the admin on the local listener
+	"e2e-fixtures": true, // hooks that delete everything
+}
+
+var errDevFromEnv = errors.New("dev-only flags must be given on the command line")
+
+func parse(cmd *ff.Command, args []string) error {
+	for name := range devOnlyFlags {
+		key := envPrefix + "_" + strings.ToUpper(strings.ReplaceAll(name, "-", "_"))
+		if _, ok := os.LookupEnv(key); ok {
+			return fmt.Errorf("%w: %s is set", errDevFromEnv, key)
+		}
+	}
+
+	return cmd.Parse(args, ff.WithEnvVarPrefix(envPrefix))
 }
 
 type app struct {

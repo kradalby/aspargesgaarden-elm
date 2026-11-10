@@ -66,12 +66,10 @@ func TestServeFlags(t *testing.T) {
 			name: "env",
 			args: []string{"serve"},
 			env: map[string]string{
-				"ASPARGES_DEV":         "true",
 				"ASPARGES_DATA_DIR":    "/srv/asparges",
 				"ASPARGES_LISTEN_ADDR": "127.0.0.1:2",
 			},
 			want: func(c *serveConfig) {
-				c.dev = true
 				c.dataDir = "/srv/asparges"
 				c.listenAddr = "127.0.0.1:2"
 			},
@@ -104,7 +102,7 @@ func TestServeFlags(t *testing.T) {
 
 			a := &app{}
 			cmd := newRootCmd(a)
-			require.NoError(t, cmd.Parse(tt.args, ff.WithEnvVarPrefix(envPrefix)))
+			require.NoError(t, parse(cmd, tt.args))
 			require.Equal(t, "serve", cmd.GetSelected().Name)
 
 			want := defaults
@@ -186,13 +184,6 @@ func TestServeConfigValidate(t *testing.T) {
 	}
 }
 
-// devOnlyFlags are the serve flags the NixOS module must never pass: they
-// are for local work and the browser tests, not a deploy.
-var devOnlyFlags = map[string]bool{
-	"dev":          true, // no Tailscale, the admin on the local listener
-	"e2e-fixtures": true, // hooks that delete everything
-}
-
 // Every setting the server takes is settable through services.asparges
 // (owner rule): each serve flag, the root ones included, must be rendered
 // into the unit by nix/module.nix, and the dev-only ones never.
@@ -225,6 +216,19 @@ func TestEveryServeFlagIsInTheModule(t *testing.T) {
 	a := &app{}
 	require.NoError(t, newRootCmd(a).Parse([]string{"serve", "--log-level=debug", "--data-dir=/var/lib/x"}))
 	require.Equal(t, "debug", a.logLevel)
+}
+
+func TestDevOnlyFlagsNotFromEnv(t *testing.T) {
+	for _, key := range []string{"ASPARGES_DEV", "ASPARGES_E2E_FIXTURES"} {
+		t.Run(key, func(t *testing.T) {
+			t.Setenv(key, "true")
+			require.ErrorIs(t, parse(newRootCmd(&app{}), []string{"serve"}), errDevFromEnv)
+		})
+	}
+
+	a := &app{}
+	require.NoError(t, parse(newRootCmd(a), []string{"serve", "--dev"}))
+	require.True(t, a.serve.dev)
 }
 
 // The browser tests' hooks delete everything: never on a real deploy.

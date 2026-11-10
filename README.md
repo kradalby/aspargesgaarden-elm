@@ -106,8 +106,9 @@ golangci-lint and `go test`.
 | `--umami-site-id`           | `umamiSiteId`      | none                         | Umami site on umami.kradalby.no. Unset: no tracker, no Umami origin in the CSP. |
 | `--log-level`               | `logLevel`         | `info`                       |                                                                                 |
 
-`--dev` and `--e2e-fixtures` are for local work and tests only and have no
-module option.
+`--dev` and `--e2e-fixtures` are for local work and tests only: no module
+option, and `serve` refuses to start when `ASPARGES_DEV` or
+`ASPARGES_E2E_FIXTURES` is set.
 
 State lives in the data directory: `asparges.db` (WAL mode),
 `originals/` (uploads as received), `variants/` (built sizes), `tmp/`, and
