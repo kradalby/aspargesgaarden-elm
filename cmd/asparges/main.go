@@ -372,14 +372,22 @@ func openData(ctx context.Context, dataDir string) (*db.DB, error) {
 	}
 
 	// SQLite would create the database 0644, and gives -wal and -shm the
-	// database's mode; litestream, in the group, writes all three.
+	// database's mode; litestream, in the group, writes all three. Chmod,
+	// not the create mode alone: the caller's umask cuts that, and a seeded
+	// or restored database arrives with whatever mode it had.
 	path := filepath.Join(dataDir, "asparges.db")
 
 	f, err := os.OpenFile(path, os.O_RDONLY|os.O_CREATE, 0o660) //nolint:gosec // see above
 	if err != nil {
 		return nil, fmt.Errorf("creating database: %w", err)
 	}
+
+	err = f.Chmod(0o660) //nolint:gosec // see above
 	_ = f.Close()
+
+	if err != nil {
+		return nil, fmt.Errorf("making the database group-writable: %w", err)
+	}
 
 	d, err := db.Open(ctx, path)
 	if err != nil {

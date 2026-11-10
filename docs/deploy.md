@@ -22,8 +22,8 @@ state: /var/lib/asparges/{asparges.db, originals/, variants/, tmp/, tsnet/}
 
 - One systemd unit, `asparges.service`, from `services.asparges`
   (`nixosModules.default` of this flake). Static user and group `asparges`,
-  `StateDirectory` with mode `2770`. The service creates `asparges.db`
-  `0660` and SQLite gives `-wal` and `-shm` its mode (`UMask=0007` keeps
+  `StateDirectory` with mode `2770`. The service makes `asparges.db` `0660`
+  at every start and SQLite gives `-wal` and `-shm` its mode (`UMask=0007` keeps
   it), so litestream (in the group) can replicate the database; the
   module's `z` tmpfiles rules put `0660 asparges:asparges` back on all
   three at boot and on every deploy. `MemoryMax=2G` covers the server and two
@@ -445,7 +445,9 @@ least of all.
    Without `tsnet/` the node needs a new auth key (step 4 of the runbook).
 
 4. Ownership and mode, then start. Files a root shell made are root's and
-   `0644`; litestream, in the group, needs `0660` to replicate.
+   `0644`; litestream, in the group, needs `0660` to replicate. The service
+   sets the database's mode at start too; the `chmod` keeps that from being
+   the only guard.
 
    ```bash
    chown -R asparges:asparges /var/lib/asparges
@@ -534,9 +536,8 @@ journalctl -u asparges -f
 ```
 
 The seed is made on a laptop; the host never needs `asparges import`. If it
-is ever run there, run it with the service stopped and as the service user
-with `umask 0007`, so litestream can still write what it creates:
-`sudo -u asparges sh -c 'umask 0007 && asparges import --data-dir /var/lib/asparges <checkout>'`.
+is ever run there, run it with the service stopped and as the service user:
+`sudo -u asparges asparges import --data-dir /var/lib/asparges <checkout>`.
 It leaves events already there and a non-empty gallery alone.
 
 Never start `serve --e2e-fixtures` against real data: its `/__reset` hook

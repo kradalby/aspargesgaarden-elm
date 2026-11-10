@@ -318,18 +318,45 @@ func TestSweepUnusedPhotos(t *testing.T) {
 
 // Under the unit's UMask=0007 litestream, in the group, can write the
 // database and the -wal and -shm SQLite makes beside it.
+// Whatever the umask, and whatever mode a seeded or restored database
+// arrived with, the database and its -wal and -shm are left 0660.
 func TestOpenDataGroupWritable(t *testing.T) {
-	old := syscall.Umask(0o007)
-	t.Cleanup(func() { syscall.Umask(old) })
+	for _, tt := range []struct {
+		name  string
+		umask int
+		seed  bool // a database already there, 0644
+	}{
+		{name: "unit umask", umask: 0o007},
+		{name: "shell umask", umask: 0o022},
+		{name: "seeded 0644", umask: 0o022, seed: true},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			old := syscall.Umask(tt.umask)
+			t.Cleanup(func() { syscall.Umask(old) })
 
-	dir := t.TempDir()
-	d, err := openData(t.Context(), dir)
-	require.NoError(t, err)
-	t.Cleanup(func() { _ = d.Close() })
+			dir := t.TempDir()
 
-	for _, name := range []string{"asparges.db", "asparges.db-wal", "asparges.db-shm"} {
-		fi, err := os.Stat(filepath.Join(dir, name))
-		require.NoError(t, err)
-		assert.Equal(t, os.FileMode(0o660), fi.Mode().Perm(), name)
+			if tt.seed {
+				d, err := db.Open(t.Context(), filepath.Join(dir, "asparges.db"))
+				require.NoError(t, err)
+				require.NoError(t, d.Close())
+
+				for _, name := range []string{"asparges.db-wal", "asparges.db-shm"} {
+					require.NoError(t, os.RemoveAll(filepath.Join(dir, name)))
+				}
+
+				require.NoError(t, os.Chmod(filepath.Join(dir, "asparges.db"), 0o644))
+			}
+
+			d, err := openData(t.Context(), dir)
+			require.NoError(t, err)
+			t.Cleanup(func() { _ = d.Close() })
+
+			for _, name := range []string{"asparges.db", "asparges.db-wal", "asparges.db-shm"} {
+				fi, err := os.Stat(filepath.Join(dir, name))
+				require.NoError(t, err)
+				assert.Equal(t, os.FileMode(0o660), fi.Mode().Perm(), name)
+			}
+		})
 	}
 }
