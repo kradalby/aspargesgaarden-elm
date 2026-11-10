@@ -32,6 +32,7 @@ func rendered(t *testing.T) map[string]string {
 
 	out := map[string]string{
 		"404":                    NotFound(testSite).Render(),
+		"/galleri":               Galleri(testSite, testGalleryPhotos).Render(),
 		"/arrangementer":         Events(testSite, testEvents(), testNow).Render(),
 		"/arrangementer (empty)": Events(testSite, nil, testNow).Render(),
 	}
@@ -178,12 +179,18 @@ func attr(n *html.Node, key string) string {
 
 // The stylesheet must not pull anything from outside either: no @import of
 // a web font service, no url() to a CDN.
-func TestStylesheetLoadsNothingFromOutside(t *testing.T) {
+func staticFile(t *testing.T, name string) string {
+	t.Helper()
+
 	rec := httptest.NewRecorder()
-	static.Handler().ServeHTTP(rec, httptest.NewRequestWithContext(t.Context(), http.MethodGet, static.URL("site.css"), nil))
+	static.Handler().ServeHTTP(rec, httptest.NewRequestWithContext(t.Context(), http.MethodGet, static.URL(name), nil))
 	require.Equal(t, http.StatusOK, rec.Code)
 
-	css := rec.Body.String()
+	return rec.Body.String()
+}
+
+func TestStylesheetLoadsNothingFromOutside(t *testing.T) {
+	css := staticFile(t, "site.css")
 	require.NotContains(t, css, "@import", "the built stylesheet must be self-contained")
 
 	urls := regexp.MustCompile(`url\(([^)]*)\)`).FindAllStringSubmatch(css, -1)
@@ -192,5 +199,19 @@ func TestStylesheetLoadsNothingFromOutside(t *testing.T) {
 	for _, m := range urls {
 		ref := strings.Trim(m[1], `'"`)
 		require.True(t, ui.ExternalLoadAllowed("font-src", ref), "site.css loads %s", ref)
+	}
+}
+
+// The lightbox only shows the gallery's own images: it requests nothing
+// itself, and the only addresses in it are links in Elm's error messages.
+func TestLightboxScriptLoadsNothingFromOutside(t *testing.T) {
+	js := staticFile(t, "gallery.js")
+
+	for _, api := range []string{"XMLHttpRequest", "fetch(", "WebSocket", "EventSource", "sendBeacon", "import("} {
+		require.NotContains(t, js, api)
+	}
+
+	for _, u := range regexp.MustCompile(`https?://[^\s"'\x60)]+`).FindAllString(js, -1) {
+		require.Regexp(t, `^https://(github\.com/elm/|package\.elm-lang\.org/)`, u, "gallery.js names an outside address")
 	}
 }

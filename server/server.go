@@ -30,7 +30,7 @@ var redirects = map[string]string{
 	"/events":         "/arrangementer",
 	"/christmas":      "/julemarked",
 	"/christmas/2026": "/arrangementer/2026/julemarked",
-	// The gallery adds /gallery with its page.
+	"/gallery":        "/galleri",
 }
 
 // evergreen addresses lead to the newest published event with a slug. The
@@ -180,8 +180,11 @@ func (s *Server) lookup(ctx context.Context, path string) (a answer, ok bool, er
 		}}, true, nil
 	}
 
-	if path == "/arrangementer" {
+	switch path {
+	case "/arrangementer":
 		return answer{build: s.eventList}, true, nil
+	case "/galleri":
+		return answer{build: s.gallery}, true, nil
 	}
 
 	if year, slug, isEvent := eventAddress(path); isEvent {
@@ -256,6 +259,20 @@ func (s *Server) eventPage(year int, slug string) render.Builder {
 
 		return pages.Event(st, e, s.cfg.Now()), nil
 	}
+}
+
+func (s *Server) gallery(ctx context.Context) (*elem.Element, error) {
+	st, err := s.site(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	photos, err := s.cfg.Store.Gallery(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("gallery: %w", err)
+	}
+
+	return pages.Galleri(st, photos), nil
 }
 
 // site is what pages need, with today's menu. On error the menu lacks the

@@ -59,6 +59,7 @@ func (f *fakeImages) Changed()              { f.changed++ }
 func (f *fakeImages) Enqueue(sha256 string) { f.enqueued = append(f.enqueued, sha256) }
 
 type fixture struct {
+	db     *db.DB
 	srv    *Server
 	store  *site.Store
 	clock  *clock
@@ -78,7 +79,7 @@ func newFixture(t *testing.T, dev bool) *fixture {
 	imgs := &fakeImages{}
 	srv := New(Config{BaseURL: "https://aspargesgaarden.no", Dev: dev, Store: store, Images: imgs, Now: clk.now})
 
-	return &fixture{srv: srv, store: store, clock: clk, images: imgs, h: srv.Public()}
+	return &fixture{db: d, srv: srv, store: store, clock: clk, images: imgs, h: srv.Public()}
 }
 
 func (f *fixture) get(t *testing.T, target string, header ...string) *httptest.ResponseRecorder {
@@ -159,6 +160,7 @@ func TestAddresses(t *testing.T) {
 		{path: "/arrangementer/2026/julemarked", wantCode: http.StatusOK, wantBody: `<link href="https://aspargesgaarden.no/arrangementer/2026/julemarked" rel="canonical">`},
 		// Past events keep their page.
 		{path: "/arrangementer/2025/julemarked", wantCode: http.StatusOK, wantBody: "Arrangementet er over."},
+		{path: "/galleri", wantCode: http.StatusOK, wantBody: ">Galleri</h1>"},
 
 		{path: "/facilities", wantCode: http.StatusMovedPermanently, wantTo: "/lokaler"},
 		{path: "/about", wantCode: http.StatusMovedPermanently, wantTo: "/om-oss"},
@@ -166,6 +168,7 @@ func TestAddresses(t *testing.T) {
 		{path: "/events", wantCode: http.StatusMovedPermanently, wantTo: "/arrangementer"},
 		{path: "/christmas", wantCode: http.StatusMovedPermanently, wantTo: "/julemarked"},
 		{path: "/christmas/2026", wantCode: http.StatusMovedPermanently, wantTo: "/arrangementer/2026/julemarked"},
+		{path: "/gallery", wantCode: http.StatusMovedPermanently, wantTo: "/galleri"},
 		// Temporary: next year the newest market is another page.
 		{path: "/julemarked", wantCode: http.StatusFound, wantTo: "/arrangementer/2026/julemarked"},
 
@@ -178,6 +181,8 @@ func TestAddresses(t *testing.T) {
 		{path: "/arrangementer/", wantCode: http.StatusMovedPermanently, wantTo: "/arrangementer"},
 		{path: "/arrangementer/2026/julemarked/", wantCode: http.StatusMovedPermanently, wantTo: "/arrangementer/2026/julemarked"},
 		{path: "/christmas/2026/", wantCode: http.StatusMovedPermanently, wantTo: "/arrangementer/2026/julemarked"},
+		{path: "/galleri/", wantCode: http.StatusMovedPermanently, wantTo: "/galleri"},
+		{path: "/gallery/", wantCode: http.StatusMovedPermanently, wantTo: "/galleri"},
 		{path: "/julemarked/?ref=fb", wantCode: http.StatusFound, wantTo: "/arrangementer/2026/julemarked?ref=fb"},
 
 		// Unknown addresses get the 404 page with a real 404, slash or not.
@@ -309,6 +314,49 @@ func TestNotFoundIsNotKept(t *testing.T) {
 	require.Equal(t, http.StatusOK, f.get(t, e.Path()).Code, "a 404 is never kept, even without Changed")
 }
 
+// The gallery is kept like any page, shows the admin's order once Changed,
+// and loads the lightbox.
+func TestGallery(t *testing.T) {
+	f := withMarkets(t)
+	ctx := t.Context()
+
+	empty := f.get(t, "/galleri")
+	require.Equal(t, http.StatusOK, empty.Code)
+	require.NotContains(t, empty.Body.String(), "gallery.js", "no photos, nothing to open")
+
+	ids := make([]int64, 0, 2)
+
+	for _, c := range "12" { // hex, and not a market photo's
+		p, err := f.store.AddPhoto(ctx, site.Photo{SHA256: strings.Repeat(string(c), 64), MIME: "image/jpeg", Width: 1600, Height: 1200, Alt: "Bilde " + string(c)})
+		require.NoError(t, err)
+
+		ids = append(ids, p.ID)
+	}
+
+	require.NoError(t, f.store.SetGallery(ctx, ids))
+
+	require.NotContains(t, f.get(t, "/galleri").Body.String(), "data-gallery", "kept until Changed")
+
+	f.srv.Changed()
+
+	body := f.get(t, "/galleri").Body.String()
+	require.Contains(t, body, `alt="Bilde 1"`)
+	require.Less(t, strings.Index(body, `alt="Bilde 1"`), strings.Index(body, `alt="Bilde 2"`))
+	require.Contains(t, body, `<script defer src="`+static.URL("gallery.js")+`">`)
+}
+
+// A database failure must not look like a missing page to a search engine,
+// leak the error, or be kept as the page.
+func TestGalleryDatabaseFailure(t *testing.T) {
+	f := newFixture(t, false)
+	require.NoError(t, f.db.Close())
+
+	rec := f.get(t, "/galleri")
+	require.Equal(t, http.StatusInternalServerError, rec.Code)
+	require.Empty(t, rec.Header().Get("ETag"))
+	require.NotContains(t, rec.Body.String(), "sql")
+}
+
 func TestImages(t *testing.T) {
 	f := withMarkets(t)
 
@@ -321,7 +369,7 @@ func TestImages(t *testing.T) {
 func TestEveryResponseCarriesCSP(t *testing.T) {
 	f := withMarkets(t)
 
-	for _, target := range []string{"/", "/facilities", "/finnes-ikke", "/arrangementer", "/julemarked", static.URL("site.css")} {
+	for _, target := range []string{"/", "/facilities", "/finnes-ikke", "/arrangementer", "/julemarked", "/galleri", static.URL("site.css"), static.URL("gallery.js")} {
 		rec := f.get(t, target)
 
 		require.Equal(t, ui.CSP(), rec.Header().Get("Content-Security-Policy"), target)
