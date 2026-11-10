@@ -55,7 +55,7 @@ CREATE TABLE event_dates (
 
 -- photographers are credited on photos: one row per person, picked rather
 -- than retyped, so correcting a link fixes every credit. name_key is the name
--- lowercased with its spaces collapsed, set by site/; SQLite's NOCASE folds
+-- in NFC, lowercased, spaces collapsed, set by site/; SQLite's NOCASE folds
 -- ASCII only, and "Øyvind" and "øyvind" must be one photographer too. The url
 -- check keeps javascript: and other schemes out of a credit's href.
 CREATE TABLE photographers (

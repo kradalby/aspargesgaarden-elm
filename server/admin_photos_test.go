@@ -448,6 +448,14 @@ func TestAdminPhotographers(t *testing.T) {
 		"existing": map[string]any{"id": float64(ola.ID), "name": "Ola Nordmann", "url": "https://example.no"},
 	}, decode[map[string]any](t, rec))
 
+	// The same name in another Unicode spelling (A and a combining ring).
+	ase := decode[photographerJSON](t, a.do(t, "POST", "/admin/api/photographers", req{body: map[string]string{"name": "Åse Berg"}}))
+	rec = a.do(t, "POST", "/admin/api/photographers", req{body: map[string]string{"name": "Åse berg"}})
+	require.Equal(t, http.StatusConflict, rec.Code)
+	require.Equal(t, ase, decode[struct {
+		Existing photographerJSON `json:"existing"`
+	}](t, rec).Existing)
+
 	rec = a.do(t, "POST", "/admin/api/photographers", req{body: map[string]string{"name": " ", "url": "instagram.com/x"}})
 	require.Equal(t, http.StatusUnprocessableEntity, rec.Code)
 	require.Equal(t, []problem{{Code: "photographer_name_required", Field: "name"}, {Code: "photographer_url", Field: "url"}}, errorsOf(t, rec))

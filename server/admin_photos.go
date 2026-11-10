@@ -503,7 +503,13 @@ func (s *Server) savePhotographer(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if errors.Is(err, site.ErrPhotographerTaken) {
-		s.apiFail(w, r, err, s.existingPhotographer(r.Context(), in.Name))
+		var extra map[string]any
+		if ph, err := s.cfg.Store.PhotographerByName(r.Context(), in.Name); err == nil {
+			extra = map[string]any{"existing": toPhotographerJSON(ph)}
+		}
+
+		s.apiFail(w, r, err, extra)
+
 		return
 	}
 
@@ -515,24 +521,6 @@ func (s *Server) savePhotographer(w http.ResponseWriter, r *http.Request) {
 	s.Changed()
 	s.audit(r, "photographer saved", "photographer", p.ID, "name", p.Name)
 	s.writeJSON(w, r, status, toPhotographerJSON(p))
-}
-
-// existingPhotographer finds the photographer who already has the name, as
-// site compares names: case and spacing do not count.
-func (s *Server) existingPhotographer(ctx context.Context, name string) map[string]any {
-	ps, err := s.cfg.Store.Photographers(ctx)
-	if err != nil {
-		return nil
-	}
-
-	want := strings.Join(strings.Fields(name), " ")
-	for _, p := range ps {
-		if strings.EqualFold(p.Name, want) {
-			return map[string]any{"existing": toPhotographerJSON(p)}
-		}
-	}
-
-	return nil
 }
 
 func (s *Server) writeGallery(w http.ResponseWriter, r *http.Request) {

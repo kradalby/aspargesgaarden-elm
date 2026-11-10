@@ -184,7 +184,7 @@ polling (see [Photo status](#photo-status)).
 ```
 
 A person to credit, shared by all their photos. `name` is required and
-unique ignoring case (the server trims it and collapses inner whitespace);
+unique ignoring case and Unicode spelling (the server trims it and collapses inner whitespace);
 `url` is optional (`""`), `http`/`https` only. Changing a photographer changes the credit on every photo that refers
 to them.
 

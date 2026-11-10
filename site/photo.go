@@ -7,6 +7,8 @@ import (
 	"strings"
 	"time"
 
+	"golang.org/x/text/unicode/norm"
+
 	"github.com/kradalby/asparges/images"
 )
 
@@ -37,10 +39,11 @@ func (p Photographer) Normalize() (Photographer, error) {
 	return p, errors.Join(errs...)
 }
 
-// nameKey is what makes two names one photographer: case and spacing are
-// typing accidents, not different people.
+// nameKey is what makes two names one photographer: case, spacing and how
+// a keyboard spells "å" (one letter, or a and a ring) are typing accidents,
+// not different people.
 func nameKey(name string) string {
-	return strings.ToLower(strings.Join(strings.Fields(name), " "))
+	return strings.ToLower(norm.NFC.String(strings.Join(strings.Fields(name), " ")))
 }
 
 // Photo is one uploaded original and what is known about it.

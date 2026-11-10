@@ -64,4 +64,6 @@ func TestPhotographerNormalize(t *testing.T) {
 func TestNameKey(t *testing.T) {
 	require.Equal(t, "anita saga", nameKey(" ANITA   Saga"))
 	require.Equal(t, nameKey("Øyvind Ås"), nameKey("øyvind ås"), "Norwegian letters fold too")
+	// "Åse" typed as A plus a ring (as macOS may send it) is the same name.
+	require.Equal(t, nameKey("Åse"), nameKey("Åse"))
 }

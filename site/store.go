@@ -745,6 +745,20 @@ func photographer(ctx context.Context, q *dbsqlc.Queries, id int64) (Photographe
 	return photographerFromRow(r), nil
 }
 
+// PhotographerByName finds the photographer who has name, as names are
+// compared: see nameKey.
+func (s *Store) PhotographerByName(ctx context.Context, name string) (Photographer, error) {
+	r, err := s.db.Queries().GetPhotographerByNameKey(ctx, nameKey(name))
+	if errors.Is(err, sql.ErrNoRows) {
+		return Photographer{}, fmt.Errorf("photographer %q: %w", name, ErrNotFound)
+	}
+	if err != nil {
+		return Photographer{}, fmt.Errorf("finding photographer %q: %w", name, err)
+	}
+
+	return photographerFromRow(r), nil
+}
+
 // CreatePhotographer stores a new photographer; see Photographer.Normalize.
 // A name already used, whatever its case or spacing, is ErrPhotographerTaken.
 func (s *Store) CreatePhotographer(ctx context.Context, p Photographer) (Photographer, error) {
