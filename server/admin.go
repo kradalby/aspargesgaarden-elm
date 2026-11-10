@@ -16,6 +16,7 @@ import (
 	"tailscale.com/tailcfg/peercap"
 
 	"github.com/kradalby/asparges/images"
+	"github.com/kradalby/asparges/pages"
 	"github.com/kradalby/asparges/ui"
 )
 
@@ -55,12 +56,7 @@ type AdminConfig struct {
 	// --dev; in --dev the loopback listener stands in and every caller is
 	// DevName.
 	Tailnet Tailnet
-	// App answers every address under /admin/ but the API: the document
-	// the admin app runs in (pages.AdminHandler). Its files come from
-	// /static/, which the listener serves beside it. Nil serves a
-	// placeholder page.
-	App    http.Handler
-	Photos Photos
+	Photos  Photos
 }
 
 // user is who made an admin request.
@@ -90,13 +86,11 @@ func (s *Server) Admin() http.Handler {
 	mux.HandleFunc("/admin/api/", func(w http.ResponseWriter, r *http.Request) {
 		s.writeProblems(w, r, http.StatusNotFound, []problem{{Code: codeNotFound}}, nil)
 	})
-	// No method in the pattern: "GET /admin/" would conflict with the
+	// Every other address under /admin/ is the document the app runs in; its
+	// files come from /static/, which the listener serves beside it. No
+	// method in the pattern: "GET /admin/" would conflict with the
 	// method-less "/admin/api/".
-	if s.cfg.Admin.App != nil {
-		mux.Handle("/admin/", s.cfg.Admin.App)
-	} else {
-		mux.HandleFunc("/admin/", placeholderApp)
-	}
+	mux.Handle("/admin/", pages.AdminHandler())
 
 	csrf := http.NewCrossOriginProtection()
 	csrf.SetDenyHandler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -251,20 +245,4 @@ func logPath(p string) string {
 	}
 
 	return p
-}
-
-// placeholderApp stands in for the admin app until it is built in.
-func placeholderApp(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodGet && r.Method != http.MethodHead {
-		w.Header().Set("Allow", "GET, HEAD")
-		http.Error(w, http.StatusText(http.StatusMethodNotAllowed), http.StatusMethodNotAllowed)
-
-		return
-	}
-
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	_, _ = w.Write([]byte(`<!doctype html>
-<html lang="nb"><head><meta charset="utf-8"><title>Aspargesgården admin</title></head>
-<body><p>Admin-appen er ikke bygget inn ennå.</p></body></html>
-`))
 }

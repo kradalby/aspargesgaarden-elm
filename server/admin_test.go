@@ -23,6 +23,7 @@ import (
 	"tailscale.com/tailcfg"
 
 	"github.com/kradalby/asparges/images"
+	"github.com/kradalby/asparges/pages"
 	"github.com/kradalby/asparges/ui"
 )
 
@@ -421,11 +422,12 @@ func TestAdminCrossOriginWrites(t *testing.T) {
 func TestAdminHeaders(t *testing.T) {
 	a := newAdmin(t, false)
 
-	for _, path := range []string{"/admin/", "/admin/api/me", "/admin/api/nope"} {
+	// The app's document revalidates instead, so a deploy reaches an open tab.
+	for path, cache := range map[string]string{"/admin/": "no-cache", "/admin/api/me": "no-store", "/admin/api/nope": "no-store"} {
 		rec := a.do(t, "GET", path, req{})
 		h := rec.Header()
 		require.Equal(t, ui.AdminCSP(), h.Get("Content-Security-Policy"), path)
-		require.Equal(t, "no-store", h.Get("Cache-Control"), path)
+		require.Equal(t, cache, h.Get("Cache-Control"), path)
 		require.Equal(t, "nosniff", h.Get("X-Content-Type-Options"), path)
 	}
 
@@ -472,25 +474,18 @@ func TestAdminNoIndexAndUncounted(t *testing.T) {
 	require.InDelta(t, before, counted(), 0)
 }
 
-// The admin app plugs in as a handler; until it does, a placeholder.
+// Every address under /admin/ but the API is the app's document.
 func TestAdminApp(t *testing.T) {
 	a := newAdmin(t, false)
-	rec := a.do(t, "GET", "/admin/arrangementer/4", req{})
-	require.Equal(t, http.StatusOK, rec.Code)
-	require.Contains(t, rec.Body.String(), "ikke bygget inn")
-
-	require.Equal(t, http.StatusMethodNotAllowed, a.do(t, "POST", "/admin/", req{}).Code)
-
-	a.srv.cfg.Admin.App = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		_, _ = w.Write([]byte("shell for " + r.URL.Path))
-	})
-	a.admin = a.srv.Admin()
+	want := pages.Admin().Render()
 
 	for _, path := range []string{"/admin/", "/admin/arrangementer/4", "/admin/galleri"} {
 		rec := a.do(t, "GET", path, req{})
 		require.Equal(t, http.StatusOK, rec.Code, path)
-		require.Equal(t, "shell for "+path, rec.Body.String(), path)
+		require.Equal(t, want, rec.Body.String(), path)
 	}
+
+	require.Equal(t, http.StatusMethodNotAllowed, a.do(t, "POST", "/admin/", req{}).Code)
 
 	// The API stays the API, and the app is as closed as the rest.
 	require.Equal(t, http.StatusOK, a.do(t, "GET", "/admin/api/me", req{}).Code)
