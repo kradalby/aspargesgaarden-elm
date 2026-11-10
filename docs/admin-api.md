@@ -19,9 +19,16 @@ change here means a change in all three places.
 - Status codes: `200` with a body, `201` for a created resource (body = the
   resource), `204` without a body. Errors use the shape below.
 - No caching: responses carry `Cache-Control: no-store`.
-- Every route also answers `403` (no capability) and `500`; the app treats an
-  unexpected status or an unreadable body as "the server failed" and keeps
-  everything the user typed.
+- A route that takes JSON reads it only with `Content-Type: application/json`;
+  anything else is `400 bad_request` (a cross-site form cannot send it
+  without the browser asking first).
+- Every request must name the admin node as its `Host`, and every write must
+  come from the admin's own origin (`Sec-Fetch-Site`, `Origin`); the browser
+  sends both for the app's own requests. See the refusals in the table.
+- An unknown `/admin/api/…` route is `404 not_found` with the error body.
+- Any route may also answer `500 internal`; the app treats it, an unexpected
+  status or an unreadable body as "the server failed" and keeps everything
+  the user typed.
 
 ## Errors
 
@@ -45,34 +52,37 @@ Any `4xx`/`5xx` from `/admin/api/` has this body:
 - The app owns the Norwegian text, so the server never sends user-facing
   text. A server may add `"detail": "<english>"` for logs; the app ignores it.
 
-| `code`                                                  | Status      | `site` error           | `field`                              | Notes                                                                                                                                                      |
-| ------------------------------------------------------- | ----------- | ---------------------- | ------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `bad_request`                                           | 400         | —                      | —                                    | Body is not valid JSON or has the wrong types.                                                                                                             |
-| `not_found`                                             | 404         | `ErrNotFound`          | —                                    | Event or photo id unknown. On an event save, a photo id that does not exist is also `not_found` with `field` = `mainPhoto` or `extraPhotos` and `photoId`. |
-| `conflict`                                              | 409         | —                      | —                                    | `updatedAt` precondition failed, see [Two editors](#two-editors).                                                                                          |
-| `invalid_date`                                          | 422         | `ErrInvalidDate`       | `start`, `end` or `extraDates`       |                                                                                                                                                            |
-| `invalid_time`                                          | 422         | `ErrInvalidTime`       | `startTime` or `endTime`             | The server checks the two times one by one so it knows which.                                                                                              |
-| `slug_invalid`                                          | 422         | `ErrSlugInvalid`       | `slug`                               |                                                                                                                                                            |
-| `slug_reserved`                                         | 422         | `ErrSlugReserved`      | `slug`                               |                                                                                                                                                            |
-| `slug_taken`                                            | 422         | `ErrSlugTaken`         | `slug`                               |                                                                                                                                                            |
-| `slug_frozen`                                           | 422         | `ErrSlugFrozen`        | `slug`                               |                                                                                                                                                            |
-| `end_before_start`                                      | 422         | `ErrEndBeforeStart`    | `end` or `endTime`                   | `end` when the last day is before the first; `endTime` when a one-day event ends before it starts.                                                         |
-| `extra_date`                                            | 422         | `ErrExtraDate`         | `extraDates`                         |                                                                                                                                                            |
-| `ticket_url`                                            | 422         | `ErrTicketURL`         | `ticketUrl`                          |                                                                                                                                                            |
-| `title_required`                                        | 422         | `ErrTitleRequired`     | `title`                              |                                                                                                                                                            |
-| `start_required`                                        | 422         | `ErrStartRequired`     | `start`                              |                                                                                                                                                            |
-| `main_photo_required`                                   | 422         | `ErrMainPhotoRequired` | `mainPhoto`                          |                                                                                                                                                            |
-| `alt_required`                                          | 422         | `ErrAltRequired`       | `mainPhoto` or `extraPhotos`         | With `photoId`. One entry per photo.                                                                                                                       |
-| `duplicate_photo`                                       | 422         | `ErrDuplicatePhoto`    | `mainPhoto`, `extraPhotos` or —      | With `photoId`. No field for the gallery.                                                                                                                  |
-| `photographer_name_required`                            | 422         | `ErrPhotographerName`  | `name`                               | Empty name on a photographer create or update.                                                                                                             |
-| `photographer_name_taken`                               | 409         | `ErrPhotographerTaken` | `name`                               | Another photographer has that name. Body also has `existing`: that Photographer, so the app can pick it instead.                                           |
-| `photographer_url`                                      | 422         | `ErrPhotographerURL`   | `url`                                | A non-empty link that is not an `http`/`https` address with a host (same rule as `ticket_url`).                                                            |
-| `photo_in_use`                                          | 409         | `ErrPhotoInUse`        | —                                    | Body also has `usedBy`, see [Delete a photo](#delete-a-photo).                                                                                             |
-| `crop_kind`                                             | 422         | `ErrCropKind`          | the kind                             |                                                                                                                                                            |
-| `crop_outside`                                          | 422         | `ErrCropOutside`       | the kind (`card`, `banner`, `share`) |                                                                                                                                                            |
-| `crop_aspect`                                           | 422         | (images/)              | the kind                             | `\|w/aspect − h\| > 1`.                                                                                                                                    |
-| `crop_too_small`                                        | 422         | (images/)              | the kind                             | Smaller than the kind's smallest output width.                                                                                                             |
-| `too_large`, `unsupported_type`, `damaged`, `too_small` | 413/415/422 | (images/)              | —                                    | Upload only, see [Photos](#photos).                                                                                                                        |
+| `code`                                                                     | Status      | `site` error           | `field`                              | Notes                                                                                                                                                      |
+| -------------------------------------------------------------------------- | ----------- | ---------------------- | ------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `bad_request`                                                              | 400         | —                      | —                                    | Body is not valid JSON, has the wrong types, or came without `Content-Type: application/json`.                                                             |
+| `forbidden`                                                                | 403         | —                      | —                                    | The caller has no identity on the tailnet, or no grant of the capability. The app says she lacks access and whom to ask.                                   |
+| `wrong_host`                                                               | 403         | —                      | —                                    | The request's `Host` is not this node (in `--dev`: not loopback). Guards against a rebound DNS name.                                                       |
+| `cross_origin`                                                             | 403         | —                      | —                                    | A write from another origin.                                                                                                                               |
+| `not_found`                                                                | 404         | `ErrNotFound`          | —                                    | Event or photo id unknown. On an event save, a photo id that does not exist is also `not_found` with `field` = `mainPhoto` or `extraPhotos` and `photoId`. |
+| `conflict`                                                                 | 409         | `ErrStale`             | —                                    | `updatedAt` precondition failed (also an empty or unreadable one), see [Two editors](#two-editors).                                                        |
+| `invalid_date`                                                             | 422         | `ErrInvalidDate`       | `start`, `end` or `extraDates`       |                                                                                                                                                            |
+| `invalid_time`                                                             | 422         | `ErrInvalidTime`       | `startTime` or `endTime`             | The server checks the two times one by one so it knows which.                                                                                              |
+| `slug_invalid`                                                             | 422         | `ErrSlugInvalid`       | `slug`                               |                                                                                                                                                            |
+| `slug_reserved`                                                            | 422         | `ErrSlugReserved`      | `slug`                               |                                                                                                                                                            |
+| `slug_taken`                                                               | 422         | `ErrSlugTaken`         | `slug`                               |                                                                                                                                                            |
+| `slug_frozen`                                                              | 422         | `ErrSlugFrozen`        | `slug`                               |                                                                                                                                                            |
+| `end_before_start`                                                         | 422         | `ErrEndBeforeStart`    | `end` or `endTime`                   | `end` when the last day is before the first; `endTime` when a one-day event ends before it starts.                                                         |
+| `extra_date`                                                               | 422         | `ErrExtraDate`         | `extraDates`                         |                                                                                                                                                            |
+| `ticket_url`                                                               | 422         | `ErrTicketURL`         | `ticketUrl`                          |                                                                                                                                                            |
+| `title_required`                                                           | 422         | `ErrTitleRequired`     | `title`                              |                                                                                                                                                            |
+| `start_required`                                                           | 422         | `ErrStartRequired`     | `start`                              |                                                                                                                                                            |
+| `main_photo_required`                                                      | 422         | `ErrMainPhotoRequired` | `mainPhoto`                          |                                                                                                                                                            |
+| `alt_required`                                                             | 422         | `ErrAltRequired`       | `mainPhoto` or `extraPhotos`         | With `photoId`. One entry per photo.                                                                                                                       |
+| `duplicate_photo`                                                          | 422         | `ErrDuplicatePhoto`    | `mainPhoto`, `extraPhotos` or —      | With `photoId`. No field for the gallery.                                                                                                                  |
+| `photographer_name_required`                                               | 422         | `ErrPhotographerName`  | `name`                               | Empty name on a photographer create or update.                                                                                                             |
+| `photographer_name_taken`                                                  | 409         | `ErrPhotographerTaken` | `name`                               | Another photographer has that name. Body also has `existing`: that Photographer, so the app can pick it instead.                                           |
+| `photographer_url`                                                         | 422         | `ErrPhotographerURL`   | `url`                                | A non-empty link that is not an `http`/`https` address with a host (same rule as `ticket_url`).                                                            |
+| `photo_in_use`                                                             | 409         | `ErrPhotoInUse`        | —                                    | Body also has `usedBy`, see [Delete a photo](#delete-a-photo).                                                                                             |
+| `crop_kind`                                                                | 422         | `ErrCropKind`          | the kind                             |                                                                                                                                                            |
+| `crop_outside`                                                             | 422         | `ErrCropOutside`       | the kind (`card`, `banner`, `share`) |                                                                                                                                                            |
+| `crop_aspect`                                                              | 422         | (images/)              | the kind                             | `\|h − w/aspect\|` over max(2 px, 1 % of `w/aspect`).                                                                                                      |
+| `crop_too_small`                                                           | 422         | (images/)              | the kind                             | Narrower than the kind's minimum, see [Crops](#crops).                                                                                                     |
+| `too_large`, `unsupported_type`, `damaged`, `too_small`, `too_many_pixels` | 413/415/422 | (images/)              | —                                    | Upload only, see [Photos](#photos).                                                                                                                        |
 
 Any other `code` is shown as a generic "something went wrong" message, so the
 server may add codes without breaking the app.
@@ -88,7 +98,7 @@ server may add codes without breaking the app.
   "height": 3024,
   "alt": "Låven pyntet til jul",
   "photographer": { "id": 3, "name": "Ola Nordmann", "url": "https://example.no" },
-  "previewUrl": "/img/v1/<sha256>/full-00000000-1600.jpg",
+  "previewUrl": "/img/v1/<sha256>/full-00000000-1200.jpg",
   "thumbUrl": "/img/v1/<sha256>/full-00000000-480.jpg",
   "crops": {
     "card": { "x": 1012, "y": 0, "w": 2419, "h": 3024 },
@@ -102,12 +112,15 @@ server may add codes without breaking the app.
 - `photographer`: the credited Photographer as stored now, or `null`.
 - `width`/`height`: the **upright** size of the original, i.e. after EXIF
   autorotation. Crop rectangles use this frame.
-- `previewUrl`: the server's own uncropped, upright JPEG, long side at most
-  1600 px — never the original. The crop editor draws on it. `thumbUrl`: the
-  same at 480 px wide, for lists. Both load once `status.previewReady` is
-  `true`; before that the app shows a placeholder and does not request them.
-- `crops`: always all three kinds. A kind that was never set holds the
-  centred default the server uses, so the app never computes defaults itself.
+- `previewUrl`: the server's own uncropped, upright JPEG, the widest of its
+  sizes up to 1200 px (smaller for a smaller photo) — never the original. The
+  crop editor draws on it; it exists once `status.previewReady` is `true`.
+  `thumbUrl`: the same at 480 px wide, for lists, built on its first request
+  if the queue has not got to it. Before `previewReady` the app shows a
+  placeholder and requests neither.
+- `crops`: always all three kinds. A kind that was never set, or that the
+  photo is too small for (see [Crops](#crops)), holds the largest centred
+  rectangle of its shape, so the app never computes one itself.
 
 ### PhotoStatus
 
@@ -128,8 +141,9 @@ polling (see [Photo status](#photo-status)).
   the public pages need for this photo and its current crops exists), or
   `failed` (the server gave up; see `reason`). A crop change sends a `ready`
   photo back to `preparing` until the new set is built.
-- `done`/`total`: variants built so far, of all expected. `total` is `0` until
-  known. The app shows "Klargjør bildet … 12 av 46" from them.
+- `done`/`total`: variants built so far, of all expected (real counts; how
+  many depends on the photo). `total` is `0` until known. The app shows
+  "Klargjør bildet … 12 av 46" from them.
 - `previewReady`: the preview and thumb sizes exist. Built first, so the user
   can see and crop the photo while the rest is still being made.
 - `reason`: `""` unless `failed`. Codes the app explains:
@@ -141,6 +155,10 @@ polling (see [Photo status](#photo-status)).
 - A `failed` photo can still be referred to by events and the gallery; the
   public pages fall back to building on request. Publishing is never blocked
   by a photo's status.
+- No state is guaranteed to be seen: a photo whose sizes are still on disk
+  (the same bytes uploaded again) is `ready` in the upload answer, and a
+  poll may jump from `previewReady` to `ready`. The app announces where a
+  photo is, never which step it passed.
 
 ### Photographer
 
@@ -190,10 +208,11 @@ to them.
 - `status`: `draft` or `published`. `slugFrozen` is `true` once the event has
   ever been published (`site.Event.SlugFrozen`).
 - `year`/`path`/`url`: where the page is (or will be) on the public site.
-  `year` is `0` and `path`/`url` are `""` while there is no start date. `url`
-  is `path` on the configured `baseURL`.
+  `year` is `0` while there is no start date, and `path`/`url` are `""` while
+  there is no start date or no slug (no title yet). `url` is `path` on the
+  configured `baseURL`.
 - `dateText`: `site.Event.DateLine()` (`""` without a start date).
-- `isOver`: `site.Event.IsOver(now)`.
+- `isOver`: `site.Event.IsOver(now)`; `false` for an event without a date.
 - `mainPhoto` is a Photo or `null`; `extraPhotos` is a list of Photos in page
   order.
 
@@ -316,7 +335,7 @@ reads the stored event, and a delete is confirmed by the user.
 `POST /admin/api/preview` with
 
 ```json
-{ "view": "page", "event": EventInput }
+{ "view": "page", "id": 7, "event": EventInput }
 ```
 
 → `200 text/html; charset=utf-8`: a complete HTML document, rendered by the
@@ -326,6 +345,10 @@ database row.
 - `view`: `page` = the event's own page; `list` = the `/arrangementer` page
   with this event in its place among the other published events (as if it
   were published; leaving it out of the list would show nothing useful).
+- `id`: the saved event being edited; leave it out (or `0`) for a new one.
+  With it, a published event keeps its frozen address, and the list shows the
+  form in the saved event's place instead of next to it. The app sends it
+  whenever the event has been saved. An unknown id is `404`.
 - Rendering never fails on the publish rules: no title, no date and no photo
   render as empty text and a neutral placeholder. Only a body that is not
   valid JSON is a `400`, and an unknown photo id a `404`.
@@ -334,7 +357,8 @@ database row.
 - Asset URLs in the HTML are root-relative (`/static/…`, `/img/…`), and the
   admin listener serves `/static/` and `/img/` too, because the app shows the
   HTML in an `<iframe srcdoc sandbox="allow-same-origin">` on the admin
-  origin. No scripts are needed or run in it.
+  origin. The server leaves every script out of it (analytics included: a
+  preview is not a visit), and the sandbox would run none anyway.
 - The response bypasses the render store; nothing is kept.
 
 The app sends a preview about 0.6 s after the user stops typing and drops
@@ -344,11 +368,13 @@ answers to older requests.
 
 `POST /admin/api/photos` — `multipart/form-data` with one part `file` →
 `201` Photo. The same bytes twice give the same photo (`200` then, with the
-stored one). The server answers once the file is stored, its type sniffed and
-its upright size read; building the sizes starts in the background, so the
-answer's `status` is normally `preparing` with `previewReady: false`. The new
-photo is used by nothing until an event save or a gallery change refers to
-it. Upload errors, all without `field`:
+stored one). The server answers once the file is stored, its type sniffed,
+its upright size read and its preview made, so the answer has
+`previewReady: true`; the other sizes are built in the background, so its
+`state` is normally `preparing` (or `ready`, if they are still on disk). A
+new photo is used by nothing until an event save or a gallery change refers
+to it; one nothing uses is deleted after a week. Upload errors, all without
+`field`:
 
 | `code`             | Status | Meaning for the user                              |
 | ------------------ | ------ | ------------------------------------------------- |
@@ -356,6 +382,7 @@ it. Upload errors, all without `field`:
 | `unsupported_type` | 415    | Not a JPEG, PNG, WebP or HEIC photo by its bytes. |
 | `damaged`          | 422    | Sniffed as a photo, but its size cannot be read.  |
 | `too_small`        | 422    | Under 480 px wide upright.                        |
+| `too_many_pixels`  | 422    | Over 100 million pixels; too big to decode.       |
 
 The app keeps the chosen file in memory, so after a lost connection (no
 answer at all) "Prøv igjen" sends it again and nothing typed is lost. The
@@ -397,8 +424,17 @@ photo instead); the publish rules only apply to events.
 ```
 
 → `200` Photo. Rules (trust boundary): known kind, inside the upright photo,
-`|w / aspect − h| ≤ 1`, at least the kind's smallest output width. Errors
-carry the kind as `field`. All kinds in the body are written or none.
+`|h − w / aspect|` at most max(2 px, 1 % of `w / aspect`), and at least the
+kind's minimum width: `card` 480, `banner` 800, `share` 1200. Errors carry
+the kind as `field`. All kinds in the body are written or none.
+
+A photo whose largest centred rectangle of a kind is narrower than that
+minimum (every photo under 1200 px wide, for `share`) gets no crop of that
+kind; its page uses another picture there (the share image falls back to the
+banner). Such a kind's rectangle in the photo is the centred one, and
+sending exactly that back is accepted and stores nothing, so the app may
+send every kind as it got them; any other rectangle for it is
+`crop_too_small`.
 A crop belongs to the photo, so it takes effect on every page that shows the
 photo as soon as it is saved, published or not. The app says so in the crop
 dialog.
@@ -449,15 +485,17 @@ in display order.
 
 `PUT /admin/api/gallery` with `{ "photoIds": [12, 13, 9] }` → `200`
 `{ "photos": [Photo] }`. Replaces the whole gallery in that order; this one
-route adds (after an upload), removes and reorders. `404 not_found` with
-`photoId` for an unknown id, `422 duplicate_photo` with `photoId` for an id
-listed twice. No precondition: the last order saved wins, which is harmless
+route adds (after an upload), removes and reorders. A body without
+`photoIds` is `400 bad_request` (it must not empty the gallery by accident);
+`404 not_found` with `photoId` for an unknown id, `422 duplicate_photo` with
+`photoId` for an id listed twice. No precondition: the last order saved wins, which is harmless
 for a list of photos.
 
 ## The admin page
 
 `pages.AdminHandler()` serves the document the app runs in (built with
-elem-go in `pages/admin.go`). Mount it at `/admin/` on the tailnet listener:
+elem-go in `pages/admin.go`); `serve` passes it as `server.AdminConfig.App`.
+It is mounted at `/admin/` on the tailnet listener (in `--dev`, the local one):
 it answers `GET` and `HEAD` of every path under it with the same document,
 so a deep link such as `/admin/arrangementer/12` loads the app, which reads
 the address itself; other methods get `405`. The pattern carries no method,
@@ -486,23 +524,12 @@ refused (and a preview is not a visit).
    seconds, so two saves of one event inside the same second pass the
    precondition. Accepted as rare for four admins; a `version` counter would
    close it.
-2. **Orphan photos.** A photo uploaded into a form that is never saved, or
-   replaced as main photo, keeps its `photos` row with no user. `Reconcile`
-   only removes originals without a row. Should a nightly job delete photo
-   rows that no event and no gallery has used for 7 days?
-3. **Crops take effect at once**, also on a published page (see Crops). The
+2. **Crops take effect at once**, also on a published page (see Crops). The
    alternative, crops saved with the event, needs `/img/` to serve variants of
-   a crop that is not yet stored, which the plan's strict variant rule
-   forbids. Fine as is?
-4. **Preview path.** The plan named `/admin/preview`; this puts it under
-   `/admin/api/preview` so one prefix carries the auth check and the error
-   shape. Either works for the app if decided before the Go side is written.
-5. **`list` preview of a draft** places the draft among the published events
-   by its date. Should drafts without a date show at the top instead? The app
-   does not care; the Go side picks.
-6. **Photographer delete.** `Store.DeletePhotographer` exists but the app
+   a crop that is not yet stored, which the strict variant rule forbids.
+3. **Photographer delete.** `Store.DeletePhotographer` exists but the app
    has no screen for it (the owner asked for no management area), so there is
    no route. A misspelt duplicate is corrected in place instead.
-7. **Gallery alt text is not enforced** by the server (many imported gallery
-   photos have none today). The gallery editor marks photos without a
-   description instead. Enforce it once the import has been cleaned up?
+4. **Gallery alt text is not enforced** by the server (many imported gallery
+   photos have none). The gallery editor marks photos without a description
+   instead. Enforce it once the import has been cleaned up?
