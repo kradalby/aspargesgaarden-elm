@@ -97,11 +97,7 @@ func e2eHooks(store *site.Store, imgs *images.Store, srv *server.Server, fixture
 
 		// The store checks only the frame, so this keeps a crop under today's
 		// floor, as an old import may have.
-		p, err := store.Photo(r.Context(), id)
-		if err == nil {
-			err = store.SetCrops(r.Context(), id, crops)
-		}
-
+		p, err := store.SetCrops(r.Context(), id, crops)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
@@ -252,23 +248,9 @@ func e2ePhoto(ctx context.Context, store *site.Store, imgs *images.Store, path, 
 		return site.Photo{}, fmt.Errorf("e2e fixture %s: %w", path, err)
 	}
 
-	p, err := store.AddPhoto(ctx, site.Photo{SHA256: o.SHA256, MIME: o.MIME, Width: o.Width, Height: o.Height, Alt: alt})
-	if err != nil {
-		return site.Photo{}, err
-	}
+	p, _, err := store.AddPhoto(ctx, site.Photo{SHA256: o.SHA256, MIME: o.MIME, Width: o.Width, Height: o.Height, Alt: alt})
 
-	crops := map[images.Kind]images.Rect{}
-	for _, k := range images.CropKinds {
-		if r, err := images.DefaultCrop(k, p.Width, p.Height); err == nil {
-			crops[k] = r
-		}
-	}
-
-	if err := store.SetCrops(ctx, p.ID, crops); err != nil {
-		return site.Photo{}, err
-	}
-
-	return store.Photo(ctx, p.ID)
+	return p, err
 }
 
 func mustDate(s string) site.Date {

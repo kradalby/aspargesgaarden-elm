@@ -40,6 +40,27 @@ func read[T any](ctx context.Context, s *Store, fn func(*dbsqlc.Queries) (T, err
 	return out, err
 }
 
+// write runs fn in one transaction and returns what fn read back inside it.
+// The commit is the last step that can fail: a write that reports an error
+// stored nothing, and one that reports success stored all of it, so a
+// caller can tie what follows a write (dropping kept pages) to its result.
+func write[T any](ctx context.Context, s *Store, fn func(*dbsqlc.Queries) (T, error)) (T, error) {
+	var out T
+
+	err := s.db.InTx(ctx, func(q *dbsqlc.Queries) error {
+		var err error
+		out, err = fn(q)
+
+		return err
+	})
+	if err != nil {
+		var zero T
+		return zero, err
+	}
+
+	return out, nil
+}
+
 // Events lists every event, drafts included, newest start first.
 func (s *Store) Events(ctx context.Context) ([]Event, error) {
 	return read(ctx, s, func(q *dbsqlc.Queries) ([]Event, error) {
@@ -105,20 +126,18 @@ func (s *Store) CreateEvent(ctx context.Context, e Event) (Event, error) {
 	now := s.now()
 	next.CreatedAt, next.UpdatedAt = now, now
 
-	var id int64
-	err = s.db.InTx(ctx, func(q *dbsqlc.Queries) error {
-		id, err = q.CreateEvent(ctx, createParams(next))
+	return write(ctx, s, func(q *dbsqlc.Queries) (Event, error) {
+		id, err := q.CreateEvent(ctx, createParams(next))
 		if err != nil {
-			return eventWriteErr(err, next)
+			return Event{}, eventWriteErr(err, next)
 		}
 
-		return writeEventChildren(ctx, q, id, next)
-	})
-	if err != nil {
-		return Event{}, err
-	}
+		if err := writeEventChildren(ctx, q, id, next); err != nil {
+			return Event{}, err
+		}
 
-	return s.Event(ctx, id)
+		return event(ctx, q, id)
+	})
 }
 
 // UpdateEvent saves an edit of an existing event; see Revise for the rules.
@@ -178,34 +197,33 @@ func (s *Store) DeleteEvent(ctx context.Context, id int64) error {
 // second as the one the editor loaded passes; add a version counter to
 // events if two editors ever meet that.
 func (s *Store) modify(ctx context.Context, id int64, seen time.Time, change func(Event) (Event, error)) (Event, error) {
-	err := s.db.InTx(ctx, func(q *dbsqlc.Queries) error {
+	return write(ctx, s, func(q *dbsqlc.Queries) (Event, error) {
 		prev, err := event(ctx, q, id)
 		if err != nil {
-			return err
+			return Event{}, err
 		}
 
 		if prev.UpdatedAt.Unix() != seen.Unix() {
-			return fmt.Errorf("event %d saved at %s, editor has %s: %w",
+			return Event{}, fmt.Errorf("event %d saved at %s, editor has %s: %w",
 				prev.ID, prev.UpdatedAt.Format(time.RFC3339), seen.UTC().Format(time.RFC3339), ErrStale)
 		}
 
 		next, err := change(prev)
 		if err != nil {
-			return err
+			return Event{}, err
 		}
 
 		next.ID, next.CreatedAt, next.UpdatedAt = prev.ID, prev.CreatedAt, s.now()
 		if err := q.UpdateEvent(ctx, updateParams(next)); err != nil {
-			return eventWriteErr(err, next)
+			return Event{}, eventWriteErr(err, next)
 		}
 
-		return writeEventChildren(ctx, q, id, next)
-	})
-	if err != nil {
-		return Event{}, err
-	}
+		if err := writeEventChildren(ctx, q, id, next); err != nil {
+			return Event{}, err
+		}
 
-	return s.Event(ctx, id)
+		return event(ctx, q, id)
+	})
 }
 
 // writeEventChildren replaces the event's extra dates and photo links.
@@ -444,29 +462,62 @@ func updateParams(e Event) dbsqlc.UpdateEventParams {
 	}
 }
 
-// AddPhoto records an uploaded original. The same content twice is one photo:
-// the stored one is returned unchanged.
-func (s *Store) AddPhoto(ctx context.Context, p Photo) (Photo, error) {
+// AddPhoto records an uploaded original with the centred crop of every kind
+// it is large enough for (the pages show it whole for the rest), and reports
+// whether it is new. The same content twice is one photo: the stored one is
+// returned as it is, its unused grace period (DeleteUnusedPhotos) restarted,
+// since uploading it again means someone is about to use it.
+func (s *Store) AddPhoto(ctx context.Context, p Photo) (Photo, bool, error) {
 	now := s.now().Unix()
+	created := false
 
-	id, err := s.db.Queries().CreatePhoto(ctx, dbsqlc.CreatePhotoParams{
-		Sha256:         p.SHA256,
-		Mime:           p.MIME,
-		Width:          int64(p.Width),
-		Height:         int64(p.Height),
-		Alt:            p.Alt,
-		PhotographerID: photographerRef(p.Photographer),
-		CreatedAt:      now,
-		UpdatedAt:      now,
+	stored, err := write(ctx, s, func(q *dbsqlc.Queries) (Photo, error) {
+		id, err := q.GetPhotoIDBySha256(ctx, p.SHA256)
+		switch {
+		case err == nil:
+			if err := q.TouchPhoto(ctx, dbsqlc.TouchPhotoParams{UpdatedAt: now, ID: id}); err != nil {
+				return Photo{}, fmt.Errorf("renewing photo %d: %w", id, err)
+			}
+
+			return photo(ctx, q, id)
+		case !errors.Is(err, sql.ErrNoRows):
+			return Photo{}, fmt.Errorf("finding photo %s: %w", p.SHA256, err)
+		}
+
+		id, err = q.CreatePhoto(ctx, dbsqlc.CreatePhotoParams{
+			Sha256:         p.SHA256,
+			Mime:           p.MIME,
+			Width:          int64(p.Width),
+			Height:         int64(p.Height),
+			Alt:            p.Alt,
+			PhotographerID: photographerRef(p.Photographer),
+			CreatedAt:      now,
+			UpdatedAt:      now,
+		})
+		if db.IsForeignKeyViolation(err) {
+			return Photo{}, fmt.Errorf("photographer %d: %w", p.Photographer.ID, ErrNotFound)
+		}
+		if err != nil {
+			return Photo{}, fmt.Errorf("adding photo %s: %w", p.SHA256, err)
+		}
+
+		for _, k := range images.CropKinds {
+			r, err := images.DefaultCrop(k, p.Width, p.Height)
+			if err != nil {
+				continue
+			}
+
+			if err := upsertCrop(ctx, q, id, k, r); err != nil {
+				return Photo{}, err
+			}
+		}
+
+		created = true
+
+		return photo(ctx, q, id)
 	})
-	if db.IsForeignKeyViolation(err) {
-		return Photo{}, fmt.Errorf("photographer %d: %w", p.Photographer.ID, ErrNotFound)
-	}
-	if err != nil {
-		return Photo{}, fmt.Errorf("adding photo %s: %w", p.SHA256, err)
-	}
 
-	return s.Photo(ctx, id)
+	return stored, created, err
 }
 
 // Photo loads one photo with its crops.
@@ -518,24 +569,26 @@ func (s *Store) Photos(ctx context.Context) ([]Photo, error) {
 // UpdatePhoto saves the editable fields of p: alt text and photographer, which
 // a nil Photographer clears.
 func (s *Store) UpdatePhoto(ctx context.Context, p Photo) (Photo, error) {
-	n, err := s.db.Queries().UpdatePhotoMeta(ctx, dbsqlc.UpdatePhotoMetaParams{
-		Alt:            p.Alt,
-		PhotographerID: photographerRef(p.Photographer),
-		UpdatedAt:      s.now().Unix(),
-		ID:             p.ID,
+	return write(ctx, s, func(q *dbsqlc.Queries) (Photo, error) {
+		n, err := q.UpdatePhotoMeta(ctx, dbsqlc.UpdatePhotoMetaParams{
+			Alt:            p.Alt,
+			PhotographerID: photographerRef(p.Photographer),
+			UpdatedAt:      s.now().Unix(),
+			ID:             p.ID,
+		})
+		if db.IsForeignKeyViolation(err) {
+			return Photo{}, fmt.Errorf("photographer %d: %w", p.Photographer.ID, ErrNotFound)
+		}
+		if err != nil {
+			return Photo{}, fmt.Errorf("updating photo %d: %w", p.ID, err)
+		}
+
+		if n == 0 {
+			return Photo{}, fmt.Errorf("photo %d: %w", p.ID, ErrNotFound)
+		}
+
+		return photo(ctx, q, p.ID)
 	})
-	if db.IsForeignKeyViolation(err) {
-		return Photo{}, fmt.Errorf("photographer %d: %w", p.Photographer.ID, ErrNotFound)
-	}
-	if err != nil {
-		return Photo{}, fmt.Errorf("updating photo %d: %w", p.ID, err)
-	}
-
-	if n == 0 {
-		return Photo{}, fmt.Errorf("photo %d: %w", p.ID, ErrNotFound)
-	}
-
-	return s.Photo(ctx, p.ID)
 }
 
 // Gallery lists the gallery's photos in order.
@@ -623,7 +676,11 @@ func (s *Store) Photographers(ctx context.Context) ([]Photographer, error) {
 
 // Photographer loads one photographer.
 func (s *Store) Photographer(ctx context.Context, id int64) (Photographer, error) {
-	r, err := s.db.Queries().GetPhotographer(ctx, id)
+	return photographer(ctx, s.db.Queries(), id)
+}
+
+func photographer(ctx context.Context, q *dbsqlc.Queries, id int64) (Photographer, error) {
+	r, err := q.GetPhotographer(ctx, id)
 	if errors.Is(err, sql.ErrNoRows) {
 		return Photographer{}, fmt.Errorf("photographer %d: %w", id, ErrNotFound)
 	}
@@ -642,17 +699,19 @@ func (s *Store) CreatePhotographer(ctx context.Context, p Photographer) (Photogr
 		return Photographer{}, err
 	}
 
-	id, err := s.db.Queries().CreatePhotographer(ctx, dbsqlc.CreatePhotographerParams{
-		Name: p.Name, NameKey: nameKey(p.Name), Url: p.URL,
-	})
-	if db.IsUniqueViolation(err) {
-		return Photographer{}, fmt.Errorf("%w: %q", ErrPhotographerTaken, p.Name)
-	}
-	if err != nil {
-		return Photographer{}, fmt.Errorf("creating photographer %q: %w", p.Name, err)
-	}
+	return write(ctx, s, func(q *dbsqlc.Queries) (Photographer, error) {
+		id, err := q.CreatePhotographer(ctx, dbsqlc.CreatePhotographerParams{
+			Name: p.Name, NameKey: nameKey(p.Name), Url: p.URL,
+		})
+		if db.IsUniqueViolation(err) {
+			return Photographer{}, fmt.Errorf("%w: %q", ErrPhotographerTaken, p.Name)
+		}
+		if err != nil {
+			return Photographer{}, fmt.Errorf("creating photographer %q: %w", p.Name, err)
+		}
 
-	return s.Photographer(ctx, id)
+		return photographer(ctx, q, id)
+	})
 }
 
 // FindOrCreatePhotographer returns the photographer named p.Name, creating it
@@ -664,14 +723,16 @@ func (s *Store) FindOrCreatePhotographer(ctx context.Context, p Photographer) (P
 		return Photographer{}, err
 	}
 
-	id, err := s.db.Queries().EnsurePhotographer(ctx, dbsqlc.EnsurePhotographerParams{
-		Name: p.Name, NameKey: nameKey(p.Name), Url: p.URL,
-	})
-	if err != nil {
-		return Photographer{}, fmt.Errorf("ensuring photographer %q: %w", p.Name, err)
-	}
+	return write(ctx, s, func(q *dbsqlc.Queries) (Photographer, error) {
+		id, err := q.EnsurePhotographer(ctx, dbsqlc.EnsurePhotographerParams{
+			Name: p.Name, NameKey: nameKey(p.Name), Url: p.URL,
+		})
+		if err != nil {
+			return Photographer{}, fmt.Errorf("ensuring photographer %q: %w", p.Name, err)
+		}
 
-	return s.Photographer(ctx, id)
+		return photographer(ctx, q, id)
+	})
 }
 
 // UpdatePhotographer saves p's name and link. The photos crediting p count as
@@ -682,33 +743,28 @@ func (s *Store) UpdatePhotographer(ctx context.Context, p Photographer) (Photogr
 		return Photographer{}, err
 	}
 
-	err = s.db.InTx(ctx, func(q *dbsqlc.Queries) error {
+	return write(ctx, s, func(q *dbsqlc.Queries) (Photographer, error) {
 		n, err := q.UpdatePhotographer(ctx, dbsqlc.UpdatePhotographerParams{
 			Name: p.Name, NameKey: nameKey(p.Name), Url: p.URL, ID: p.ID,
 		})
 		switch {
 		case db.IsUniqueViolation(err):
-			return fmt.Errorf("%w: %q", ErrPhotographerTaken, p.Name)
+			return Photographer{}, fmt.Errorf("%w: %q", ErrPhotographerTaken, p.Name)
 		case err != nil:
-			return fmt.Errorf("updating photographer %d: %w", p.ID, err)
+			return Photographer{}, fmt.Errorf("updating photographer %d: %w", p.ID, err)
 		case n == 0:
-			return fmt.Errorf("photographer %d: %w", p.ID, ErrNotFound)
+			return Photographer{}, fmt.Errorf("photographer %d: %w", p.ID, ErrNotFound)
 		}
 
 		err = q.TouchPhotographerPhotos(ctx, dbsqlc.TouchPhotographerPhotosParams{
 			UpdatedAt: s.now().Unix(), PhotographerID: photographerRef(&p),
 		})
 		if err != nil {
-			return fmt.Errorf("touching photos of photographer %d: %w", p.ID, err)
+			return Photographer{}, fmt.Errorf("touching photos of photographer %d: %w", p.ID, err)
 		}
 
-		return nil
+		return photographer(ctx, q, p.ID)
 	})
-	if err != nil {
-		return Photographer{}, err
-	}
-
-	return s.Photographer(ctx, p.ID)
 }
 
 // DeletePhotographer removes a photographer no photo credits.

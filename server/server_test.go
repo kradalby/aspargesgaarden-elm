@@ -108,7 +108,7 @@ func (f *fixture) publish(t *testing.T, e site.Event) site.Event {
 
 	ctx := t.Context()
 
-	p, err := f.store.AddPhoto(ctx, site.Photo{
+	p, _, err := f.store.AddPhoto(ctx, site.Photo{
 		SHA256: strings.Repeat(string(rune('a'+len(e.Title)%6)), 64), MIME: "image/jpeg", Width: 1600, Height: 1200, Alt: e.Title,
 	})
 	require.NoError(t, err)
@@ -333,7 +333,7 @@ func TestGallery(t *testing.T) {
 	ids := make([]int64, 0, 2)
 
 	for _, c := range "12" { // hex, and not a market photo's
-		p, err := f.store.AddPhoto(ctx, site.Photo{SHA256: strings.Repeat(string(c), 64), MIME: "image/jpeg", Width: 1600, Height: 1200, Alt: "Bilde " + string(c)})
+		p, _, err := f.store.AddPhoto(ctx, site.Photo{SHA256: strings.Repeat(string(c), 64), MIME: "image/jpeg", Width: 1600, Height: 1200, Alt: "Bilde " + string(c)})
 		require.NoError(t, err)
 
 		ids = append(ids, p.ID)

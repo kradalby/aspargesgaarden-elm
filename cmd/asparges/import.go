@@ -313,24 +313,10 @@ func (im importer) photo(ctx context.Context, op oldPhoto, alt string) (site.Pho
 	}
 
 	for _, k := range images.CropKinds {
-		if _, set := p.Crops[k]; set {
-			continue
-		}
-
-		r, err := images.DefaultCrop(k, p.Width, p.Height)
-		if errors.Is(err, images.ErrTooSmall) {
+		if _, set := p.Crops[k]; !set {
 			// The pages show such a photo whole; only the share image is
 			// missing, as for any small upload.
-			im.log.WarnContext(ctx, "photo too small for a crop, left without", "photo", op.Path, "kind", k, "err", err)
-			continue
-		}
-
-		if err == nil {
-			err = im.store.SetCrops(ctx, p.ID, map[images.Kind]images.Rect{k: r})
-		}
-
-		if err != nil {
-			return site.Photo{}, fmt.Errorf("photo %s: %s crop: %w", op.Path, k, err)
+			im.log.WarnContext(ctx, "photo too small for a crop, left without", "photo", op.Path, "kind", k)
 		}
 	}
 
@@ -350,7 +336,9 @@ func (im importer) addPhoto(ctx context.Context, op oldPhoto, o images.Original,
 		p.Photographer = &ph
 	}
 
-	return im.store.AddPhoto(ctx, p)
+	p, _, err := im.store.AddPhoto(ctx, p)
+
+	return p, err
 }
 
 func (im importer) gallery(ctx context.Context) error {

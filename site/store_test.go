@@ -1,10 +1,13 @@
 package site
 
 import (
+	"context"
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"path/filepath"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -38,7 +41,7 @@ func sha(c byte) string { return strings.Repeat(string(c), 64) }
 func addPhoto(t *testing.T, s *Store, c byte, alt string) Photo {
 	t.Helper()
 
-	p, err := s.AddPhoto(t.Context(), Photo{SHA256: sha(c), MIME: "image/jpeg", Width: 4000, Height: 3000, Alt: alt})
+	p, _, err := s.AddPhoto(t.Context(), Photo{SHA256: sha(c), MIME: "image/jpeg", Width: 4000, Height: 3000, Alt: alt})
 	require.NoError(t, err)
 
 	return p
@@ -262,12 +265,12 @@ func TestStoreReadsWhileUploading(t *testing.T) {
 	var g errgroup.Group
 	g.Go(func() error {
 		for i := range uploads {
-			p, err := s.AddPhoto(ctx, Photo{SHA256: fmt.Sprintf("%064x", i), MIME: "image/jpeg", Width: 4000, Height: 3000})
+			p, _, err := s.AddPhoto(ctx, Photo{SHA256: fmt.Sprintf("%064x", i), MIME: "image/jpeg", Width: 4000, Height: 3000})
 			if err != nil {
 				return err
 			}
 
-			if err := s.SetCrops(ctx, p.ID, map[images.Kind]images.Rect{images.Card: {W: 2400, H: 3000}}); err != nil {
+			if _, err := s.SetCrops(ctx, p.ID, map[images.Kind]images.Rect{images.Card: {W: 2400, H: 3000}}); err != nil {
 				return err
 			}
 		}
@@ -294,6 +297,126 @@ func TestStoreReadsWhileUploading(t *testing.T) {
 	require.NoError(t, g.Wait())
 }
 
+// cutCtx is cancelled at its n-th Done call: running a write under every n
+// cuts it short at every point where it looks at its context, the request
+// of a browser that goes away.
+type cutCtx struct {
+	context.Context //nolint:containedctx // it is a context
+
+	cancel context.CancelFunc
+	left   atomic.Int64
+}
+
+func cutAt(n int64) *cutCtx {
+	ctx, cancel := context.WithCancel(context.Background())
+	c := &cutCtx{Context: ctx, cancel: cancel}
+	c.left.Store(n)
+
+	return c
+}
+
+func (c *cutCtx) Done() <-chan struct{} {
+	if c.left.Add(-1) == 0 {
+		c.cancel()
+	}
+
+	return c.Context.Done()
+}
+
+// A write that fails stored nothing, and one that stored reports success:
+// the admin drops the kept pages only on success, so a save that committed
+// and then failed would leave the public site stale.
+func TestStoreWritesReportWhatTheyStored(t *testing.T) {
+	writes := []struct {
+		name string
+		do   func(ctx context.Context, s *Store, n int64) error
+	}{
+		{"create event", func(ctx context.Context, s *Store, n int64) error {
+			_, err := s.CreateEvent(ctx, Event{Title: fmt.Sprint("Kurs ", n)})
+			return err
+		}},
+		{"update event", func(ctx context.Context, s *Store, n int64) error {
+			e, err := s.Event(context.WithoutCancel(ctx), 1)
+			if err != nil {
+				return err
+			}
+
+			e.Title = fmt.Sprint("Kurs ", n)
+			_, err = s.UpdateEvent(ctx, e, e.UpdatedAt)
+
+			return err
+		}},
+		{"add photo", func(ctx context.Context, s *Store, n int64) error {
+			_, _, err := s.AddPhoto(ctx, Photo{SHA256: fmt.Sprintf("%064x", n), MIME: "image/jpeg", Width: 4000, Height: 3000})
+			return err
+		}},
+		{"set crops", func(ctx context.Context, s *Store, n int64) error {
+			_, err := s.SetCrops(ctx, 1, map[images.Kind]images.Rect{images.Card: {X: int(n), W: 2400, H: 3000}})
+			return err
+		}},
+		{"update photo", func(ctx context.Context, s *Store, n int64) error {
+			_, err := s.UpdatePhoto(ctx, Photo{ID: 1, Alt: fmt.Sprint("Låven ", n)})
+			return err
+		}},
+		{"create photographer", func(ctx context.Context, s *Store, n int64) error {
+			_, err := s.CreatePhotographer(ctx, Photographer{Name: fmt.Sprint("Ola ", n)})
+			return err
+		}},
+		{"update photographer", func(ctx context.Context, s *Store, n int64) error {
+			_, err := s.UpdatePhotographer(ctx, Photographer{ID: 1, Name: fmt.Sprint("Kari ", n)})
+			return err
+		}},
+	}
+
+	for _, w := range writes {
+		t.Run(w.name, func(t *testing.T) {
+			s, clock := newTestStore(t, oslo("2026-10-10 12:00"))
+			bg := t.Context()
+
+			p := addPhoto(t, s, 'a', "Låven")
+			_, err := s.CreateEvent(bg, Event{Title: "Kurs", MainPhoto: &p})
+			require.NoError(t, err)
+			_, err = s.CreatePhotographer(bg, Photographer{Name: "Kari"})
+			require.NoError(t, err)
+
+			state := func() string {
+				events, err := s.Events(bg)
+				require.NoError(t, err)
+				photos, err := s.Photos(bg)
+				require.NoError(t, err)
+				photographers, err := s.Photographers(bg)
+				require.NoError(t, err)
+
+				b, err := json.Marshal([]any{events, photos, photographers})
+				require.NoError(t, err)
+
+				return string(b)
+			}
+
+			for n := int64(1); ; n++ {
+				require.Less(t, n, int64(500), "the write never got to run whole")
+
+				clock.t = clock.t.Add(time.Minute)
+				before := state()
+				ctx := cutAt(n)
+				err := w.do(ctx, s, n)
+				after := state()
+
+				if err != nil {
+					require.Equal(t, before, after, "cut at %d: failed, yet stored", n)
+					continue
+				}
+
+				require.NotEqual(t, before, after, "cut at %d: succeeded, yet stored nothing", n)
+
+				if ctx.left.Load() > 0 {
+					return
+				}
+			}
+		})
+	}
+}
+
 func TestMergePhotosRefusesStrayRows(t *testing.T) {
 	photo := dbsqlc.Photo{ID: 1, Sha256: sha('a'), Mime: "image/jpeg", Width: 10, Height: 10}
 
@@ -316,7 +439,8 @@ func TestStorePhotos(t *testing.T) {
 
 	clock.t = start.Add(time.Hour)
 	crop := func(id int64, k images.Kind, r images.Rect) error {
-		return s.SetCrops(ctx, id, map[images.Kind]images.Rect{k: r})
+		_, err := s.SetCrops(ctx, id, map[images.Kind]images.Rect{k: r})
+		return err
 	}
 	require.ErrorIs(t, crop(a.ID, images.Card, images.Rect{X: 3000, W: 2400, H: 3000}), images.ErrCropOutside)
 	require.ErrorIs(t, crop(a.ID, "full", images.Rect{W: 1, H: 1}), images.ErrKind)
@@ -327,8 +451,9 @@ func TestStorePhotos(t *testing.T) {
 	a, err := s.Photo(ctx, a.ID)
 	require.NoError(t, err)
 	require.Equal(t, map[images.Kind]images.Rect{
-		images.Card:  {X: 800, W: 2400, H: 3000},
-		images.Share: {Y: 450, W: 4000, H: 2100},
+		images.Card:   {X: 800, W: 2400, H: 3000},
+		images.Banner: {X: 0, Y: 375, W: 4000, H: 2250},
+		images.Share:  {Y: 450, W: 4000, H: 2100},
 	}, a.Crops)
 	require.Equal(t, clock.t.UTC(), a.UpdatedAt, "a crop change is a change of the photo")
 
@@ -494,10 +619,10 @@ func TestStorePhotographers(t *testing.T) {
 	require.ErrorIs(t, s.DeletePhotographer(ctx, anita.ID), ErrNotFound)
 
 	// A photo can be credited from the start.
-	b, err := s.AddPhoto(ctx, Photo{SHA256: sha('b'), MIME: "image/jpeg", Width: 10, Height: 10, Photographer: &lucky})
+	b, _, err := s.AddPhoto(ctx, Photo{SHA256: sha('b'), MIME: "image/jpeg", Width: 10, Height: 10, Photographer: &lucky})
 	require.NoError(t, err)
 	require.Equal(t, &lucky, b.Photographer)
-	_, err = s.AddPhoto(ctx, Photo{SHA256: sha('c'), MIME: "image/jpeg", Width: 10, Height: 10, Photographer: &Photographer{ID: 999}})
+	_, _, err = s.AddPhoto(ctx, Photo{SHA256: sha('c'), MIME: "image/jpeg", Width: 10, Height: 10, Photographer: &Photographer{ID: 999}})
 	require.ErrorIs(t, err, ErrNotFound)
 }
 

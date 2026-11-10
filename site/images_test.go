@@ -16,12 +16,11 @@ func TestCatalog(t *testing.T) {
 
 	p := addPhoto(t, s, 'a', "Låven")
 	addPhoto(t, s, 'b', "")
-	require.NoError(t, s.SetCrops(ctx, p.ID, map[images.Kind]images.Rect{images.Card: {X: 100, Y: 0, W: 2400, H: 3000}}))
+	p, err := s.SetCrops(ctx, p.ID, map[images.Kind]images.Rect{images.Card: {X: 100, Y: 0, W: 2400, H: 3000}})
+	require.NoError(t, err)
 
-	want := images.Photo{
-		SHA256: sha('a'), MIME: "image/jpeg", Width: 4000, Height: 3000,
-		Crops: map[images.Kind]images.Rect{images.Card: {X: 100, Y: 0, W: 2400, H: 3000}},
-	}
+	want := images.Photo{SHA256: sha('a'), MIME: "image/jpeg", Width: 4000, Height: 3000, Crops: p.Crops}
+	require.Equal(t, images.Rect{X: 100, Y: 0, W: 2400, H: 3000}, want.Crops[images.Card])
 
 	got, err := s.Catalog().Photo(ctx, sha('a'))
 	require.NoError(t, err)

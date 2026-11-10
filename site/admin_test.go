@@ -1,6 +1,7 @@
 package site
 
 import (
+	"maps"
 	"testing"
 	"time"
 
@@ -84,7 +85,7 @@ func TestStoreSetCrops(t *testing.T) {
 	p := addPhoto(t, s, 'a', "x")
 
 	good := images.Rect{X: 0, Y: 0, W: 2400, H: 3000}
-	err := s.SetCrops(ctx, p.ID, map[images.Kind]images.Rect{images.Card: good, images.Banner: {X: 0, Y: 0, W: 5000, H: 100}})
+	_, err := s.SetCrops(ctx, p.ID, map[images.Kind]images.Rect{images.Card: good, images.Banner: {X: 0, Y: 0, W: 5000, H: 100}})
 	require.ErrorIs(t, err, images.ErrCropOutside)
 
 	var fe *FieldError
@@ -93,14 +94,19 @@ func TestStoreSetCrops(t *testing.T) {
 
 	got, err := s.Photo(ctx, p.ID)
 	require.NoError(t, err)
-	require.Empty(t, got.Crops, "one bad crop writes none")
+	require.Equal(t, p.Crops, got.Crops, "one bad crop writes none")
 
-	require.NoError(t, s.SetCrops(ctx, p.ID, map[images.Kind]images.Rect{images.Card: good}))
+	want := maps.Clone(p.Crops)
+	want[images.Card] = good
+	saved, err := s.SetCrops(ctx, p.ID, map[images.Kind]images.Rect{images.Card: good})
+	require.NoError(t, err)
+	require.Equal(t, want, saved.Crops)
 	got, err = s.Photo(ctx, p.ID)
 	require.NoError(t, err)
-	require.Equal(t, map[images.Kind]images.Rect{images.Card: good}, got.Crops)
+	require.Equal(t, saved, got)
 
-	require.ErrorIs(t, s.SetCrops(ctx, 999, map[images.Kind]images.Rect{images.Card: good}), ErrNotFound)
+	_, err = s.SetCrops(ctx, 999, map[images.Kind]images.Rect{images.Card: good})
+	require.ErrorIs(t, err, ErrNotFound)
 }
 
 func TestStoreRemovePhoto(t *testing.T) {
@@ -151,7 +157,7 @@ func TestStoreDeleteUnusedPhotos(t *testing.T) {
 
 	// Uploaded again on day six: someone is using it right now.
 	clock.t = start.Add(6 * 24 * time.Hour)
-	require.NoError(t, s.RenewPhoto(ctx, renewed.ID))
+	addPhoto(t, s, 'b', "")
 
 	clock.t = start.Add(grace - time.Second)
 	gone, err := s.DeleteUnusedPhotos(ctx, grace)
@@ -177,14 +183,26 @@ func TestStoreDeleteUnusedPhotos(t *testing.T) {
 	require.Equal(t, []string{renewed.SHA256}, gone)
 }
 
-func TestStorePhotoBySHA256(t *testing.T) {
-	s, _ := newTestStore(t, oslo("2026-10-10 12:00"))
-	p := addPhoto(t, s, 'a', "x")
+// An upload is stored with its centred crops in one step, so no photo is
+// ever without them; the same bytes again are the photo already there.
+func TestStoreAddPhoto(t *testing.T) {
+	start := oslo("2026-10-10 12:00")
+	s, clock := newTestStore(t, start)
+	ctx := t.Context()
 
-	got, err := s.PhotoBySHA256(t.Context(), p.SHA256)
+	p, created, err := s.AddPhoto(ctx, Photo{SHA256: sha('a'), MIME: "image/jpeg", Width: 1000, Height: 1250, Alt: "Låven"})
 	require.NoError(t, err)
-	require.Equal(t, p.ID, got.ID)
+	require.True(t, created)
+	require.Equal(t, map[images.Kind]images.Rect{
+		images.Card:   {X: 0, Y: 0, W: 1000, H: 1250},
+		images.Banner: {X: 0, Y: 344, W: 1000, H: 562},
+	}, p.Crops, "no share crop: the photo is narrower than a share image")
 
-	_, err = s.PhotoBySHA256(t.Context(), sha('f'))
-	require.ErrorIs(t, err, ErrNotFound)
+	clock.t = start.Add(time.Hour)
+	again, created, err := s.AddPhoto(ctx, Photo{SHA256: sha('a'), MIME: "image/jpeg", Width: 1000, Height: 1250, Alt: "ignored"})
+	require.NoError(t, err)
+	require.False(t, created)
+	require.Equal(t, clock.t.UTC(), again.UpdatedAt, "the grace period starts again")
+	again.UpdatedAt = p.UpdatedAt
+	require.Equal(t, p, again, "the stored photo is kept as it is")
 }

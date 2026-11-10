@@ -14,40 +14,16 @@ import (
 	"github.com/kradalby/asparges/images"
 )
 
-// PhotoBySHA256 loads the photo whose original has this content hash.
-func (s *Store) PhotoBySHA256(ctx context.Context, sha256 string) (Photo, error) {
-	row, err := s.db.Queries().GetPhotoBySha256(ctx, sha256)
-	if errors.Is(err, sql.ErrNoRows) {
-		return Photo{}, fmt.Errorf("photo %s: %w", sha256, ErrNotFound)
-	}
-	if err != nil {
-		return Photo{}, fmt.Errorf("finding photo %s: %w", sha256, err)
-	}
-
-	return s.Photo(ctx, row.ID)
-}
-
-// RenewPhoto restarts a photo's unused grace period (DeleteUnusedPhotos):
-// uploading a photo again means someone is about to use it.
-func (s *Store) RenewPhoto(ctx context.Context, id int64) error {
-	err := s.db.Queries().TouchPhoto(ctx, dbsqlc.TouchPhotoParams{UpdatedAt: s.now().Unix(), ID: id})
-	if err != nil {
-		return fmt.Errorf("renewing photo %d: %w", id, err)
-	}
-
-	return nil
-}
-
 // SetCrops sets several crops of a photo at once: all of them or, if one is
-// refused, none.
-func (s *Store) SetCrops(ctx context.Context, photoID int64, crops map[images.Kind]images.Rect) error {
-	return s.db.InTx(ctx, func(q *dbsqlc.Queries) error {
+// refused, none. It returns the photo as stored.
+func (s *Store) SetCrops(ctx context.Context, photoID int64, crops map[images.Kind]images.Rect) (Photo, error) {
+	return write(ctx, s, func(q *dbsqlc.Queries) (Photo, error) {
 		row, err := q.GetPhoto(ctx, photoID)
 		if errors.Is(err, sql.ErrNoRows) {
-			return fmt.Errorf("photo %d: %w", photoID, ErrNotFound)
+			return Photo{}, fmt.Errorf("photo %d: %w", photoID, ErrNotFound)
 		}
 		if err != nil {
-			return fmt.Errorf("loading photo %d: %w", photoID, err)
+			return Photo{}, fmt.Errorf("loading photo %d: %w", photoID, err)
 		}
 
 		p := photoFromRow(row)
@@ -59,25 +35,34 @@ func (s *Store) SetCrops(ctx context.Context, photoID int64, crops map[images.Ki
 		}
 
 		if err := errors.Join(errs...); err != nil {
-			return err
+			return Photo{}, err
 		}
 
 		for kind, r := range crops {
-			if err := q.UpsertPhotoCrop(ctx, dbsqlc.UpsertPhotoCropParams{
-				PhotoID: photoID, Kind: string(kind),
-				X: int64(r.X), Y: int64(r.Y), W: int64(r.W), H: int64(r.H),
-			}); err != nil {
-				return fmt.Errorf("setting %s crop of photo %d: %w", kind, photoID, err)
+			if err := upsertCrop(ctx, q, photoID, kind, r); err != nil {
+				return Photo{}, err
 			}
 		}
 
 		// A new crop changes the pages that show the photo.
 		if err := q.TouchPhoto(ctx, dbsqlc.TouchPhotoParams{UpdatedAt: s.now().Unix(), ID: photoID}); err != nil {
-			return fmt.Errorf("touching photo %d: %w", photoID, err)
+			return Photo{}, fmt.Errorf("touching photo %d: %w", photoID, err)
 		}
 
-		return nil
+		return photo(ctx, q, photoID)
 	})
+}
+
+func upsertCrop(ctx context.Context, q *dbsqlc.Queries, photoID int64, kind images.Kind, r images.Rect) error {
+	err := q.UpsertPhotoCrop(ctx, dbsqlc.UpsertPhotoCropParams{
+		PhotoID: photoID, Kind: string(kind),
+		X: int64(r.X), Y: int64(r.Y), W: int64(r.W), H: int64(r.H),
+	})
+	if err != nil {
+		return fmt.Errorf("setting %s crop of photo %d: %w", kind, photoID, err)
+	}
+
+	return nil
 }
 
 // RemovePhoto deletes a photo that no event shows, taking it out of the

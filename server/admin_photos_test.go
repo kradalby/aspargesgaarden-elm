@@ -263,7 +263,7 @@ func TestAdminCrops(t *testing.T) {
 
 			stored, err := a.store.Photo(t.Context(), p.ID)
 			require.NoError(t, err)
-			require.Empty(t, stored.Crops)
+			require.Equal(t, p.Crops, stored.Crops, "a refused change writes nothing")
 		})
 	}
 
@@ -282,7 +282,7 @@ func TestAdminCrops(t *testing.T) {
 	// Too narrow for a share image: the app sends back the centred share
 	// rectangle it was shown, which is accepted and not stored; any other
 	// share rectangle is refused.
-	narrow, err := a.store.AddPhoto(t.Context(), site.Photo{SHA256: strings.Repeat("e", 64), MIME: "image/jpeg", Width: 1000, Height: 1219})
+	narrow, _, err := a.store.AddPhoto(t.Context(), site.Photo{SHA256: strings.Repeat("e", 64), MIME: "image/jpeg", Width: 1000, Height: 1219})
 	require.NoError(t, err)
 
 	shown := decode[photoJSON](t, a.do(t, "GET", "/admin/api/photos/"+itoa(narrow.ID), req{})).Crops
@@ -293,7 +293,8 @@ func TestAdminCrops(t *testing.T) {
 
 	stored, err = a.store.Photo(t.Context(), narrow.ID)
 	require.NoError(t, err)
-	require.Equal(t, map[images.Kind]images.Rect{images.Card: {X: 0, Y: 0, W: 960, H: 1200}}, stored.Crops)
+	require.Equal(t, images.Rect{X: 0, Y: 0, W: 960, H: 1200}, stored.Crops[images.Card])
+	require.NotContains(t, stored.Crops, images.Share)
 
 	rec = a.do(t, "PUT", path, req{body: map[string]rectJSON{"share": {0, 0, 950, 499}}})
 	require.Equal(t, []problem{{Code: "crop_too_small", Field: "share"}}, errorsOf(t, rec))
@@ -305,7 +306,8 @@ func TestAdminCropsKeepAnOldCrop(t *testing.T) {
 	a := newAdmin(t, false)
 	p := a.storedPhoto(t, 'a') // 1600×1200
 	old := images.Rect{X: 10, Y: 20, W: 700, H: 394}
-	require.NoError(t, a.store.SetCrops(t.Context(), p.ID, map[images.Kind]images.Rect{images.Banner: old}))
+	_, err := a.store.SetCrops(t.Context(), p.ID, map[images.Kind]images.Rect{images.Banner: old})
+	require.NoError(t, err)
 
 	path := "/admin/api/photos/" + itoa(p.ID) + "/crops"
 	rec := a.do(t, "PUT", path, req{body: map[string]rectJSON{"banner": {10, 20, 700, 394}, "card": {0, 0, 600, 750}}})
@@ -313,7 +315,8 @@ func TestAdminCropsKeepAnOldCrop(t *testing.T) {
 
 	stored, err := a.store.Photo(t.Context(), p.ID)
 	require.NoError(t, err)
-	require.Equal(t, map[images.Kind]images.Rect{images.Banner: old, images.Card: {X: 0, Y: 0, W: 600, H: 750}}, stored.Crops,
+	require.Equal(t, old, stored.Crops[images.Banner])
+	require.Equal(t, images.Rect{X: 0, Y: 0, W: 600, H: 750}, stored.Crops[images.Card],
 		"the soft card is accepted too: sharpness only warns")
 
 	// Moved, it is a new crop, and today's floor applies.
@@ -326,18 +329,20 @@ func TestAdminCropsKeepAnOldCrop(t *testing.T) {
 func TestAdminPhotoQuality(t *testing.T) {
 	a := newAdmin(t, false)
 
-	small, err := a.store.AddPhoto(t.Context(), site.Photo{SHA256: strings.Repeat("c", 64), MIME: "image/jpeg", Width: 768, Height: 1024})
+	small, _, err := a.store.AddPhoto(t.Context(), site.Photo{SHA256: strings.Repeat("c", 64), MIME: "image/jpeg", Width: 768, Height: 1024})
 	require.NoError(t, err)
-	require.NoError(t, a.store.SetCrops(t.Context(), small.ID, map[images.Kind]images.Rect{images.Card: {X: 0, Y: 32, W: 768, H: 960}}))
+	_, err = a.store.SetCrops(t.Context(), small.ID, map[images.Kind]images.Rect{images.Card: {X: 0, Y: 32, W: 768, H: 960}})
+	require.NoError(t, err)
 
 	large := a.storedPhoto(t, 'a') // 1600×1200
-	require.NoError(t, a.store.SetCrops(t.Context(), large.ID, map[images.Kind]images.Rect{
+	_, err = a.store.SetCrops(t.Context(), large.ID, map[images.Kind]images.Rect{
 		images.Card: {X: 0, Y: 0, W: 600, H: 750},
 		// Under the floor, as an old import may have it: the pages skip it
 		// and draw the whole photo, which is sharp.
 		images.Banner: {X: 0, Y: 0, W: 700, H: 394},
 		images.Share:  {X: 0, Y: 0, W: 1600, H: 840},
-	}))
+	})
+	require.NoError(t, err)
 
 	tests := []struct {
 		name  string

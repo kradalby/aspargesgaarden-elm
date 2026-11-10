@@ -228,53 +228,21 @@ func (s *Server) uploadPhoto(w http.ResponseWriter, r *http.Request) {
 		break
 	}
 
-	status := http.StatusOK
-
-	p, err := s.cfg.Store.PhotoBySHA256(ctx, o.SHA256)
-	switch {
-	case err == nil:
-		// The same bytes again: someone is about to use it, so the unused
-		// photo cleanup must not take it from under them.
-		err = s.cfg.Store.RenewPhoto(ctx, p.ID)
-	case errors.Is(err, site.ErrNotFound):
-		status = http.StatusCreated
-		p, err = s.addPhoto(ctx, o)
-	}
-
+	p, created, err := s.cfg.Store.AddPhoto(ctx, site.Photo{SHA256: o.SHA256, MIME: o.MIME, Width: o.Width, Height: o.Height})
 	if err != nil {
 		s.apiFail(w, r, err, nil)
 		return
 	}
 
 	s.Changed(p.SHA256)
-	s.audit(r, "photo uploaded", "photo", p.ID, "sha256", p.SHA256, "new", status == http.StatusCreated)
+	s.audit(r, "photo uploaded", "photo", p.ID, "sha256", p.SHA256, "new", created)
+
+	status := http.StatusOK
+	if created {
+		status = http.StatusCreated
+	}
 
 	s.writeJSON(w, r, status, s.photoJSON(ctx, p))
-}
-
-// addPhoto records a new upload with the centred crops of every kind it is
-// large enough for; the rest stay unset, and the pages show it whole there.
-func (s *Server) addPhoto(ctx context.Context, o images.Original) (site.Photo, error) {
-	p, err := s.cfg.Store.AddPhoto(ctx, site.Photo{SHA256: o.SHA256, MIME: o.MIME, Width: o.Width, Height: o.Height})
-	if err != nil {
-		return site.Photo{}, err
-	}
-
-	crops := map[images.Kind]images.Rect{}
-	for _, k := range images.CropKinds {
-		r, err := images.DefaultCrop(k, p.Width, p.Height)
-		if err == nil {
-			crops[k] = r
-		}
-	}
-
-	if len(crops) > 0 {
-		if err := s.cfg.Store.SetCrops(ctx, p.ID, crops); err != nil {
-			return site.Photo{}, err
-		}
-	}
-
-	return s.cfg.Store.Photo(ctx, p.ID)
 }
 
 // uploadFailed answers a refused upload with the codes docs/admin-api.md
@@ -456,12 +424,7 @@ func (s *Server) setCrops(w http.ResponseWriter, r *http.Request, p site.Photo) 
 		return
 	}
 
-	if err := s.cfg.Store.SetCrops(r.Context(), p.ID, crops); err != nil {
-		s.apiFail(w, r, err, nil)
-		return
-	}
-
-	p, err := s.cfg.Store.Photo(r.Context(), p.ID)
+	p, err := s.cfg.Store.SetCrops(r.Context(), p.ID, crops)
 	if err != nil {
 		s.apiFail(w, r, err, nil)
 		return

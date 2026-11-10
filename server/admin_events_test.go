@@ -17,7 +17,7 @@ import (
 func (a *adminFixture) storedPhoto(t *testing.T, c byte) site.Photo {
 	t.Helper()
 
-	p, err := a.store.AddPhoto(t.Context(), site.Photo{
+	p, _, err := a.store.AddPhoto(t.Context(), site.Photo{
 		SHA256: strings.Repeat(string(c), 64), MIME: "image/jpeg", Width: 1600, Height: 1200,
 	})
 	require.NoError(t, err)
@@ -262,10 +262,11 @@ func TestAdminPublishRules(t *testing.T) {
 func TestAdminPhotoQualityNeverBlocks(t *testing.T) {
 	a := newAdmin(t, false)
 	main := a.storedPhoto(t, 'a')
-	require.NoError(t, a.store.SetCrops(t.Context(), main.ID, map[images.Kind]images.Rect{
+	_, err := a.store.SetCrops(t.Context(), main.ID, map[images.Kind]images.Rect{
 		images.Card:   {X: 0, Y: 0, W: 500, H: 625},
 		images.Banner: {X: 0, Y: 0, W: 700, H: 394},
-	}))
+	})
+	require.NoError(t, err)
 
 	e := decode[eventJSON](t, a.do(t, "POST", "/admin/api/events", req{body: julemarked(main)}))
 	require.True(t, e.MainPhoto.Quality["card"].Soft)
