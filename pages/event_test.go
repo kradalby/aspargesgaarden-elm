@@ -44,7 +44,7 @@ func TestEventWithoutSummaryHasNoLead(t *testing.T) {
 
 	require.NotContains(t, got, "text-xl")
 	require.Contains(t, got, `<meta content="31. oktober 2026 på Aspargesgården i Tjølling, Larvik: Invitasjon til takkebakstkurs`)
-	require.Contains(t, got, "<strong class=\"font-bold\">Datoer:</strong> 31. oktober 2026, 28. november 2026, 29. november 2026 kl 10:00 - 15:00")
+	require.Contains(t, got, "<strong class=\"font-bold\">Datoer:</strong> 31. oktober, 28. november og 29. november 2026 kl. 10.00–15.00")
 }
 
 // A past event stays at its address, says it is over and sells nothing.

@@ -52,7 +52,7 @@ func TestAdminEventLifecycle(t *testing.T) {
 	require.Equal(t, "julemarked-2026", e.Slug)
 	require.Equal(t, "/arrangementer/2026/julemarked-2026", e.Path)
 	require.Equal(t, "https://aspargesgaarden.no/arrangementer/2026/julemarked-2026", e.URL)
-	require.Equal(t, "14. november 2026 kl 12:00 - 15. november 2026 kl 16:00 på Aspargesgården", e.DateText)
+	require.Equal(t, "14. november kl. 12.00 – 15. november 2026 kl. 16.00 på Aspargesgården", e.DateText)
 	require.Equal(t, "Boder med julepynt i låven", e.MainPhoto.Alt, "the form's alt text is stored with the event")
 	require.Nil(t, e.PublishedAt)
 	require.Equal(t, []string{}, e.ExtraDates)

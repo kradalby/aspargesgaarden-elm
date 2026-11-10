@@ -14,7 +14,7 @@ func testEventItem() EventItem {
 		Href:      "/arrangementer/2026/julemarked",
 		Title:     "Julemarked på Aspargesgården",
 		DateLabel: "Dato:",
-		DateLine:  "14. november 2026 kl 12:00 - 15. november 2026 kl 16:00 på Aspargesgården",
+		DateLine:  "14. november kl. 12.00 – 15. november 2026 kl. 16.00 på Aspargesgården",
 		Date:      "14. november 2026",
 		Summary:   "Mer enn 30 utstillere, kafé og bålfat.",
 		Photo:     testPhoto(),

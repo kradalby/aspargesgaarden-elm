@@ -208,7 +208,7 @@ func TestLLMsTxt(t *testing.T) {
 	body := rec.Body.String()
 	require.True(t, strings.HasPrefix(body, "# Aspargesgården\n"))
 	require.Contains(t, body, "- [Muligheter](https://aspargesgaarden.no/lokaler)\n")
-	require.Contains(t, body, "- [Julemarked](https://aspargesgaarden.no/arrangementer/2026/julemarked): 14. november 2026 - 15. november 2026\n")
+	require.Contains(t, body, "- [Julemarked](https://aspargesgaarden.no/arrangementer/2026/julemarked): 14. november – 15. november 2026\n")
 	require.NotContains(t, body, "/arrangementer/2025/", "only what is coming")
 	require.NotContains(t, body, "Kladd", "drafts are not public")
 }

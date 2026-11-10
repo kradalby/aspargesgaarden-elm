@@ -199,7 +199,7 @@ to them.
   "year": 2026,
   "path": "/arrangementer/2026/julemarked",
   "url": "https://aspargesgaarden.no/arrangementer/2026/julemarked",
-  "dateText": "14. november 2026 kl 12:00 - 15. november 2026 kl 16:00 på Aspargesgården",
+  "dateText": "14. november kl. 12.00 – 15. november 2026 kl. 16.00 på Aspargesgården",
   "isOver": false,
   "title": "Julemarked 2026",
   "summary": "Velkommen til årets julemarked i Låven.",

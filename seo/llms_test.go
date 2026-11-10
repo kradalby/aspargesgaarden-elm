@@ -40,8 +40,8 @@ func TestLLMs(t *testing.T) {
 
 ## Kommende arrangementer
 
-- [Julemarked på Aspargesgården](https://aspargesgaarden.no/arrangementer/2026/julemarked): 14. november 2026 kl 12:00 - 15. november 2026 kl 16:00
-- [Takkebakstkurs](https://aspargesgaarden.no/arrangementer/2026/takkebakstkurs): 28. november 2026 kl 10:00 - 15:00 (avlyst)
+- [Julemarked på Aspargesgården](https://aspargesgaarden.no/arrangementer/2026/julemarked): 14. november kl. 12.00 – 15. november 2026 kl. 16.00
+- [Takkebakstkurs](https://aspargesgaarden.no/arrangementer/2026/takkebakstkurs): 28. november 2026 kl. 10.00–15.00 (avlyst)
 `, got)
 }
 

@@ -14,8 +14,7 @@ import (
 type legacyEvent struct {
 	file  string
 	event Event
-	// line is the date line the old site renders for the file (dist/events),
-	// except that "ca. " is gone from the takkebakst end time.
+	// line is the date line the site writes for the file.
 	label, line string
 }
 
@@ -45,62 +44,62 @@ var legacyEvents = []legacyEvent{
 	{
 		file:  "2024-04-24-ingunn-anvik.md",
 		event: legacy(1, "Hageglede", "2024-04-24", "19:00", "", ""),
-		label: "Dato:", line: "24. april 2024 kl 19:00 på Aspargesgården",
+		label: "Dato:", line: "24. april 2024 kl. 19.00 på Aspargesgården",
 	},
 	{
 		file:  "2024-05-29-bettan.md",
 		event: legacy(2, "Vårkonsert med Bettan", "2024-05-29", "18:30", "", ""),
-		label: "Dato:", line: "29. mai 2024 kl 18:30 på Aspargesgården",
+		label: "Dato:", line: "29. mai 2024 kl. 18.30 på Aspargesgården",
 	},
 	{
 		file:  "2024-13-13-gourmet.md",
 		event: legacy(3, "Gourmetaften", "2024-10-01", "", "", ""),
-		label: "Dato:", line: "01. oktober 2024 på Aspargesgården",
+		label: "Dato:", line: "1. oktober 2024 på Aspargesgården",
 	},
 	{
 		file:  "2025-03-22-afternoon.md",
 		event: legacy(4, "Afternoon tea - ladies and gentlemen", "2025-03-22", "16:00", "", ""),
-		label: "Dato:", line: "22. mars 2025 kl 16:00 på Aspargesgården",
+		label: "Dato:", line: "22. mars 2025 kl. 16.00 på Aspargesgården",
 	},
 	{
 		file:  "2025-03-26-manneken.md",
 		event: legacy(5, "Mannekengoppvisning", "2025-03-26", "18:30", "", ""),
-		label: "Dato:", line: "26. mars 2025 kl 18:30 på Aspargesgården",
+		label: "Dato:", line: "26. mars 2025 kl. 18.30 på Aspargesgården",
 	},
 	{
 		file:  "2025-06-04-didrik-solli.md",
 		event: legacy(6, "O sole mio med Didrik Solli-Tangen", "2025-06-04", "17:00", "", ""),
-		label: "Dato:", line: "04. juni 2025 kl 17:00 på Aspargesgården",
+		label: "Dato:", line: "4. juni 2025 kl. 17.00 på Aspargesgården",
 	},
 	{
 		file:  "2025-12-01-didrik-solli-tangen.md",
 		event: legacy(7, "Julekonsert med Didrik Solli-Tangen", "2025-12-01", "19:00", "", ""),
-		label: "Dato:", line: "01. desember 2025 kl 19:00 på Aspargesgården",
+		label: "Dato:", line: "1. desember 2025 kl. 19.00 på Aspargesgården",
 	},
 	{
 		file:  "2025-12-06-julemarked.md",
 		event: legacy(8, "Julemarked på Aspargesgården", "2025-11-15", "12:00", "2025-11-16", "16:00"),
-		label: "Dato:", line: "15. november 2025 kl 12:00 - 16. november 2025 kl 16:00 på Aspargesgården",
+		label: "Dato:", line: "15. november kl. 12.00 – 16. november 2025 kl. 16.00 på Aspargesgården",
 	},
 	{
 		file:  "2026-04-15-manneken.md",
 		event: legacy(9, "Mannekengoppvisning", "2026-04-15", "18:30", "", ""),
-		label: "Dato:", line: "15. april 2026 kl 18:30 på Aspargesgården",
+		label: "Dato:", line: "15. april 2026 kl. 18.30 på Aspargesgården",
 	},
 	{
 		file:  "2026-05-19-varkonsert.md",
 		event: legacy(10, "Vårkonsert med Black & Lekker", "2026-05-19", "19:30", "", ""),
-		label: "Dato:", line: "19. mai 2026 kl 19:30 på Aspargesgården",
+		label: "Dato:", line: "19. mai 2026 kl. 19.30 på Aspargesgården",
 	},
 	{
 		file:  "2026-10-31-takkebakstkurs.md",
 		event: legacy(11, "Takkebakstkurs med Anita Saga", "2026-10-31", "10:00", "2026-10-31", "15:00", "2026-11-28", "2026-11-29"),
-		label: "Datoer:", line: "31. oktober 2026, 28. november 2026, 29. november 2026 kl 10:00 - 15:00 på Aspargesgården",
+		label: "Datoer:", line: "31. oktober, 28. november og 29. november 2026 kl. 10.00–15.00 på Aspargesgården",
 	},
 	{
 		file:  "2026-11-14-julemarked.md",
 		event: legacy(12, "Julemarked på Aspargesgården", "2026-11-14", "12:00", "2026-11-15", "16:00"),
-		label: "Dato:", line: "14. november 2026 kl 12:00 - 15. november 2026 kl 16:00 på Aspargesgården",
+		label: "Dato:", line: "14. november kl. 12.00 – 15. november 2026 kl. 16.00 på Aspargesgården",
 	},
 }
 

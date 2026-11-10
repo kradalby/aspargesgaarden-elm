@@ -246,7 +246,7 @@ test("new event, from first word to published, copied and deleted", async ({
   ).toBeVisible();
   await expect(
     upcoming.getByText(
-      "14. november 2026 kl 12:00 - 15. november 2026 kl 16:00 på Aspargesgården",
+      "14. november kl. 12.00 – 15. november 2026 kl. 16.00 på Aspargesgården",
     ),
   ).toBeVisible();
 

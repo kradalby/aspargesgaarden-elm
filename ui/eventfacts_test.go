@@ -11,7 +11,7 @@ import (
 func TestEventFacts(t *testing.T) {
 	golden.HTML(t, "eventfacts", EventFacts(EventFactsProps{
 		DateLabel: "Dato:",
-		DateLine:  "01. desember 2025 kl 19:00 på Aspargesgården",
+		DateLine:  "1. desember 2025 kl. 19.00 på Aspargesgården",
 		Price:     "695,-",
 		TicketURL: "https://fabnite.com/no/events/julekonsert",
 	}).Render())

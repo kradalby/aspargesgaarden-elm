@@ -64,7 +64,7 @@ func TestAdminPreviewIsThePage(t *testing.T) {
 	code, html := a.preview(t, "page", julemarked(main), 0)
 	require.Equal(t, http.StatusOK, code)
 	require.Contains(t, html, ">Julemarked 2026</h1>")
-	require.Contains(t, html, "14. november 2026 kl 12:00 - 15. november 2026 kl 16:00 på Aspargesgården")
+	require.Contains(t, html, "14. november kl. 12.00 – 15. november 2026 kl. 16.00 på Aspargesgården")
 	require.Contains(t, html, `alt="Boder med julepynt i låven"`, "the form's alt text, not the stored one")
 	require.Contains(t, html, "/"+main.SHA256+"/", "its stored photo, by the stored crops")
 }
