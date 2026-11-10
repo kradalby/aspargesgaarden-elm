@@ -110,6 +110,11 @@ func TestExcerpt(t *testing.T) {
 			want: "Invitasjon til kurs. Sted: Bryggerhuset.",
 		},
 		{
+			name: "notes-skipped", max: 100,
+			src:  "*Slutt ca. kl. 15:00.*\n\n**Velkommen!**\n\nInvitasjon til kurs.",
+			want: "Invitasjon til kurs.",
+		},
+		{
 			name: "long-cut-at-a-word", max: 20,
 			src:  "Aspargesgården inviterer denne høsten til gourmetaftener.",
 			want: "Aspargesgården…",

@@ -241,7 +241,7 @@ func Excerpt(src string, maxRunes int) string {
 
 	length := 0
 	for n := parser.Parse(text.NewReader(r.src)).FirstChild(); n != nil && length < maxRunes/2; n = n.NextSibling() {
-		if _, ok := n.(*ast.Paragraph); !ok {
+		if _, ok := n.(*ast.Paragraph); !ok || isNote(n) {
 			continue
 		}
 
@@ -265,6 +265,13 @@ func Excerpt(src string, maxRunes int) string {
 	}
 
 	return strings.TrimRight(cut, " ,.;:–-") + "…"
+}
+
+// isNote reports whether a paragraph is set wholly in italics or bold: an
+// aside ("*Slutt ca. kl. 15:00.*") or a highlight, not the opening prose.
+func isNote(p ast.Node) bool {
+	_, ok := p.FirstChild().(*ast.Emphasis)
+	return ok && p.ChildCount() == 1
 }
 
 // textOf flattens rendered nodes back to their words, so an excerpt
