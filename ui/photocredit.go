@@ -12,7 +12,9 @@ type Photographer struct {
 }
 
 // PhotoCredit wraps a Picture with the photographer's name, shown in a bar
-// along its bottom edge on hover (or tap). Without a name there is no bar.
+// along its bottom edge on hover (or tap), or while keyboard focus is in the
+// photo or the credit. Hidden, the bar lets taps through to the photo's own
+// link. Without a name there is no bar.
 func PhotoCredit(by Photographer, picture elem.Node) elem.Node {
 	kids := []elem.Node{picture}
 
@@ -27,7 +29,7 @@ func PhotoCredit(by Photographer, picture elem.Node) elem.Node {
 		}
 
 		kids = append(kids, elem.Div(attrs.Props{
-			attrs.Class: "opacity-0 absolute left-0 bottom-0 right-0 z-10 flex justify-around items-end bg-brown text-black group-hover:opacity-100",
+			attrs.Class: "opacity-0 pointer-events-none absolute left-0 bottom-0 right-0 z-10 flex justify-around items-end bg-brown text-black group-hover:opacity-100 group-hover:pointer-events-auto group-focus-within:opacity-100 group-focus-within:pointer-events-auto",
 		}, name))
 	}
 

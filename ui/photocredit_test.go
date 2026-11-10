@@ -18,6 +18,16 @@ func TestPhotoCredit(t *testing.T) {
 	).Render())
 }
 
+// The hidden bar must not catch a tap meant for the photo's link, and must
+// show when a keyboard reaches its link.
+func TestPhotoCreditHiddenBarLetsTapsThrough(t *testing.T) {
+	got := PhotoCredit(Photographer{Name: "Aurora Hovland", Website: "https://www.aurorahovland.com"}, elem.Span(nil)).Render()
+
+	for _, c := range []string{"opacity-0 pointer-events-none", "group-focus-within:opacity-100", "group-focus-within:pointer-events-auto", "group-hover:pointer-events-auto"} {
+		require.Contains(t, got, c)
+	}
+}
+
 // The old site showed an empty "av " bar when nobody was credited.
 func TestPhotoCreditWithoutPhotographer(t *testing.T) {
 	got := PhotoCredit(Photographer{}, elem.Span(nil)).Render()
