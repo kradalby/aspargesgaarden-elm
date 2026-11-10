@@ -53,6 +53,19 @@ CREATE TABLE event_dates (
     PRIMARY KEY (event_id, date)
 ) WITHOUT ROWID;
 
+-- photographers are credited on photos: one row per person, picked rather
+-- than retyped, so correcting a link fixes every credit. name_key is the name
+-- lowercased with its spaces collapsed, set by site/; SQLite's NOCASE folds
+-- ASCII only, and "Øyvind" and "øyvind" must be one photographer too. The url
+-- check keeps javascript: and other schemes out of a credit's href.
+CREATE TABLE photographers (
+    id       INTEGER PRIMARY KEY,
+    name     TEXT    NOT NULL CHECK (name <> '' AND name = trim(name)),
+    name_key TEXT    NOT NULL UNIQUE CHECK (name_key <> ''),
+    url      TEXT    NOT NULL DEFAULT ''
+        CHECK (url = '' OR url LIKE 'http://_%' OR url LIKE 'https://_%')
+);
+
 -- photos is one uploaded original, named by the sha256 of its content; the
 -- file itself lives in originals/ and is never referenced by any other key.
 CREATE TABLE photos (
@@ -65,9 +78,13 @@ CREATE TABLE photos (
     alt               TEXT    NOT NULL DEFAULT '',
     photographer_name TEXT    NOT NULL DEFAULT '',
     photographer_url  TEXT    NOT NULL DEFAULT '',
+    photographer_id   INTEGER REFERENCES photographers (id),
     created_at        INTEGER NOT NULL,
     updated_at        INTEGER NOT NULL
 );
+
+-- Without ON DELETE: a photographer credited on a photo cannot be deleted.
+CREATE INDEX photos_photographer ON photos (photographer_id);
 
 -- photo_crops holds one rectangle per crop kind, in source pixels. A photo
 -- without a crop of a kind falls back to a centred one computed by images/.

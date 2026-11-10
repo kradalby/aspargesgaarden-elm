@@ -4,8 +4,8 @@
 -- because SQLite cannot RETURN from a bare DO NOTHING.
 INSERT INTO photos (
     sha256, mime, width, height, alt, photographer_name, photographer_url,
-    created_at, updated_at
-) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    photographer_id, created_at, updated_at
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 ON CONFLICT (sha256) DO UPDATE SET sha256 = excluded.sha256
 RETURNING id;
 
@@ -17,11 +17,16 @@ SELECT * FROM photos ORDER BY id;
 
 -- name: UpdatePhotoMeta :execrows
 UPDATE photos
-SET alt = ?, photographer_name = ?, photographer_url = ?, updated_at = ?
+SET alt = ?, photographer_name = ?, photographer_url = ?, photographer_id = ?,
+    updated_at = ?
 WHERE id = ?;
 
 -- name: TouchPhoto :exec
 UPDATE photos SET updated_at = ? WHERE id = ?;
+
+-- name: TouchPhotographerPhotos :exec
+-- A photographer's new name or link changes the pages that credit them.
+UPDATE photos SET updated_at = ? WHERE photographer_id = ?;
 
 -- name: DeletePhoto :execrows
 DELETE FROM photos WHERE id = ?;
