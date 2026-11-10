@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"slices"
 	"strings"
 
 	"github.com/chasefleming/elem-go"
@@ -18,12 +19,18 @@ type MenuItem struct {
 // Header is the logo and the main menu. Below lg the menu folds behind a
 // burger that toggles it without JavaScript: the label checks a hidden
 // checkbox, and the menu shows while it is checked (peer-checked).
-// The item whose first path segment matches current is marked as the
-// current page and keeps its colour on hover.
+// One item is marked as the current page and keeps its colour on hover: the
+// one linking to current itself, else the section current lies in. An event
+// in the menu lives under /arrangementer, so only its own page marks it.
 func Header(menu []MenuItem, current string) elem.Node {
+	marked := slices.IndexFunc(menu, func(m MenuItem) bool { return m.Href == current })
+	if marked < 0 {
+		marked = slices.IndexFunc(menu, func(m MenuItem) bool { return m.Href == "/"+firstSegment(current) })
+	}
+
 	items := make([]elem.Node, len(menu))
 	for i, m := range menu {
-		items[i] = headerLink(m, firstSegment(m.Href) == firstSegment(current))
+		items[i] = headerLink(m, i == marked)
 	}
 
 	return elem.Header(attrs.Props{attrs.Class: "flex flex-wrap items-center px-4 py-0 border-b border-brown-border lg:px-16 lg:py-2"},

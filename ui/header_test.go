@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"slices"
 	"strings"
 	"testing"
 
@@ -44,6 +45,23 @@ func TestHeaderMarksCurrentSection(t *testing.T) {
 			require.Contains(t, got, `aria-current="page" class="font-bold text-sm text-sort uppercase hover:text-brown-link" href=`)
 			require.Contains(t, got, ">"+tt.want+"</a>")
 		})
+	}
+}
+
+// An event in the menu sits under /arrangementer; only its own page marks
+// it, and the list and other events still mark Arrangementer.
+func TestHeaderMarksEventInMenu(t *testing.T) {
+	menu := append(slices.Clone(testMenu), MenuItem{Label: "Julemarked", Href: "/arrangementer/2026/julemarked"})
+
+	for current, want := range map[string]string{
+		"/arrangementer":                 `href="/arrangementer">Arrangementer</a>`,
+		"/arrangementer/2026/julemarked": `href="/arrangementer/2026/julemarked">Julemarked</a>`,
+		"/arrangementer/2025/julemarked": `href="/arrangementer">Arrangementer</a>`,
+	} {
+		got := Header(menu, current).Render()
+
+		require.Equal(t, 1, strings.Count(got, `aria-current="page"`), current)
+		require.Contains(t, got, `aria-current="page" class="font-bold text-sm text-sort uppercase hover:text-brown-link" `+want, current)
 	}
 }
 

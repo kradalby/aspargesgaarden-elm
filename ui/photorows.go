@@ -25,7 +25,8 @@ func (k RowKind) classes() (photo, text string) {
 	case RowFacility:
 		return "object-cover h-48 w-full md:h-auto", "w-full h-full p-12 md:w-1/2 lg:w-2/3"
 	case RowEvent:
-		return "object-cover h-1/2 w-full md:h-auto", "w-full h-full px-12 py-8 break-words md:w-1/2 lg:w-2/3"
+		// A teaser is shorter than its photo; centred, it reads as one unit.
+		return "object-cover h-1/2 w-full md:h-auto", "w-full h-full px-12 py-8 break-words md:self-center md:w-1/2 lg:w-2/3"
 	}
 
 	panic("ui: PhotoRows needs a RowKind")
@@ -37,6 +38,10 @@ type Row struct {
 	Alt   string
 	By    Photographer
 	Body  []elem.Node
+	// Href makes the photo a link too, for rows that lead to a page; the
+	// body must hold a visible link to the same place, since this one is
+	// hidden from keyboards and screen readers to avoid saying it twice.
+	Href string
 }
 
 // PhotoRows lists rows of photo and text, alternating sides and tint so a
@@ -55,6 +60,9 @@ func PhotoRows(kind RowKind, rows ...Row) elem.Node {
 		}
 
 		pic := Picture(PictureProps{Photo: r.Photo, Alt: r.Alt, Layout: LayoutRowPhoto, Priority: priority, Class: photoClass})
+		if r.Href != "" {
+			pic = hiddenLink(r.Href, pic)
+		}
 
 		out = append(out, elem.Div(attrs.Props{
 			attrs.Class: cls("w-full flex flex-wrap",
@@ -69,4 +77,10 @@ func PhotoRows(kind RowKind, rows ...Row) elem.Node {
 	}
 
 	return elem.Div(attrs.Props{attrs.Class: "w-full flex flex-col"}, out...)
+}
+
+// hiddenLink makes a photo clickable for pointer users only; the visible
+// title link next to it is the one keyboards and screen readers get.
+func hiddenLink(href string, picture elem.Node) elem.Node {
+	return elem.A(attrs.Props{attrs.Href: href, attrs.Class: "block", attrs.Tabindex: "-1", attrs.AriaHidden: "true"}, picture)
 }

@@ -25,6 +25,14 @@ const (
 	// LayoutRowPhoto is the photo column of PhotoRows: full width on a
 	// phone, half from md, a third from lg.
 	LayoutRowPhoto
+	// LayoutBanner is the photo at the top of an event page, as wide as
+	// EventColumn.
+	LayoutBanner
+	// LayoutCardGrid is a photo in EventCards: half the width on a phone,
+	// a third from md, a quarter from lg.
+	LayoutCardGrid
+	// LayoutHalfColumn is a photo in a two-column grid inside EventColumn.
+	LayoutHalfColumn
 )
 
 func (l Layout) sizes(photo images.Ref) string {
@@ -39,6 +47,12 @@ func (l Layout) sizes(photo images.Ref) string {
 		return "max(100vw, " + strconv.Itoa((100*photo.Width+photo.Height-1)/photo.Height) + "vh)"
 	case LayoutRowPhoto:
 		return "(min-width: 64rem) 33vw, (min-width: 48rem) 50vw, 100vw"
+	case LayoutBanner:
+		return "(min-width: 56rem) 56rem, 100vw"
+	case LayoutCardGrid:
+		return "(min-width: 64rem) 25vw, (min-width: 48rem) 33vw, 50vw"
+	case LayoutHalfColumn:
+		return "(min-width: 56rem) 28rem, 50vw"
 	}
 
 	panic("ui: Picture needs a Layout")

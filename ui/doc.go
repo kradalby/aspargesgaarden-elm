@@ -31,6 +31,9 @@
 //   - Only origins in external.go may be loaded from; CSP enforces it.
 //
 // Files: page (document, head), header (logo, menu), footer (ContactPoint),
-// container, headline, picture, photocredit, photorows, backdrop, icon,
-// infoline, contactlink, external (outside origins, CSP).
+// container, headline, sectionheading, lead, picture, photocredit,
+// photorows, backdrop, icon, infoline, contactlink, buttonlink, external
+// (outside origins, CSP). Events: eventrows (coming, with EventItem),
+// eventcards (past), eventcolumn, eventbanner, eventfacts, eventdetail,
+// eventnotice.
 package ui
