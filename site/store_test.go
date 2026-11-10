@@ -1,6 +1,8 @@
 package site
 
 import (
+	"database/sql"
+	"fmt"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -8,8 +10,10 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/require"
+	"golang.org/x/sync/errgroup"
 
 	"github.com/kradalby/asparges/db"
+	"github.com/kradalby/asparges/db/dbsqlc"
 	"github.com/kradalby/asparges/images"
 )
 
@@ -240,6 +244,65 @@ func TestStoreEventPhotoErrors(t *testing.T) {
 	events, err := s.Events(ctx)
 	require.NoError(t, err)
 	require.Empty(t, events, "a failed create leaves nothing behind")
+}
+
+// The admin uploads several photos at once while pages and the IndexNow
+// worker read: each read must see whole photos, never a crop of a photo it
+// did not list.
+func TestStoreReadsWhileUploading(t *testing.T) {
+	s, _ := newTestStore(t, oslo("2026-10-10 12:00"))
+	ctx := t.Context()
+
+	main := addPhoto(t, s, 'a', "Låven")
+	_, err := s.CreateEvent(ctx, Event{Title: "Kurs", MainPhoto: &main})
+	require.NoError(t, err)
+
+	const uploads = 100
+
+	var g errgroup.Group
+	g.Go(func() error {
+		for i := range uploads {
+			p, err := s.AddPhoto(ctx, Photo{SHA256: fmt.Sprintf("%064x", i), MIME: "image/jpeg", Width: 4000, Height: 3000})
+			if err != nil {
+				return err
+			}
+
+			if err := s.SetCrops(ctx, p.ID, map[images.Kind]images.Rect{images.Card: {W: 2400, H: 3000}}); err != nil {
+				return err
+			}
+		}
+
+		return nil
+	})
+	g.Go(func() error {
+		for range uploads {
+			if _, err := s.Photos(ctx); err != nil {
+				return err
+			}
+
+			if _, err := s.PublishedEvents(ctx); err != nil {
+				return err
+			}
+
+			if _, err := s.Events(ctx); err != nil {
+				return err
+			}
+		}
+
+		return nil
+	})
+	require.NoError(t, g.Wait())
+}
+
+func TestMergePhotosRefusesStrayRows(t *testing.T) {
+	photo := dbsqlc.Photo{ID: 1, Sha256: sha('a'), Mime: "image/jpeg", Width: 10, Height: 10}
+
+	_, _, err := mergePhotos([]dbsqlc.Photo{photo}, nil, []dbsqlc.PhotoCrop{{PhotoID: 2, Kind: "card", W: 1, H: 1}})
+	require.ErrorContains(t, err, "photo 2")
+
+	photo.PhotographerID = sql.NullInt64{Int64: 3, Valid: true}
+	_, _, err = mergePhotos([]dbsqlc.Photo{photo}, nil, nil)
+	require.ErrorContains(t, err, "photographer 3")
 }
 
 func TestStorePhotos(t *testing.T) {

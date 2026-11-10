@@ -25,37 +25,62 @@ func NewStore(d *db.DB, now func() time.Time) *Store {
 	return &Store{db: d, now: now}
 }
 
+// read runs fn in one read transaction, so what it puts together from
+// several tables is one moment's state, whatever is written meanwhile.
+func read[T any](ctx context.Context, s *Store, fn func(*dbsqlc.Queries) (T, error)) (T, error) {
+	var out T
+
+	err := s.db.ReadTx(ctx, func(q *dbsqlc.Queries) error {
+		var err error
+		out, err = fn(q)
+
+		return err
+	})
+
+	return out, err
+}
+
 // Events lists every event, drafts included, newest start first.
 func (s *Store) Events(ctx context.Context) ([]Event, error) {
-	return s.events(ctx, s.db.Queries(), "list events", s.db.Queries().ListEvents)
+	return read(ctx, s, func(q *dbsqlc.Queries) ([]Event, error) {
+		return events(ctx, q, "list events", q.ListEvents)
+	})
 }
 
 // PublishedEvents lists the public events; Split divides them for the page.
 func (s *Store) PublishedEvents(ctx context.Context) ([]Event, error) {
-	return s.events(ctx, s.db.Queries(), "list published events", s.db.Queries().ListPublishedEvents)
+	return read(ctx, s, func(q *dbsqlc.Queries) ([]Event, error) {
+		return events(ctx, q, "list published events", q.ListPublishedEvents)
+	})
 }
 
 // Menu is the header links that events contribute today.
 func (s *Store) Menu(ctx context.Context) ([]MenuEntry, error) {
-	events, err := s.events(ctx, s.db.Queries(), "list menu events", s.db.Queries().ListPublishedMenuEvents)
+	evs, err := read(ctx, s, func(q *dbsqlc.Queries) ([]Event, error) {
+		return events(ctx, q, "list menu events", q.ListPublishedMenuEvents)
+	})
 	if err != nil {
 		return nil, err
 	}
 
-	return Menu(events, s.now()), nil
+	return Menu(evs, s.now()), nil
 }
 
 // Event loads one event by id, whatever its status.
 func (s *Store) Event(ctx context.Context, id int64) (Event, error) {
-	return s.event(ctx, s.db.Queries(), id)
+	return read(ctx, s, func(q *dbsqlc.Queries) (Event, error) {
+		return event(ctx, q, id)
+	})
 }
 
 // PublishedEvent loads the public event at /arrangementer/{year}/{slug}.
 func (s *Store) PublishedEvent(ctx context.Context, year int, slug string) (Event, error) {
-	return s.one(ctx, s.db.Queries(), fmt.Sprintf("event %d/%s", year, slug), func(ctx context.Context) (dbsqlc.Event, error) {
-		return s.db.Queries().GetPublishedEventByYearSlug(ctx, dbsqlc.GetPublishedEventByYearSlugParams{
-			Year: sql.NullInt64{Int64: int64(year), Valid: true},
-			Slug: slug,
+	return read(ctx, s, func(q *dbsqlc.Queries) (Event, error) {
+		return one(ctx, q, fmt.Sprintf("event %d/%s", year, slug), func(ctx context.Context) (dbsqlc.Event, error) {
+			return q.GetPublishedEventByYearSlug(ctx, dbsqlc.GetPublishedEventByYearSlugParams{
+				Year: sql.NullInt64{Int64: int64(year), Valid: true},
+				Slug: slug,
+			})
 		})
 	})
 }
@@ -63,8 +88,10 @@ func (s *Store) PublishedEvent(ctx context.Context, year int, slug string) (Even
 // NewestPublishedEvent is the latest public event with slug, the target of
 // evergreen addresses such as /julemarked.
 func (s *Store) NewestPublishedEvent(ctx context.Context, slug string) (Event, error) {
-	return s.one(ctx, s.db.Queries(), "newest event "+slug, func(ctx context.Context) (dbsqlc.Event, error) {
-		return s.db.Queries().GetNewestPublishedEventBySlug(ctx, slug)
+	return read(ctx, s, func(q *dbsqlc.Queries) (Event, error) {
+		return one(ctx, q, "newest event "+slug, func(ctx context.Context) (dbsqlc.Event, error) {
+			return q.GetNewestPublishedEventBySlug(ctx, slug)
+		})
 	})
 }
 
@@ -152,7 +179,7 @@ func (s *Store) DeleteEvent(ctx context.Context, id int64) error {
 // events if two editors ever meet that.
 func (s *Store) modify(ctx context.Context, id int64, seen time.Time, change func(Event) (Event, error)) (Event, error) {
 	err := s.db.InTx(ctx, func(q *dbsqlc.Queries) error {
-		prev, err := s.event(ctx, q, id)
+		prev, err := event(ctx, q, id)
 		if err != nil {
 			return err
 		}
@@ -255,14 +282,14 @@ func eventWriteErr(err error, e Event) error {
 	return fmt.Errorf("writing event %q: %w", e.Title, err)
 }
 
-func (s *Store) event(ctx context.Context, q *dbsqlc.Queries, id int64) (Event, error) {
-	return s.one(ctx, q, fmt.Sprintf("event %d", id), func(ctx context.Context) (dbsqlc.Event, error) {
+func event(ctx context.Context, q *dbsqlc.Queries, id int64) (Event, error) {
+	return one(ctx, q, fmt.Sprintf("event %d", id), func(ctx context.Context) (dbsqlc.Event, error) {
 		return q.GetEvent(ctx, id)
 	})
 }
 
-func (s *Store) one(ctx context.Context, q *dbsqlc.Queries, what string, get func(context.Context) (dbsqlc.Event, error)) (Event, error) {
-	events, err := s.events(ctx, q, what, func(ctx context.Context) ([]dbsqlc.Event, error) {
+func one(ctx context.Context, q *dbsqlc.Queries, what string, get func(context.Context) (dbsqlc.Event, error)) (Event, error) {
+	evs, err := events(ctx, q, what, func(ctx context.Context) ([]dbsqlc.Event, error) {
 		row, err := get(ctx)
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, fmt.Errorf("%s: %w", what, ErrNotFound)
@@ -274,15 +301,16 @@ func (s *Store) one(ctx context.Context, q *dbsqlc.Queries, what string, get fun
 		return Event{}, err
 	}
 
-	return events[0], nil
+	return evs[0], nil
 }
 
-// events loads rows with their dates and photos.
+// events loads rows with their dates and photos. q must be a transaction,
+// or a photo saved between its queries could be linked but not loaded.
 //
 // shortcut: it reads every date, photo link, photo and crop, whatever rows
 // asked for. The tables hold a few rows per event and pages are cached by
 // render/; filter by event id if an event page ever shows up in profiles.
-func (s *Store) events(ctx context.Context, q *dbsqlc.Queries, what string, list func(context.Context) ([]dbsqlc.Event, error)) ([]Event, error) {
+func events(ctx context.Context, q *dbsqlc.Queries, what string, list func(context.Context) ([]dbsqlc.Event, error)) ([]Event, error) {
 	rows, err := list(ctx)
 	if err != nil {
 		if errors.Is(err, ErrNotFound) {
@@ -330,7 +358,11 @@ func (s *Store) events(ctx context.Context, q *dbsqlc.Queries, what string, list
 
 		e.ExtraDates = dates[r.ID]
 		for _, l := range links[r.ID] {
-			p := photos[l.PhotoID]
+			p, ok := photos[l.PhotoID]
+			if !ok {
+				return nil, fmt.Errorf("event %d links photo %d, which is not there", r.ID, l.PhotoID)
+			}
+
 			if l.Role == "main" {
 				e.MainPhoto = &p
 			} else {
@@ -439,8 +471,12 @@ func (s *Store) AddPhoto(ctx context.Context, p Photo) (Photo, error) {
 
 // Photo loads one photo with its crops.
 func (s *Store) Photo(ctx context.Context, id int64) (Photo, error) {
-	q := s.db.Queries()
+	return read(ctx, s, func(q *dbsqlc.Queries) (Photo, error) {
+		return photo(ctx, q, id)
+	})
+}
 
+func photo(ctx context.Context, q *dbsqlc.Queries, id int64) (Photo, error) {
 	row, err := q.GetPhoto(ctx, id)
 	if errors.Is(err, sql.ErrNoRows) {
 		return Photo{}, fmt.Errorf("photo %d: %w", id, ErrNotFound)
@@ -473,8 +509,10 @@ func (s *Store) Photo(ctx context.Context, id int64) (Photo, error) {
 // Photos lists every photo with its crops, oldest first. images/ derives its
 // expected file set from this.
 func (s *Store) Photos(ctx context.Context) ([]Photo, error) {
-	list, _, err := allPhotos(ctx, s.db.Queries())
-	return list, err
+	return read(ctx, s, func(q *dbsqlc.Queries) ([]Photo, error) {
+		list, _, err := allPhotos(ctx, q)
+		return list, err
+	})
 }
 
 // UpdatePhoto saves the editable fields of p: alt text and photographer, which
@@ -502,24 +540,29 @@ func (s *Store) UpdatePhoto(ctx context.Context, p Photo) (Photo, error) {
 
 // Gallery lists the gallery's photos in order.
 func (s *Store) Gallery(ctx context.Context) ([]Photo, error) {
-	q := s.db.Queries()
+	return read(ctx, s, func(q *dbsqlc.Queries) ([]Photo, error) {
+		_, byID, err := allPhotos(ctx, q)
+		if err != nil {
+			return nil, err
+		}
 
-	_, byID, err := allPhotos(ctx, q)
-	if err != nil {
-		return nil, err
-	}
+		ids, err := q.ListGalleryPhotoIDs(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("listing gallery: %w", err)
+		}
 
-	ids, err := q.ListGalleryPhotoIDs(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("listing gallery: %w", err)
-	}
+		out := make([]Photo, 0, len(ids))
+		for _, id := range ids {
+			p, ok := byID[id]
+			if !ok {
+				return nil, fmt.Errorf("gallery lists photo %d, which is not there", id)
+			}
 
-	out := make([]Photo, 0, len(ids))
-	for _, id := range ids {
-		out = append(out, byID[id])
-	}
+			out = append(out, p)
+		}
 
-	return out, nil
+		return out, nil
+	})
 }
 
 // SetGallery replaces the gallery with photoIDs, in that order.
@@ -686,21 +729,16 @@ func (s *Store) DeletePhotographer(ctx context.Context, id int64) error {
 }
 
 // allPhotos loads every photo with its crops and photographer, by id order
-// and by id.
+// and by id. q must be a transaction; see mergePhotos.
 func allPhotos(ctx context.Context, q *dbsqlc.Queries) ([]Photo, map[int64]Photo, error) {
 	rows, err := q.ListPhotos(ctx)
 	if err != nil {
 		return nil, nil, fmt.Errorf("listing photos: %w", err)
 	}
 
-	photographerRows, err := q.ListPhotographers(ctx)
+	photographers, err := q.ListPhotographers(ctx)
 	if err != nil {
 		return nil, nil, fmt.Errorf("listing photographers: %w", err)
-	}
-
-	photographers := make(map[int64]Photographer, len(photographerRows))
-	for _, r := range photographerRows {
-		photographers[r.ID] = photographerFromRow(r)
 	}
 
 	crops, err := q.ListAllPhotoCrops(ctx)
@@ -708,12 +746,28 @@ func allPhotos(ctx context.Context, q *dbsqlc.Queries) ([]Photo, map[int64]Photo
 		return nil, nil, fmt.Errorf("listing crops: %w", err)
 	}
 
+	return mergePhotos(rows, photographers, crops)
+}
+
+// mergePhotos puts photos together from their tables' rows. Rows read
+// outside one transaction can disagree (a crop of a photo saved after the
+// photos were listed); that is an error here, never a crash.
+func mergePhotos(rows []dbsqlc.Photo, photographerRows []dbsqlc.Photographer, crops []dbsqlc.PhotoCrop) ([]Photo, map[int64]Photo, error) {
+	photographers := make(map[int64]Photographer, len(photographerRows))
+	for _, r := range photographerRows {
+		photographers[r.ID] = photographerFromRow(r)
+	}
+
 	list := make([]Photo, 0, len(rows))
 	byID := make(map[int64]Photo, len(rows))
 	for _, r := range rows {
 		p := photoFromRow(r)
 		if r.PhotographerID.Valid {
-			p.Photographer = new(photographers[r.PhotographerID.Int64])
+			ph, ok := photographers[r.PhotographerID.Int64]
+			if !ok {
+				return nil, nil, fmt.Errorf("photo %d credits photographer %d, who is not there", r.ID, r.PhotographerID.Int64)
+			}
+			p.Photographer = &ph
 		}
 		list = append(list, p)
 		byID[p.ID] = p
@@ -721,7 +775,11 @@ func allPhotos(ctx context.Context, q *dbsqlc.Queries) ([]Photo, map[int64]Photo
 
 	// Crops is a map, so the list and byID share each photo's crops.
 	for _, c := range crops {
-		byID[c.PhotoID].Crops[images.Kind(c.Kind)] = rectFromRow(c)
+		p, ok := byID[c.PhotoID]
+		if !ok {
+			return nil, nil, fmt.Errorf("crop %s of photo %d, which is not there", c.Kind, c.PhotoID)
+		}
+		p.Crops[images.Kind(c.Kind)] = rectFromRow(c)
 	}
 
 	return list, byID, nil

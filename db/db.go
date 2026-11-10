@@ -96,6 +96,20 @@ func (d *DB) InTx(ctx context.Context, fn func(*dbsqlc.Queries) error) error {
 	return nil
 }
 
+// ReadTx runs fn in one read transaction: every query in it sees the same
+// committed state, whatever commits meanwhile. It takes no write lock, so it
+// never waits for a writer, nor a writer for it.
+func (d *DB) ReadTx(ctx context.Context, fn func(*dbsqlc.Queries) error) error {
+	tx, err := d.sql.BeginTx(ctx, &sql.TxOptions{ReadOnly: true})
+	if err != nil {
+		return fmt.Errorf("beginning read transaction: %w", err)
+	}
+	// Nothing to commit: a read ends by letting go of its snapshot.
+	defer func() { _ = tx.Rollback() }()
+
+	return fn(d.q.WithTx(tx))
+}
+
 // IsUniqueViolation reports whether err is a UNIQUE or PRIMARY KEY conflict.
 func IsUniqueViolation(err error) bool {
 	return hasCode(err, sqlite3.SQLITE_CONSTRAINT_UNIQUE, sqlite3.SQLITE_CONSTRAINT_PRIMARYKEY)

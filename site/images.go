@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/kradalby/asparges/db/dbsqlc"
 	"github.com/kradalby/asparges/images"
 )
 
@@ -20,22 +21,27 @@ func (s *Store) Catalog() images.Catalog { return catalog{s} }
 
 type catalog struct{ s *Store }
 
+// Photo looks the photo up and loads it in one read, so a delete cannot
+// land between the two and turn "no such photo" into an error of another
+// kind.
 func (c catalog) Photo(ctx context.Context, sha256 string) (images.Photo, error) {
-	id, err := c.s.db.Queries().GetPhotoIDBySha256(ctx, sha256)
-	if errors.Is(err, sql.ErrNoRows) {
-		return images.Photo{}, fmt.Errorf("photo %s: %w", sha256, images.ErrNotFound)
-	}
+	return read(ctx, c.s, func(q *dbsqlc.Queries) (images.Photo, error) {
+		id, err := q.GetPhotoIDBySha256(ctx, sha256)
+		if errors.Is(err, sql.ErrNoRows) {
+			return images.Photo{}, fmt.Errorf("photo %s: %w", sha256, images.ErrNotFound)
+		}
 
-	if err != nil {
-		return images.Photo{}, fmt.Errorf("finding photo %s: %w", sha256, err)
-	}
+		if err != nil {
+			return images.Photo{}, fmt.Errorf("finding photo %s: %w", sha256, err)
+		}
 
-	p, err := c.s.Photo(ctx, id)
-	if err != nil {
-		return images.Photo{}, err
-	}
+		p, err := photo(ctx, q, id)
+		if err != nil {
+			return images.Photo{}, err
+		}
 
-	return p.Image(), nil
+		return p.Image(), nil
+	})
 }
 
 // Photos fails rather than return a short list: images/ deletes the files
