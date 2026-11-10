@@ -25,6 +25,8 @@ var errStale = errors.New("flakehashes.json is stale: run `go run ./cmd/vendorha
 
 type flakeHashes struct {
 	Vendor vendorBlock `json:"vendor"`
+	// Yarn is the Elm apps' npm hashes, kept as they are.
+	Yarn map[string]string `json:"yarn,omitempty"`
 }
 
 type vendorBlock struct {
@@ -178,12 +180,12 @@ func cmdUpdate() error {
 		return err
 	}
 
-	h := &flakeHashes{
-		Vendor: vendorBlock{
-			GoModSum: fp,
-			SRI:      sri,
-		},
+	h, err := readHashes()
+	if err != nil {
+		return err
 	}
+
+	h.Vendor = vendorBlock{GoModSum: fp, SRI: sri}
 
 	err = writeHashes(h)
 	if err != nil {
