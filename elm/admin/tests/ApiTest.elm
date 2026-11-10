@@ -1,6 +1,7 @@
 module ApiTest exposing (suite)
 
 import Api
+import ApiExamples
 import Dict
 import Expect
 import Json.Decode as D
@@ -37,6 +38,17 @@ eventJson =
       "mainPhoto": """ ++ photoJson ++ """, "extraPhotos": [],
       "publishedAt": null, "createdAt": "2026-11-01T10:00:00Z", "updatedAt": "2026-11-10T09:12:44Z" }
     """
+
+
+{-| The keys of an EventInput, and of its main photo's reference.
+-}
+inputKeys : String -> Result D.Error ( List String, List String )
+inputKeys =
+    let
+        keys =
+            D.keyValuePairs D.value |> D.map (List.map Tuple.first >> List.sort)
+    in
+    D.decodeString (D.map2 Tuple.pair keys (D.field "mainPhoto" keys))
 
 
 suite : Test
@@ -124,14 +136,15 @@ suite =
                     , extraPhotos = []
                     }
                     |> E.encode 0
-                    |> D.decodeString (D.keyValuePairs D.value)
-                    |> Result.map (List.map Tuple.first >> List.sort)
-                    |> Expect.equal
-                        (Ok
-                            (List.sort
-                                [ "updatedAt", "slug", "title", "summary", "body", "start", "startTime", "end", "endTime", "extraDates", "priceText", "ticketUrl", "showInMenu", "menuLabel", "cancelled", "mainPhoto", "extraPhotos" ]
-                            )
-                        )
+                    |> inputKeys
+                    |> Expect.equal (inputKeys ApiExamples.eventInput)
+        , test "decodes the documented examples" <|
+            \_ ->
+                [ D.decodeString Api.eventDecoder ApiExamples.event |> Result.map .id
+                , D.decodeString Api.photoDecoder ApiExamples.photo |> Result.map .id
+                ]
+                    |> List.map (Result.mapError D.errorToString)
+                    |> Expect.equal [ Ok 7, Ok 12 ]
         , test "a photo reference carries the photo's version" <|
             \_ ->
                 Api.encodeEventInput
