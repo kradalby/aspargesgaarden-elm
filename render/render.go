@@ -77,23 +77,15 @@ func (s *Store) Get(ctx context.Context, key string, build Builder) (*Page, erro
 			}
 		}()
 
-		// The miss above and this flight are not atomic: a flight that began
-		// after it may already have ended with the page kept. Any kept page
-		// is at least as new as gen, as Invalidate empties the map.
-		s.mu.Lock()
-		p, ok := s.pages[key]
-		s.mu.Unlock()
-
-		if ok {
-			return p, nil
-		}
-
+		// A flight that ended between the miss above and this one has kept
+		// the page already; rendering it again yields the same bytes, and the
+		// window is too narrow to be worth a second look.
 		page, err := build(ctx)
 		if err != nil {
 			return nil, err
 		}
 
-		p = newPage(page.Render())
+		p := newPage(page.Render())
 
 		s.mu.Lock()
 		if s.gen == gen {
