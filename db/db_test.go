@@ -55,6 +55,36 @@ func TestOpenTwice(t *testing.T) {
 	require.NoError(t, d.Close())
 }
 
+// A database made before the settings table gains it on open.
+func TestOpenAddsSettings(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "test.db")
+
+	d, err := Open(t.Context(), path)
+	require.NoError(t, err)
+
+	// Dropping the table gives the earlier schema back, digest and all.
+	_, err = d.sql.ExecContext(t.Context(), "DROP TABLE settings")
+	require.NoError(t, err)
+	require.NoError(t, d.Close())
+
+	d, err = Open(t.Context(), path)
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = d.Close() })
+
+	require.NoError(t, d.Queries().InsertSettingIfMissing(t.Context(), dbsqlc.InsertSettingIfMissingParams{Name: "k", Value: "v"}))
+}
+
+func TestSettingKeepsFirstValue(t *testing.T) {
+	q := openTest(t).Queries()
+
+	require.NoError(t, q.InsertSettingIfMissing(t.Context(), dbsqlc.InsertSettingIfMissingParams{Name: "k", Value: "first"}))
+	require.NoError(t, q.InsertSettingIfMissing(t.Context(), dbsqlc.InsertSettingIfMissingParams{Name: "k", Value: "second"}))
+
+	v, err := q.GetSetting(t.Context(), "k")
+	require.NoError(t, err)
+	require.Equal(t, "first", v)
+}
+
 // The litestream tables appear in a replicated database at runtime; squibble
 // must not treat them as drift.
 func TestOpenIgnoresLitestreamTables(t *testing.T) {
