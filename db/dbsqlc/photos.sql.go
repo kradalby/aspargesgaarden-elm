@@ -274,6 +274,50 @@ func (q *Queries) ListPhotoCrops(ctx context.Context, photoID int64) ([]PhotoCro
 	return items, nil
 }
 
+const listPhotoCropsByPhotoID = `-- name: ListPhotoCropsByPhotoID :many
+SELECT photo_id, kind, x, y, w, h FROM photo_crops WHERE photo_id IN (/*SLICE:photo_ids*/?)
+`
+
+func (q *Queries) ListPhotoCropsByPhotoID(ctx context.Context, photoIds []int64) ([]PhotoCrop, error) {
+	query := listPhotoCropsByPhotoID
+	var queryParams []interface{}
+	if len(photoIds) > 0 {
+		for _, v := range photoIds {
+			queryParams = append(queryParams, v)
+		}
+		query = strings.Replace(query, "/*SLICE:photo_ids*/?", strings.Repeat(",?", len(photoIds))[1:], 1)
+	} else {
+		query = strings.Replace(query, "/*SLICE:photo_ids*/?", "NULL", 1)
+	}
+	rows, err := q.db.QueryContext(ctx, query, queryParams...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []PhotoCrop
+	for rows.Next() {
+		var i PhotoCrop
+		if err := rows.Scan(
+			&i.PhotoID,
+			&i.Kind,
+			&i.X,
+			&i.Y,
+			&i.W,
+			&i.H,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listPhotoEvents = `-- name: ListPhotoEvents :many
 SELECT events.id, events.title, events.status FROM events
 JOIN event_photos ON event_photos.event_id = events.id
@@ -317,6 +361,53 @@ SELECT id, sha256, mime, width, height, alt, photographer_id, created_at, update
 
 func (q *Queries) ListPhotos(ctx context.Context) ([]Photo, error) {
 	rows, err := q.db.QueryContext(ctx, listPhotos)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Photo
+	for rows.Next() {
+		var i Photo
+		if err := rows.Scan(
+			&i.ID,
+			&i.Sha256,
+			&i.Mime,
+			&i.Width,
+			&i.Height,
+			&i.Alt,
+			&i.PhotographerID,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listPhotosByID = `-- name: ListPhotosByID :many
+SELECT id, sha256, mime, width, height, alt, photographer_id, created_at, updated_at FROM photos WHERE id IN (/*SLICE:ids*/?)
+`
+
+func (q *Queries) ListPhotosByID(ctx context.Context, ids []int64) ([]Photo, error) {
+	query := listPhotosByID
+	var queryParams []interface{}
+	if len(ids) > 0 {
+		for _, v := range ids {
+			queryParams = append(queryParams, v)
+		}
+		query = strings.Replace(query, "/*SLICE:ids*/?", strings.Repeat(",?", len(ids))[1:], 1)
+	} else {
+		query = strings.Replace(query, "/*SLICE:ids*/?", "NULL", 1)
+	}
+	rows, err := q.db.QueryContext(ctx, query, queryParams...)
 	if err != nil {
 		return nil, err
 	}

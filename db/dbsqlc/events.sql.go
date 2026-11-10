@@ -8,6 +8,7 @@ package dbsqlc
 import (
 	"context"
 	"database/sql"
+	"strings"
 )
 
 const createEvent = `-- name: CreateEvent :one
@@ -305,6 +306,45 @@ func (q *Queries) ListAllEventPhotos(ctx context.Context) ([]EventPhoto, error) 
 	return items, nil
 }
 
+const listEventDates = `-- name: ListEventDates :many
+SELECT event_id, date FROM event_dates
+WHERE event_id IN (/*SLICE:event_ids*/?)
+ORDER BY event_id, date
+`
+
+func (q *Queries) ListEventDates(ctx context.Context, eventIds []int64) ([]EventDate, error) {
+	query := listEventDates
+	var queryParams []interface{}
+	if len(eventIds) > 0 {
+		for _, v := range eventIds {
+			queryParams = append(queryParams, v)
+		}
+		query = strings.Replace(query, "/*SLICE:event_ids*/?", strings.Repeat(",?", len(eventIds))[1:], 1)
+	} else {
+		query = strings.Replace(query, "/*SLICE:event_ids*/?", "NULL", 1)
+	}
+	rows, err := q.db.QueryContext(ctx, query, queryParams...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []EventDate
+	for rows.Next() {
+		var i EventDate
+		if err := rows.Scan(&i.EventID, &i.Date); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listEventPhotoIDs = `-- name: ListEventPhotoIDs :many
 SELECT photo_id FROM event_photos WHERE event_id = ? ORDER BY position
 `
@@ -322,6 +362,50 @@ func (q *Queries) ListEventPhotoIDs(ctx context.Context, eventID int64) ([]int64
 			return nil, err
 		}
 		items = append(items, photo_id)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listEventPhotos = `-- name: ListEventPhotos :many
+SELECT event_id, photo_id, role, position FROM event_photos
+WHERE event_id IN (/*SLICE:event_ids*/?)
+ORDER BY event_id, position
+`
+
+func (q *Queries) ListEventPhotos(ctx context.Context, eventIds []int64) ([]EventPhoto, error) {
+	query := listEventPhotos
+	var queryParams []interface{}
+	if len(eventIds) > 0 {
+		for _, v := range eventIds {
+			queryParams = append(queryParams, v)
+		}
+		query = strings.Replace(query, "/*SLICE:event_ids*/?", strings.Repeat(",?", len(eventIds))[1:], 1)
+	} else {
+		query = strings.Replace(query, "/*SLICE:event_ids*/?", "NULL", 1)
+	}
+	rows, err := q.db.QueryContext(ctx, query, queryParams...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []EventPhoto
+	for rows.Next() {
+		var i EventPhoto
+		if err := rows.Scan(
+			&i.EventID,
+			&i.PhotoID,
+			&i.Role,
+			&i.Position,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
 	}
 	if err := rows.Close(); err != nil {
 		return nil, err
