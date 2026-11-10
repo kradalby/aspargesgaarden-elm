@@ -1,0 +1,67 @@
+# TODO
+
+Left out on purpose. Each item: the fact, then the next action.
+
+## Content for search and AI answers
+
+Visible facts on the page count for more than metadata. The venue facts are
+already in the structured data (`seo/`, `site/`); the pages do not say them
+yet.
+
+- [ ] `/bryllup`: weddings, the most searched use. Rooms and guest numbers
+      (Låven 100, Fjøset 68), what is included, how to book. Code only, as
+      the fixed pages are; add it to the sitemap and `llms.txt`. No prices.
+- [ ] A practical-info page (`/praktisk-info`): address, parking, how to get
+      there, capacity, accessibility, contact. The same facts as the
+      `LocalBusiness`/`EventVenue` JSON-LD.
+- [ ] Front page text: a short paragraph that says what the place is and
+      where (Tjølling, Larvik), above the fold.
+- [ ] An English summary page for visitors from abroad, linked from the
+      footer, with `hreflang` on both sides.
+
+## Off-site
+
+- [ ] Google Business Profile: claim or verify, same name, address, phone
+      and categories as the site; link to the site.
+- [ ] Bing Places: the same, or import from Google.
+- [ ] Ask guests for reviews (Google); answer them.
+- [ ] Directory listings (venue and wedding directories, the municipality's
+      and the region's tourism pages) with the same name, address and phone.
+
+## Settings to look up
+
+- [ ] Umami site id: find or create the site on umami.kradalby.no and set
+      `services.asparges.umamiSiteId` at cutover (unset means no tracker).
+- [ ] Font licence: Avenir LT Std and Cardillac are commercial fonts, served
+      from the binary. Confirm the web licence covers self-hosting.
+
+## Outside this repository
+
+- [ ] The `kra` web library mounts `/debug`, `/who` and `/quitquitquit` on
+      tsnet nodes without the capability check the admin has; any tailnet
+      peer that reaches the node (monitoring) can call them. Fix in `kra`:
+      gate them like `HandleTSOnly` or behind a capability.
+- [ ] Move to a new repository with fresh history (this one carries the old
+      site's photos in its history), then rename the Go module's GitHub
+      repository to match `github.com/kradalby/asparges`.
+
+## Not yet tested
+
+- [ ] HTTPS on the real tailnet: the tsnet node's certificate
+      (`https://asparges-beta.dalby.ts.net`). The VM test uses plain HTTP.
+- [ ] Safari and iOS on a real device: the admin (photo upload from the
+      camera roll, the cropper by touch) and the gallery's swipe. The browser
+      suites use Playwright's WebKit, not Safari.
+- [ ] The first deploy on `core.oracldn` (aarch64): the checklist in
+      [docs/deploy.md](docs/deploy.md#7-verify--the-first-real-arm-deploy).
+
+## Content for the owners to check
+
+- [ ] "Vårkonsert med Black & Lekker" (2026) is a draft: its only photo is
+      393 px wide, under the 480 px minimum. Find a larger photo, then
+      publish.
+- [ ] Photo descriptions written during the import (every gallery photo
+      that had none): read them, correct names and places.
+- [ ] Photographer names and links, as imported from the old site.
+- [ ] Event dates, times and "ca." notes the import moved into the text
+      where the old free-text time was not a clock time.
