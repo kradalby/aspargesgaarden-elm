@@ -43,3 +43,35 @@ jobs:
 
       - name: ${{ matrix.check }}
         run: nix build -L .#checks.x86_64-linux.${{ matrix.check }}
+
+  # The beta host is aarch64. Only what can differ by architecture: the
+  # builds (photo-variants among them), the real vips on the fixtures, and the
+  # unit's sandbox on a real kernel. No /dev/kvm on these runners, so the VM
+  # tests stay x86-only.
+  check-aarch64:
+    runs-on: ubuntu-24.04-arm
+    strategy:
+      fail-fast: false
+      matrix:
+        check:
+          - build
+          - gotest
+          - hardening-smoke
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Install Nix
+        uses: NixOS/nix-installer-action@62c1943b776c509394b550f3f983adc14e9212d6 # v1.0.0
+
+      - name: Setup Nix cache (hestia)
+        uses: Mic92/hestia@dfed9ced335d28978ba74e513939a10db1f71025 # v3.1.0
+
+      - name: ${{ matrix.check }}
+        if: matrix.check != 'hardening-smoke'
+        run: nix build -L .#checks.aarch64-linux.${{ matrix.check }}
+
+      # Root and the runner's systemd, so it runs outside the nix sandbox.
+      - name: hardening-smoke
+        if: matrix.check == 'hardening-smoke'
+        run: sudo "$(nix build -L --no-link --print-out-paths .#packages.aarch64-linux.hardening-smoke)/bin/asparges-hardening-smoke"
