@@ -47,7 +47,7 @@ type Store struct {
 
 	// files orders Intake's storing of an original against forget.
 	files sync.Mutex
-	fresh map[string]bool // stored by Intake, row not yet seen; see forget
+	fresh map[string]bool // stored by Intake, not yet enqueued; see forget
 }
 
 // Option configures a Store.

@@ -36,6 +36,12 @@ func (s *Store) push(sha string, asked bool) {
 
 	if asked {
 		delete(s.failed, sha)
+
+		// The uploader enqueues once its row is written; from then on the
+		// row, not the mark, keeps the files.
+		s.files.Lock()
+		delete(s.fresh, sha)
+		s.files.Unlock()
 	}
 
 	if i := slices.Index(s.queue, sha); i >= 0 {

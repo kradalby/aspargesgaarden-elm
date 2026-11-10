@@ -40,7 +40,7 @@ type Original struct {
 // so a broken file is rejected now and not at its first build. The same
 // content twice is one file. Errors map to a Reason with ReasonOf.
 //
-// The caller then writes the photos row.
+// The caller then writes the photos row and calls Enqueue.
 func (s *Store) Intake(ctx context.Context, r io.Reader) (Original, error) {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
@@ -140,9 +140,9 @@ func (s *Store) Intake(ctx context.Context, r io.Reader) (Original, error) {
 
 // store moves a checked upload to its content address, unless the same
 // content is there already, and its built files into place. The photo is
-// fresh until the worker finds its row: the caller is about to write it,
-// and a forget queued by an earlier delete of the same bytes must not take
-// the original from under it.
+// fresh until the caller enqueues it or the worker finds its row: the
+// caller is about to write that row, and a forget queued by an earlier
+// delete of the same bytes must not take the original from under it.
 func (s *Store) store(upload string, o Original, specs []VariantSpec, built func(VariantSpec) string) error {
 	s.files.Lock()
 	defer s.files.Unlock()

@@ -414,6 +414,23 @@ func TestForgetDeletedPhoto(t *testing.T) {
 
 // The same bytes uploaded again after a delete, before the worker got to
 // the delete: the upload's row is on the way, so nothing is removed.
+// Uploaded and deleted before the worker got to it: still forgotten whole.
+func TestForgetQuickDelete(t *testing.T) {
+	t.Parallel()
+	cat := newFakeCatalog()
+	s := newTestStore(t, cat)
+
+	p := photoOf(intake(t, s, "upright.jpg"))
+	cat.put(p)
+	s.Enqueue(p.SHA256) // the upload's Changed
+	cat.remove(p.SHA256)
+	s.Enqueue(p.SHA256) // the delete's
+
+	require.True(t, s.step(t.Context()))
+	require.NoFileExists(t, s.originalPath(p.SHA256, p.MIME))
+	require.NoDirExists(t, s.photoDir(p.SHA256))
+}
+
 func TestForgetSparesReupload(t *testing.T) {
 	t.Parallel()
 	cat := newFakeCatalog()
