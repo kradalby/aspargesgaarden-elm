@@ -164,9 +164,9 @@ in
         assert "Konsert i låven" in html and "Låven pyntet til konsert" in html
         assert e["path"] in public("/sitemap.xml")[1]
         assert "Konsert i låven" in public("/arrangementer")[1]
-        # The uploaded photo, built by the unit's queue or on this request.
+        # The uploaded photo, a 404 until the unit's queue has built it.
         url = re.findall(r"/img/[^\" ,]+\.avif", html)[0]
-        server.succeed(f"curl -fsS --max-time 120 -o /dev/null http://127.0.0.1:8090{url}")
+        server.wait_until_succeeds(f"curl -fsS -o /dev/null http://127.0.0.1:8090{url}", timeout=300)
         for path in ["/admin/", "/admin/api/me"]:
             assert public(path)[0] == 404, path
 
