@@ -140,6 +140,33 @@ func TestStoreRemovePhoto(t *testing.T) {
 	require.ErrorIs(t, err, ErrNotFound)
 }
 
+// Deleting a gallery photo changes the gallery page, so its lastmod moves,
+// though no row left in the gallery was edited.
+func TestStoreRemovePhotoMovesGalleryLastmod(t *testing.T) {
+	start := oslo("2026-10-10 12:00")
+	s, clock := newTestStore(t, start)
+	ctx := t.Context()
+
+	a := addPhoto(t, s, 'a', "Hagen")
+	b := addPhoto(t, s, 'b', "Låven")
+	other := addPhoto(t, s, 'c', "Tunet")
+	require.NoError(t, s.SetGallery(ctx, []int64{a.ID, b.ID}))
+
+	clock.t = start.Add(time.Hour)
+	_, err := s.RemovePhoto(ctx, other.ID)
+	require.NoError(t, err)
+	at, err := s.GalleryUpdatedAt(ctx)
+	require.NoError(t, err)
+	require.Equal(t, start.UTC(), at, "a photo outside the gallery is no change of it")
+
+	clock.t = start.Add(2 * time.Hour)
+	_, err = s.RemovePhoto(ctx, a.ID)
+	require.NoError(t, err)
+	at, err = s.GalleryUpdatedAt(ctx)
+	require.NoError(t, err)
+	require.Equal(t, clock.t.UTC(), at)
+}
+
 func TestStoreDeleteUnusedPhotos(t *testing.T) {
 	const grace = 7 * 24 * time.Hour
 
