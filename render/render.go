@@ -11,7 +11,9 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"fmt"
 	"net/http"
+	"runtime/debug"
 	"strconv"
 	"strings"
 	"sync"
@@ -66,7 +68,15 @@ func (s *Store) Get(ctx context.Context, key string, build Builder) (*Page, erro
 	// One caller giving up must not fail the others waiting on the render.
 	ctx = context.WithoutCancel(ctx)
 
-	v, err, _ := s.flight.Do(strconv.FormatUint(gen, 10)+" "+key, func() (any, error) {
+	v, err, _ := s.flight.Do(strconv.FormatUint(gen, 10)+" "+key, func() (_ any, err error) {
+		// singleflight throws a panic into every waiter; one error with its
+		// stack answers each of them and keeps it in the log.
+		defer func() {
+			if r := recover(); r != nil {
+				err = fmt.Errorf("rendering %s: panic: %v\n%s", key, r, debug.Stack())
+			}
+		}()
+
 		// The miss above and this flight are not atomic: a flight that began
 		// after it may already have ended with the page kept. Any kept page
 		// is at least as new as gen, as Invalidate empties the map.

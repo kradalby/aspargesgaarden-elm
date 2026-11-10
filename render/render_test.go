@@ -173,6 +173,51 @@ func TestConcurrentMissesRenderOnce(t *testing.T) {
 	}
 }
 
+// A page that panics while rendering is one error with its cause for each
+// request that waited on it, not a panic thrown into all of them.
+func TestPanickingRenderIsAnError(t *testing.T) {
+	s := New((&clock{t: oslo("2026-11-10 12:00")}).now)
+
+	release := make(chan struct{})
+	started := make(chan struct{})
+
+	var builds atomic.Int32
+
+	var build Builder = func(context.Context) (*elem.Element, error) {
+		if builds.Add(1) == 1 {
+			close(started)
+		}
+		<-release
+
+		panic("photo without a picture")
+	}
+
+	const n = 4
+
+	errs := make(chan error, n)
+
+	var wg sync.WaitGroup
+	for range n {
+		wg.Go(func() {
+			_, err := s.Get(t.Context(), "/a", build)
+			errs <- err
+		})
+	}
+
+	<-started
+	close(release)
+	wg.Wait()
+	close(errs)
+
+	for err := range errs {
+		require.ErrorContains(t, err, "photo without a picture")
+		require.ErrorContains(t, err, "render.TestPanickingRenderIsAnError", "the error carries where it panicked")
+	}
+
+	_, err := s.Get(t.Context(), "/a", func(context.Context) (*elem.Element, error) { return elem.P(nil), nil })
+	require.NoError(t, err, "nothing is kept of it")
+}
+
 // A render that started before Invalidate shows data from before the change;
 // it may answer the requests that waited for it, but must not be kept.
 func TestRenderRacingInvalidateIsNotKept(t *testing.T) {
