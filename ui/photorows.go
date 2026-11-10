@@ -23,10 +23,10 @@ const (
 func (k RowKind) classes() (photo, text string) {
 	switch k {
 	case RowFacility:
-		return "object-cover h-48 w-full md:h-auto", "w-full h-full p-12 md:w-1/2 lg:w-2/3"
+		return "object-cover h-48 w-full md:h-auto", "w-full h-full p-12 md:w-1/2 lg:flex-1"
 	case RowEvent:
 		// A teaser is shorter than its photo; centred, it reads as one unit.
-		return "object-cover h-1/2 w-full md:h-auto", "w-full px-12 py-8 break-words md:self-center md:w-1/2 lg:w-2/3"
+		return "object-cover h-1/2 w-full md:h-auto", "w-full px-12 py-8 break-words md:self-center md:w-1/2 lg:flex-1"
 	}
 
 	panic("ui: PhotoRows needs a RowKind")
@@ -69,7 +69,8 @@ func PhotoRows(kind RowKind, rows ...Row) elem.Node {
 				onClass(even, "bg-brown/20 flex-row-reverse md:pl-12"),
 				onClass(!even, "flex-row")),
 		},
-			elem.Div(attrs.Props{attrs.Class: "w-full md:w-1/2 lg:w-1/3"},
+			// The cap keeps an event's card within images.Card's SharpWidth.
+			elem.Div(attrs.Props{attrs.Class: "w-full md:w-1/2 lg:w-1/3 lg:max-w-192"},
 				elem.Div(attrs.Props{attrs.Class: cls("w-full md:h-auto", onClass(!even, "float-right"))},
 					PhotoCredit(r.By, pic))),
 			elem.Div(attrs.Props{attrs.Class: textClass}, r.Body...),

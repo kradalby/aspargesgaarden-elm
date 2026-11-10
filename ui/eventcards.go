@@ -25,7 +25,8 @@ func EventCards(items ...EventItem) elem.Node {
 			kids = append(kids, cancelledBadge())
 		}
 
-		cards[i] = elem.Li(nil, kids...)
+		// The cap keeps a card photo within images.Card's SharpWidth.
+		cards[i] = elem.Li(attrs.Props{attrs.Class: "max-w-192"}, kids...)
 	}
 
 	return elem.Ul(attrs.Props{attrs.Class: "grid grid-cols-2 gap-4 px-4 pb-8 md:grid-cols-3 md:gap-6 md:px-0 lg:grid-cols-4"}, cards...)

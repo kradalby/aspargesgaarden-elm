@@ -215,7 +215,7 @@ fit viewport photo =
 
         room =
             if wide then
-                { width = max 1 (min 1024 (viewport.width - 2 * 80) - frame)
+                { width = max 1 (min widest (viewport.width - 2 * 80 - frame))
                 , height = max 1 (viewport.height - 2 * 32 - frame - caption)
                 }
 
@@ -238,6 +238,14 @@ fit viewport photo =
 
     else
         { width = max 1 (w * room.height // h), height = room.height }
+
+
+{-| The widest a photo is ever shown: the 1024 px frame less its padding.
+images.Full's SharpWidth is this number; a test in ui reads it from here.
+-}
+widest : Int
+widest =
+    992
 
 
 {-| The ids of the first and last focusable control of the lightbox.
