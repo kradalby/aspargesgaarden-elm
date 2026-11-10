@@ -1,0 +1,634 @@
+package site
+
+import (
+	"context"
+	"database/sql"
+	"errors"
+	"fmt"
+	"time"
+
+	"github.com/kradalby/asparges/db"
+	"github.com/kradalby/asparges/db/dbsqlc"
+)
+
+// Store reads and writes the domain types through the database, applying the
+// rules in this package on every write. now is the clock for timestamps and
+// for anything that depends on today.
+type Store struct {
+	db  *db.DB
+	now func() time.Time
+}
+
+// NewStore returns a Store over d with the given clock.
+func NewStore(d *db.DB, now func() time.Time) *Store {
+	return &Store{db: d, now: now}
+}
+
+// Events lists every event, drafts included, newest start first.
+func (s *Store) Events(ctx context.Context) ([]Event, error) {
+	return s.events(ctx, s.db.Queries(), "list events", s.db.Queries().ListEvents)
+}
+
+// PublishedEvents lists the public events; Split divides them for the page.
+func (s *Store) PublishedEvents(ctx context.Context) ([]Event, error) {
+	return s.events(ctx, s.db.Queries(), "list published events", s.db.Queries().ListPublishedEvents)
+}
+
+// Menu is the header links that events contribute today.
+func (s *Store) Menu(ctx context.Context) ([]MenuEntry, error) {
+	events, err := s.events(ctx, s.db.Queries(), "list menu events", s.db.Queries().ListPublishedMenuEvents)
+	if err != nil {
+		return nil, err
+	}
+
+	return Menu(events, s.now()), nil
+}
+
+// Event loads one event by id, whatever its status.
+func (s *Store) Event(ctx context.Context, id int64) (Event, error) {
+	return s.event(ctx, s.db.Queries(), id)
+}
+
+// PublishedEvent loads the public event at /arrangementer/{year}/{slug}.
+func (s *Store) PublishedEvent(ctx context.Context, year int, slug string) (Event, error) {
+	return s.one(ctx, s.db.Queries(), fmt.Sprintf("event %d/%s", year, slug), func(ctx context.Context) (dbsqlc.Event, error) {
+		return s.db.Queries().GetPublishedEventByYearSlug(ctx, dbsqlc.GetPublishedEventByYearSlugParams{
+			Year: sql.NullInt64{Int64: int64(year), Valid: true},
+			Slug: slug,
+		})
+	})
+}
+
+// NewestPublishedEvent is the latest public event with slug, the target of
+// evergreen addresses such as /julemarked.
+func (s *Store) NewestPublishedEvent(ctx context.Context, slug string) (Event, error) {
+	return s.one(ctx, s.db.Queries(), "newest event "+slug, func(ctx context.Context) (dbsqlc.Event, error) {
+		return s.db.Queries().GetNewestPublishedEventBySlug(ctx, slug)
+	})
+}
+
+// CreateEvent stores e as a new draft; see Revise for the rules.
+func (s *Store) CreateEvent(ctx context.Context, e Event) (Event, error) {
+	next, err := Revise(nil, e)
+	if err != nil {
+		return Event{}, err
+	}
+
+	now := s.now()
+	next.CreatedAt, next.UpdatedAt = now, now
+
+	var id int64
+	err = s.db.InTx(ctx, func(q *dbsqlc.Queries) error {
+		id, err = q.CreateEvent(ctx, createParams(next))
+		if err != nil {
+			return eventWriteErr(err, next)
+		}
+
+		return writeEventChildren(ctx, q, id, next)
+	})
+	if err != nil {
+		return Event{}, err
+	}
+
+	return s.Event(ctx, id)
+}
+
+// UpdateEvent saves an edit of an existing event; see Revise for the rules.
+func (s *Store) UpdateEvent(ctx context.Context, e Event) (Event, error) {
+	return s.modify(ctx, e.ID, func(prev Event) (Event, error) {
+		return Revise(&prev, e)
+	})
+}
+
+// Publish makes the event public; it fails with what is missing if it is not
+// ready.
+func (s *Store) Publish(ctx context.Context, id int64) (Event, error) {
+	return s.modify(ctx, id, func(prev Event) (Event, error) {
+		return prev.Publish(s.now())
+	})
+}
+
+// Unpublish hides a published event.
+func (s *Store) Unpublish(ctx context.Context, id int64) (Event, error) {
+	return s.modify(ctx, id, func(prev Event) (Event, error) {
+		return prev.Unpublish(), nil
+	})
+}
+
+// CopyEvent stores a new draft made from event id; see Event.Copy.
+func (s *Store) CopyEvent(ctx context.Context, id int64) (Event, error) {
+	src, err := s.Event(ctx, id)
+	if err != nil {
+		return Event{}, err
+	}
+
+	return s.CreateEvent(ctx, src.Copy())
+}
+
+// DeleteEvent removes an event with its dates and photo links; the photos
+// themselves stay.
+func (s *Store) DeleteEvent(ctx context.Context, id int64) error {
+	n, err := s.db.Queries().DeleteEvent(ctx, id)
+	if err != nil {
+		return fmt.Errorf("deleting event %d: %w", id, err)
+	}
+
+	if n == 0 {
+		return fmt.Errorf("event %d: %w", id, ErrNotFound)
+	}
+
+	return nil
+}
+
+// modify loads event id, lets change produce its next state, and stores it,
+// all in one transaction so two admins cannot interleave.
+func (s *Store) modify(ctx context.Context, id int64, change func(Event) (Event, error)) (Event, error) {
+	err := s.db.InTx(ctx, func(q *dbsqlc.Queries) error {
+		prev, err := s.event(ctx, q, id)
+		if err != nil {
+			return err
+		}
+
+		next, err := change(prev)
+		if err != nil {
+			return err
+		}
+
+		next.ID, next.CreatedAt, next.UpdatedAt = prev.ID, prev.CreatedAt, s.now()
+		if err := q.UpdateEvent(ctx, updateParams(next)); err != nil {
+			return eventWriteErr(err, next)
+		}
+
+		return writeEventChildren(ctx, q, id, next)
+	})
+	if err != nil {
+		return Event{}, err
+	}
+
+	return s.Event(ctx, id)
+}
+
+// writeEventChildren replaces the event's extra dates and photo links.
+func writeEventChildren(ctx context.Context, q *dbsqlc.Queries, id int64, e Event) error {
+	if err := q.DeleteEventDates(ctx, id); err != nil {
+		return fmt.Errorf("clearing dates of event %d: %w", id, err)
+	}
+
+	for _, d := range e.ExtraDates {
+		if err := q.InsertEventDate(ctx, dbsqlc.InsertEventDateParams{EventID: id, Date: d.String()}); err != nil {
+			return fmt.Errorf("adding date %s to event %d: %w", d, id, err)
+		}
+	}
+
+	if err := q.DeleteEventPhotos(ctx, id); err != nil {
+		return fmt.Errorf("clearing photos of event %d: %w", id, err)
+	}
+
+	for i, p := range e.photos() {
+		role := "extra"
+		if i == 0 && e.MainPhoto != nil {
+			role = "main"
+		}
+
+		err := q.InsertEventPhoto(ctx, dbsqlc.InsertEventPhotoParams{
+			EventID: id, PhotoID: p.ID, Role: role, Position: int64(i),
+		})
+		if db.IsForeignKeyViolation(err) {
+			return fmt.Errorf("photo %d: %w", p.ID, ErrNotFound)
+		}
+		if err != nil {
+			return fmt.Errorf("adding photo %d to event %d: %w", p.ID, id, err)
+		}
+	}
+
+	return nil
+}
+
+func eventWriteErr(err error, e Event) error {
+	if db.IsUniqueViolation(err) {
+		return fmt.Errorf("%w: %d/%s", ErrSlugTaken, e.Year, e.Slug)
+	}
+
+	return fmt.Errorf("writing event %q: %w", e.Title, err)
+}
+
+func (s *Store) event(ctx context.Context, q *dbsqlc.Queries, id int64) (Event, error) {
+	return s.one(ctx, q, fmt.Sprintf("event %d", id), func(ctx context.Context) (dbsqlc.Event, error) {
+		return q.GetEvent(ctx, id)
+	})
+}
+
+func (s *Store) one(ctx context.Context, q *dbsqlc.Queries, what string, get func(context.Context) (dbsqlc.Event, error)) (Event, error) {
+	events, err := s.events(ctx, q, what, func(ctx context.Context) ([]dbsqlc.Event, error) {
+		row, err := get(ctx)
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, fmt.Errorf("%s: %w", what, ErrNotFound)
+		}
+
+		return []dbsqlc.Event{row}, err
+	})
+	if err != nil {
+		return Event{}, err
+	}
+
+	return events[0], nil
+}
+
+// events loads rows with their dates and photos.
+//
+// shortcut: it reads every date, photo link, photo and crop, whatever rows
+// asked for. The tables hold a few rows per event and pages are cached by
+// render/; filter by event id if an event page ever shows up in profiles.
+func (s *Store) events(ctx context.Context, q *dbsqlc.Queries, what string, list func(context.Context) ([]dbsqlc.Event, error)) ([]Event, error) {
+	rows, err := list(ctx)
+	if err != nil {
+		if errors.Is(err, ErrNotFound) {
+			return nil, err
+		}
+
+		return nil, fmt.Errorf("%s: %w", what, err)
+	}
+
+	dateRows, err := q.ListAllEventDates(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("listing event dates: %w", err)
+	}
+
+	dates := map[int64][]Date{}
+	for _, r := range dateRows {
+		d, err := ParseDate(r.Date)
+		if err != nil {
+			return nil, fmt.Errorf("event %d: %w", r.EventID, err)
+		}
+		dates[r.EventID] = append(dates[r.EventID], d)
+	}
+
+	linkRows, err := q.ListAllEventPhotos(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("listing event photos: %w", err)
+	}
+
+	links := map[int64][]dbsqlc.EventPhoto{}
+	for _, r := range linkRows {
+		links[r.EventID] = append(links[r.EventID], r)
+	}
+
+	_, photos, err := allPhotos(ctx, q)
+	if err != nil {
+		return nil, err
+	}
+
+	out := make([]Event, 0, len(rows))
+	for _, r := range rows {
+		e, err := eventFromRow(r)
+		if err != nil {
+			return nil, err
+		}
+
+		e.ExtraDates = dates[r.ID]
+		for _, l := range links[r.ID] {
+			p := photos[l.PhotoID]
+			if l.Role == "main" {
+				e.MainPhoto = &p
+			} else {
+				e.ExtraPhotos = append(e.ExtraPhotos, p)
+			}
+		}
+
+		out = append(out, e)
+	}
+
+	return out, nil
+}
+
+func eventFromRow(r dbsqlc.Event) (Event, error) {
+	e := Event{
+		ID:          r.ID,
+		Year:        int(r.Year.Int64),
+		Slug:        r.Slug,
+		Title:       r.Title,
+		Summary:     r.Summary,
+		BodyMD:      r.BodyMd,
+		StartTime:   r.StartTime,
+		EndTime:     r.EndTime,
+		PriceText:   r.PriceText,
+		TicketURL:   r.TicketUrl,
+		ShowInMenu:  r.ShowInMenu != 0,
+		MenuLabel:   r.MenuLabel,
+		Status:      Status(r.Status),
+		Cancelled:   r.Cancelled != 0,
+		PublishedAt: fromUnixNull(r.PublishedAt),
+		CreatedAt:   fromUnix(r.CreatedAt),
+		UpdatedAt:   fromUnix(r.UpdatedAt),
+	}
+
+	var err error
+	if e.Start, err = parseOptionalDate(r.StartDate); err != nil {
+		return Event{}, fmt.Errorf("event %d: %w", r.ID, err)
+	}
+
+	if e.End, err = parseOptionalDate(r.EndDate); err != nil {
+		return Event{}, fmt.Errorf("event %d: %w", r.ID, err)
+	}
+
+	return e, nil
+}
+
+func createParams(e Event) dbsqlc.CreateEventParams {
+	return dbsqlc.CreateEventParams{
+		Year:        sql.NullInt64{Int64: int64(e.Year), Valid: e.Year != 0},
+		Slug:        e.Slug,
+		Title:       e.Title,
+		Summary:     e.Summary,
+		BodyMd:      e.BodyMD,
+		StartDate:   e.Start.String(),
+		StartTime:   e.StartTime,
+		EndDate:     e.End.String(),
+		EndTime:     e.EndTime,
+		PriceText:   e.PriceText,
+		TicketUrl:   e.TicketURL,
+		ShowInMenu:  boolInt(e.ShowInMenu),
+		MenuLabel:   e.MenuLabel,
+		Status:      string(e.Status),
+		Cancelled:   boolInt(e.Cancelled),
+		PublishedAt: toUnixNull(e.PublishedAt),
+		CreatedAt:   e.CreatedAt.Unix(),
+		UpdatedAt:   e.UpdatedAt.Unix(),
+	}
+}
+
+func updateParams(e Event) dbsqlc.UpdateEventParams {
+	c := createParams(e)
+
+	return dbsqlc.UpdateEventParams{
+		Year: c.Year, Slug: c.Slug, Title: c.Title, Summary: c.Summary, BodyMd: c.BodyMd,
+		StartDate: c.StartDate, StartTime: c.StartTime, EndDate: c.EndDate, EndTime: c.EndTime,
+		PriceText: c.PriceText, TicketUrl: c.TicketUrl, ShowInMenu: c.ShowInMenu, MenuLabel: c.MenuLabel,
+		Status: c.Status, Cancelled: c.Cancelled, PublishedAt: c.PublishedAt, UpdatedAt: c.UpdatedAt,
+		ID: e.ID,
+	}
+}
+
+// AddPhoto records an uploaded original. The same content twice is one photo:
+// the stored one is returned unchanged.
+func (s *Store) AddPhoto(ctx context.Context, p Photo) (Photo, error) {
+	now := s.now().Unix()
+
+	id, err := s.db.Queries().CreatePhoto(ctx, dbsqlc.CreatePhotoParams{
+		Sha256:           p.SHA256,
+		Mime:             p.MIME,
+		Width:            int64(p.Width),
+		Height:           int64(p.Height),
+		Alt:              p.Alt,
+		PhotographerName: p.PhotographerName,
+		PhotographerUrl:  p.PhotographerURL,
+		CreatedAt:        now,
+		UpdatedAt:        now,
+	})
+	if err != nil {
+		return Photo{}, fmt.Errorf("adding photo %s: %w", p.SHA256, err)
+	}
+
+	return s.Photo(ctx, id)
+}
+
+// Photo loads one photo with its crops.
+func (s *Store) Photo(ctx context.Context, id int64) (Photo, error) {
+	q := s.db.Queries()
+
+	row, err := q.GetPhoto(ctx, id)
+	if errors.Is(err, sql.ErrNoRows) {
+		return Photo{}, fmt.Errorf("photo %d: %w", id, ErrNotFound)
+	}
+	if err != nil {
+		return Photo{}, fmt.Errorf("loading photo %d: %w", id, err)
+	}
+
+	crops, err := q.ListPhotoCrops(ctx, id)
+	if err != nil {
+		return Photo{}, fmt.Errorf("loading crops of photo %d: %w", id, err)
+	}
+
+	p := photoFromRow(row)
+	for _, c := range crops {
+		p.Crops[CropKind(c.Kind)] = rectFromRow(c)
+	}
+
+	return p, nil
+}
+
+// Photos lists every photo with its crops, oldest first. images/ derives its
+// expected file set from this.
+func (s *Store) Photos(ctx context.Context) ([]Photo, error) {
+	list, _, err := allPhotos(ctx, s.db.Queries())
+	return list, err
+}
+
+// UpdatePhoto saves the editable fields of p: alt text and photographer.
+func (s *Store) UpdatePhoto(ctx context.Context, p Photo) (Photo, error) {
+	n, err := s.db.Queries().UpdatePhotoMeta(ctx, dbsqlc.UpdatePhotoMetaParams{
+		Alt:              p.Alt,
+		PhotographerName: p.PhotographerName,
+		PhotographerUrl:  p.PhotographerURL,
+		UpdatedAt:        s.now().Unix(),
+		ID:               p.ID,
+	})
+	if err != nil {
+		return Photo{}, fmt.Errorf("updating photo %d: %w", p.ID, err)
+	}
+
+	if n == 0 {
+		return Photo{}, fmt.Errorf("photo %d: %w", p.ID, ErrNotFound)
+	}
+
+	return s.Photo(ctx, p.ID)
+}
+
+// SetCrop sets the crop of one kind on a photo.
+func (s *Store) SetCrop(ctx context.Context, photoID int64, kind CropKind, r Rect) error {
+	return s.db.InTx(ctx, func(q *dbsqlc.Queries) error {
+		row, err := q.GetPhoto(ctx, photoID)
+		if errors.Is(err, sql.ErrNoRows) {
+			return fmt.Errorf("photo %d: %w", photoID, ErrNotFound)
+		}
+		if err != nil {
+			return fmt.Errorf("loading photo %d: %w", photoID, err)
+		}
+
+		if err := photoFromRow(row).CheckCrop(kind, r); err != nil {
+			return err
+		}
+
+		if err := q.UpsertPhotoCrop(ctx, dbsqlc.UpsertPhotoCropParams{
+			PhotoID: photoID, Kind: string(kind),
+			X: int64(r.X), Y: int64(r.Y), W: int64(r.W), H: int64(r.H),
+		}); err != nil {
+			return fmt.Errorf("setting %s crop of photo %d: %w", kind, photoID, err)
+		}
+
+		// A new crop changes the pages that show the photo.
+		if err := q.TouchPhoto(ctx, dbsqlc.TouchPhotoParams{UpdatedAt: s.now().Unix(), ID: photoID}); err != nil {
+			return fmt.Errorf("touching photo %d: %w", photoID, err)
+		}
+
+		return nil
+	})
+}
+
+// DeletePhoto removes a photo that no event or gallery uses; its crops go with
+// it. The original file is images/' to clean up.
+func (s *Store) DeletePhoto(ctx context.Context, id int64) error {
+	n, err := s.db.Queries().DeletePhoto(ctx, id)
+	if db.IsForeignKeyViolation(err) {
+		return fmt.Errorf("photo %d: %w", id, ErrPhotoInUse)
+	}
+	if err != nil {
+		return fmt.Errorf("deleting photo %d: %w", id, err)
+	}
+
+	if n == 0 {
+		return fmt.Errorf("photo %d: %w", id, ErrNotFound)
+	}
+
+	return nil
+}
+
+// Gallery lists the gallery's photos in order.
+func (s *Store) Gallery(ctx context.Context) ([]Photo, error) {
+	q := s.db.Queries()
+
+	_, byID, err := allPhotos(ctx, q)
+	if err != nil {
+		return nil, err
+	}
+
+	ids, err := q.ListGalleryPhotoIDs(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("listing gallery: %w", err)
+	}
+
+	out := make([]Photo, 0, len(ids))
+	for _, id := range ids {
+		out = append(out, byID[id])
+	}
+
+	return out, nil
+}
+
+// SetGallery replaces the gallery with photoIDs, in that order.
+func (s *Store) SetGallery(ctx context.Context, photoIDs []int64) error {
+	now := s.now().Unix()
+
+	return s.db.InTx(ctx, func(q *dbsqlc.Queries) error {
+		if err := q.DeleteGallery(ctx); err != nil {
+			return fmt.Errorf("clearing gallery: %w", err)
+		}
+
+		for i, id := range photoIDs {
+			err := q.InsertGalleryPhoto(ctx, dbsqlc.InsertGalleryPhotoParams{PhotoID: id, Position: int64(i), UpdatedAt: now})
+			switch {
+			case db.IsForeignKeyViolation(err):
+				return fmt.Errorf("photo %d: %w", id, ErrNotFound)
+			case db.IsUniqueViolation(err):
+				return fmt.Errorf("photo %d is in the gallery twice: %w", id, ErrDuplicatePhoto)
+			case err != nil:
+				return fmt.Errorf("adding photo %d to gallery: %w", id, err)
+			}
+		}
+
+		return nil
+	})
+}
+
+// GalleryUpdatedAt is the last change to the gallery page, for the sitemap;
+// zero for an empty gallery.
+func (s *Store) GalleryUpdatedAt(ctx context.Context) (time.Time, error) {
+	ts, err := s.db.Queries().GalleryUpdatedAt(ctx)
+	if err != nil {
+		return time.Time{}, fmt.Errorf("gallery lastmod: %w", err)
+	}
+
+	if ts == 0 {
+		return time.Time{}, nil
+	}
+
+	return fromUnix(ts), nil
+}
+
+// allPhotos loads every photo with its crops, by id order and by id.
+func allPhotos(ctx context.Context, q *dbsqlc.Queries) ([]Photo, map[int64]Photo, error) {
+	rows, err := q.ListPhotos(ctx)
+	if err != nil {
+		return nil, nil, fmt.Errorf("listing photos: %w", err)
+	}
+
+	crops, err := q.ListAllPhotoCrops(ctx)
+	if err != nil {
+		return nil, nil, fmt.Errorf("listing crops: %w", err)
+	}
+
+	list := make([]Photo, 0, len(rows))
+	byID := make(map[int64]Photo, len(rows))
+	for _, r := range rows {
+		p := photoFromRow(r)
+		list = append(list, p)
+		byID[p.ID] = p
+	}
+
+	// Crops is a map, so the list and byID share each photo's crops.
+	for _, c := range crops {
+		byID[c.PhotoID].Crops[CropKind(c.Kind)] = rectFromRow(c)
+	}
+
+	return list, byID, nil
+}
+
+func photoFromRow(r dbsqlc.Photo) Photo {
+	return Photo{
+		ID:               r.ID,
+		SHA256:           r.Sha256,
+		MIME:             r.Mime,
+		Width:            int(r.Width),
+		Height:           int(r.Height),
+		Alt:              r.Alt,
+		PhotographerName: r.PhotographerName,
+		PhotographerURL:  r.PhotographerUrl,
+		Crops:            map[CropKind]Rect{},
+		CreatedAt:        fromUnix(r.CreatedAt),
+		UpdatedAt:        fromUnix(r.UpdatedAt),
+	}
+}
+
+func rectFromRow(c dbsqlc.PhotoCrop) Rect {
+	return Rect{X: int(c.X), Y: int(c.Y), W: int(c.W), H: int(c.H)}
+}
+
+func parseOptionalDate(s string) (Date, error) {
+	if s == "" {
+		return Date{}, nil
+	}
+
+	return ParseDate(s)
+}
+
+func boolInt(b bool) int64 {
+	if b {
+		return 1
+	}
+
+	return 0
+}
+
+func fromUnix(ts int64) time.Time { return time.Unix(ts, 0).UTC() }
+
+func fromUnixNull(ts sql.NullInt64) time.Time {
+	if !ts.Valid {
+		return time.Time{}
+	}
+
+	return fromUnix(ts.Int64)
+}
+
+func toUnixNull(t time.Time) sql.NullInt64 {
+	return sql.NullInt64{Int64: t.Unix(), Valid: !t.IsZero()}
+}
