@@ -136,6 +136,21 @@ photos:
   - path: galleri/a
     photographer: lucky
     description: "Blomster fra @bondenshage"
+  - path: arrangementer/liten
+    photographer: lucky
+    description: ""
+`)
+	write("content/events/2026-05-19-varkonsert.md", `---
+{
+  "title": "Vårkonsert med Black & Lekker",
+  "eventDate": "2026-05-19",
+  "eventTime": "19:30",
+  "publishedFrom": "2026-01-01",
+  "photo": { "path": "arrangementer/liten", "photographer": { "name": "", "website": "" }, "description": "" }
+}
+---
+
+Velkommen til en stemningsfull vårkveld.
 `)
 
 	for _, p := range []string{
@@ -148,6 +163,8 @@ photos:
 
 	// Too narrow for a banner or a share image; fine for the gallery.
 	photo("galleri/b", 600, 900)
+	// Too narrow for anything, as one old event photo is.
+	photo("arrangementer/liten", 393, 479)
 
 	return root
 }
@@ -192,14 +209,17 @@ func summarize(t *testing.T, store *site.Store) []imported {
 		got := imported{
 			Path: e.Path(), Status: string(e.Status),
 			Start: e.Start.String(), End: e.End.String(), StartTime: e.StartTime, EndTime: e.EndTime,
-			BodyStart: strings.SplitN(e.BodyMD, "\n", 2)[0], Alt: e.MainPhoto.Alt, ExtraPhotos: len(e.ExtraPhotos),
+			BodyStart: strings.SplitN(e.BodyMD, "\n", 2)[0], ExtraPhotos: len(e.ExtraPhotos),
 		}
 		for _, d := range e.ExtraDates {
 			got.Extra = append(got.Extra, d.String())
 		}
 
-		if e.MainPhoto.Photographer != nil {
-			got.Credit = e.MainPhoto.Photographer.Name + " " + e.MainPhoto.Photographer.URL
+		if p := e.MainPhoto; p != nil {
+			got.Alt = p.Alt
+			if p.Photographer != nil {
+				got.Credit = p.Photographer.Name + " " + p.Photographer.URL
+			}
 		}
 
 		out = append(out, got)
@@ -229,6 +249,11 @@ func TestImport(t *testing.T) {
 			BodyStart: "*Slutt ca. kl. 15:00.*", Alt: "Anita Saga ved bakebordet",
 		},
 		{
+			// Its photo is too small to show: a draft until a larger one comes.
+			Path: "/arrangementer/2026/varkonsert-med-black-lekker", Status: "draft", Start: "2026-05-19",
+			StartTime: "19:30", BodyStart: "Velkommen til en stemningsfull vårkveld.",
+		},
+		{
 			// The file says 2024-13-13; the page said 1 October.
 			Path: "/arrangementer/2024/gourmetaften", Status: "published", Start: "2024-10-01",
 			BodyStart: "Aspargesgården inviterer til **gourmetaften**.", Alt: "Gourmetaften",
@@ -239,6 +264,11 @@ func TestImport(t *testing.T) {
 	if diff := cmp.Diff(want, summarize(t, store)); diff != "" {
 		t.Errorf("imported events (-want +got):\n%s", diff)
 	}
+
+	// The old menu's Julemarked entry, while the market is coming.
+	menu, err := store.Menu(t.Context())
+	require.NoError(t, err)
+	require.Equal(t, []site.MenuEntry{{Label: "Julemarked", Path: "/arrangementer/2026/julemarked"}}, menu)
 
 	gallery, err := store.Gallery(t.Context())
 	require.NoError(t, err)

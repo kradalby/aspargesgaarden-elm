@@ -154,14 +154,26 @@ func (im importer) event(ctx context.Context, file string, have map[string]bool)
 
 	// Publishing needs alt text, and the old event photos had none.
 	main, err := im.photo(ctx, old.Photo, cmp.Or(strings.TrimSpace(old.Photo.Description), e.Title))
-	if err != nil {
-		return err
-	}
 
-	e.MainPhoto = &main
+	switch {
+	case errors.Is(err, images.ErrTooSmall):
+		// An event is published only with a main photo; this one waits as a
+		// draft until someone finds a larger one.
+		im.log.WarnContext(ctx, "main photo too small to use, event kept as a draft", "path", e.Path(), "err", err)
+		publish = false
+	case err != nil:
+		return err
+	default:
+		e.MainPhoto = &main
+	}
 
 	for _, op := range extras {
 		p, err := im.photo(ctx, op, op.Description)
+		if errors.Is(err, images.ErrTooSmall) {
+			im.log.WarnContext(ctx, "photo too small to use, left out", "path", e.Path(), "err", err)
+			continue
+		}
+
 		if err != nil {
 			return err
 		}
@@ -244,6 +256,12 @@ func (o oldEvent) toEvent(body string) (site.Event, bool, error) {
 		if d != start && !slices.Contains(e.ExtraDates, d) {
 			e.ExtraDates = append(e.ExtraDates, d)
 		}
+	}
+
+	// The old menu linked the Christmas market; it stays there while the
+	// market is coming.
+	if e.Slug == "julemarked" {
+		e.ShowInMenu, e.MenuLabel = true, "Julemarked"
 	}
 
 	e.BodyMD = body
@@ -364,6 +382,11 @@ func (im importer) gallery(ctx context.Context) error {
 		}
 
 		p, err := im.photo(ctx, oldPhoto{Path: gp.Path, Photographer: by}, gp.Description)
+		if errors.Is(err, images.ErrTooSmall) {
+			im.log.WarnContext(ctx, "gallery photo too small to use, left out", "photo", gp.Path, "err", err)
+			continue
+		}
+
 		if err != nil {
 			return err
 		}
