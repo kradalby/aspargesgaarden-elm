@@ -23,27 +23,31 @@ import (
 
 const testBase = "https://aspargesgaarden.no"
 
+// testUmami is analytics switched on, as the live site has it.
+var testUmami = ui.Umami{SiteID: "00000000-0000-4000-8000-000000000000", Domain: "aspargesgaarden.no"}
+
 var testSite = Site{
 	BaseURL: testBase,
 	Menu:    Menu(site.MenuEntry{Label: "Julemarked", Path: "/arrangementer/2026/julemarked"}),
+	Umami:   testUmami,
 }
 
 // rendered is every page this package builds, by address ("404" for NotFound).
-func rendered(t *testing.T) map[string]string {
+func rendered(t *testing.T, s Site) map[string]string {
 	t.Helper()
 
 	out := map[string]string{
-		"404":                    NotFound(testSite).Render(),
-		"/galleri":               Galleri(testSite, testGalleryPhotos).Render(),
-		"/arrangementer":         Events(testSite, testEvents(), testNow).Render(),
-		"/arrangementer (empty)": Events(testSite, nil, testNow).Render(),
+		"404":                    NotFound(s).Render(),
+		"/galleri":               Galleri(s, testGalleryPhotos).Render(),
+		"/arrangementer":         Events(s, testEvents(), testNow).Render(),
+		"/arrangementer (empty)": Events(s, nil, testNow).Render(),
 	}
 	for path, page := range Fixed {
-		out[path] = page(testSite).Render()
+		out[path] = page(s).Render()
 	}
 
 	for _, e := range testEvents() {
-		out[e.Path()] = Event(testSite, e, testNow).Render()
+		out[e.Path()] = Event(s, e, testNow).Render()
 	}
 
 	return out
@@ -69,7 +73,7 @@ func TestFixedPagesAreCanonicalAtTheirAddress(t *testing.T) {
 }
 
 func TestEveryPageHasOneH1(t *testing.T) {
-	for path, page := range rendered(t) {
+	for path, page := range rendered(t, testSite) {
 		require.Equal(t, 1, strings.Count(page, "<h1"), "%s must have exactly one <h1>", path)
 	}
 }
@@ -132,7 +136,7 @@ func readHead(t *testing.T, page string) head {
 func TestEveryPageDescribesItself(t *testing.T) {
 	titles, descriptions := map[string]string{}, map[string]string{}
 
-	for path, page := range rendered(t) {
+	for path, page := range rendered(t, testSite) {
 		h := readHead(t, page)
 
 		require.Len(t, h.titles, 1, "%s: one <title>", path)
@@ -180,7 +184,7 @@ func TestEveryPageDescribesItself(t *testing.T) {
 }
 
 func TestStructuredData(t *testing.T) {
-	pages := rendered(t)
+	pages := rendered(t, testSite)
 
 	for _, path := range []string{"/", "/kontakt"} {
 		require.Contains(t, readHead(t, pages[path]).ldTypes, "[LocalBusiness EventVenue]", path)
@@ -230,21 +234,27 @@ func TestPagesBuildNoRawImages(t *testing.T) {
 // Everything a page loads is built into the binary, apart from the named
 // outside services in ui/external.go. Links a reader follows are not loads.
 func TestPagesLoadNothingFromOutside(t *testing.T) {
-	for path, page := range rendered(t) {
-		doc, err := html.Parse(strings.NewReader(page))
-		require.NoError(t, err)
+	// With analytics on and off: off, the tracker's origin is not allowed.
+	for _, umami := range []ui.Umami{testUmami, {}} {
+		s := testSite
+		s.Umami = umami
 
-		for n := range doc.Descendants() {
-			if n.Type != html.ElementNode {
-				continue
+		for path, page := range rendered(t, s) {
+			doc, err := html.Parse(strings.NewReader(page))
+			require.NoError(t, err)
+
+			for n := range doc.Descendants() {
+				if n.Type != html.ElementNode {
+					continue
+				}
+
+				for _, load := range loads(n) {
+					require.True(t, ui.ExternalLoadAllowed(umami, load.directive, load.ref),
+						"%s: <%s> loads %s (%s); serve it from /static/ or add the origin to ui/external.go", path, n.Data, load.ref, load.directive)
+				}
+
+				require.Empty(t, attr(n, "style"), "%s: inline style on <%s> (CSP style-src 'self' blocks it)", path, n.Data)
 			}
-
-			for _, load := range loads(n) {
-				require.True(t, ui.ExternalLoadAllowed(load.directive, load.ref),
-					"%s: <%s> loads %s (%s); serve it from /static/ or add the origin to ui/external.go", path, n.Data, load.ref, load.directive)
-			}
-
-			require.Empty(t, attr(n, "style"), "%s: inline style on <%s> (CSP style-src 'self' blocks it)", path, n.Data)
 		}
 	}
 }
@@ -319,7 +329,7 @@ func TestStylesheetLoadsNothingFromOutside(t *testing.T) {
 
 	for _, m := range urls {
 		ref := strings.Trim(m[1], `'"`)
-		require.True(t, ui.ExternalLoadAllowed("font-src", ref), "site.css loads %s", ref)
+		require.True(t, ui.ExternalLoadAllowed(ui.Umami{}, "font-src", ref), "site.css loads %s", ref)
 	}
 }
 

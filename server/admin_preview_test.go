@@ -120,6 +120,8 @@ var assetRE = regexp.MustCompile(`(?:src|srcset)="([^"]+)"|<link [^>]*href="([^"
 func TestAdminPreviewLoadsUnderTheAdminPolicy(t *testing.T) {
 	a := newAdmin(t, true)
 	main := a.storedPhoto(t, 'a')
+	// With analytics on: the preview still carries no tracker.
+	a.srv.umami = ui.Umami{SiteID: "11111111-2222-4333-8444-555555555555", Domain: "127.0.0.1"}
 
 	rec := a.do(t, "POST", "/admin/api/preview", req{
 		from: "127.0.0.1:5000", host: "127.0.0.1:8090",
@@ -128,6 +130,7 @@ func TestAdminPreviewLoadsUnderTheAdminPolicy(t *testing.T) {
 	require.Equal(t, http.StatusOK, rec.Code)
 	require.Equal(t, ui.AdminCSP(), rec.Header().Get("Content-Security-Policy"))
 	require.NotContains(t, ui.AdminCSP(), "http", "the admin allows no outside origin")
+	require.NotContains(t, rec.Body.String(), ui.UmamiOrigin)
 
 	var loads []string
 

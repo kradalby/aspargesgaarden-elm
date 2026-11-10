@@ -77,7 +77,7 @@ func run(ctx context.Context, addr, dataDir string) error {
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /e2e/two", func(w http.ResponseWriter, _ *http.Request) {
-		w.Header().Set("Content-Security-Policy", ui.CSP())
+		w.Header().Set("Content-Security-Policy", ui.CSP(ui.Umami{}))
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		_, _ = w.Write([]byte(two))
 	})

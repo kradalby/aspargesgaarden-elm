@@ -20,6 +20,8 @@ type Site struct {
 	BaseURL string
 	// Menu is the main menu; build it with Menu.
 	Menu []ui.MenuItem
+	// Umami is the analytics site; the zero value loads no tracker.
+	Umami ui.Umami
 }
 
 // photoRef is what ui.Picture needs to show an uploaded photo as kind. A
@@ -36,7 +38,7 @@ func photoRef(p site.Photo, kind images.Kind) images.Ref {
 }
 
 func (s Site) page(meta ui.Meta, body ...elem.Node) *elem.Element {
-	return ui.Page(ui.PageProps{BaseURL: s.BaseURL, Meta: meta, Menu: s.Menu}, body...)
+	return ui.Page(ui.PageProps{BaseURL: s.BaseURL, Meta: meta, Menu: s.Menu, Umami: s.Umami}, body...)
 }
 
 // Menu is the main menu. events are the entries of events marked "Vis i

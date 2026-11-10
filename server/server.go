@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -61,6 +62,9 @@ type Config struct {
 	IndexNowEndpoint string
 	// Admin is what Admin needs; see AdminConfig.
 	Admin AdminConfig
+	// UmamiSiteID is the site's id on the Umami server; empty puts no
+	// tracker on the pages and leaves Umami out of the CSP.
+	UmamiSiteID string
 }
 
 // Images is the photo store (images.Store) as the server uses it.
@@ -78,6 +82,9 @@ type Server struct {
 	cfg      Config
 	pages    *render.Store
 	indexNow *seo.IndexNow // nil when off
+	// umami is fixed at start: kept pages and the CSP header must agree.
+	umami ui.Umami
+	csp   string
 }
 
 // New returns a Server; cfg.Store, cfg.Images and cfg.Now are required.
@@ -88,6 +95,19 @@ func New(cfg Config) *Server {
 
 	s := &Server{cfg: cfg, pages: render.New(cfg.Now)}
 	s.indexNow = s.newIndexNow()
+
+	// The tracker reports from the configured host only, so the beta site
+	// can have a site of its own and a copy elsewhere stays silent.
+	if cfg.UmamiSiteID != "" {
+		host := cfg.BaseURL
+		if u, err := url.Parse(cfg.BaseURL); err == nil {
+			host = u.Hostname()
+		}
+
+		s.umami = ui.Umami{SiteID: cfg.UmamiSiteID, Domain: host}
+	}
+
+	s.csp = ui.CSP(s.umami)
 
 	return s
 }
@@ -139,7 +159,7 @@ func (s *Server) Public() http.Handler {
 			return
 		}
 
-		w.Header().Set("Content-Security-Policy", ui.CSP())
+		w.Header().Set("Content-Security-Policy", s.csp)
 		w.Header().Set("X-Content-Type-Options", "nosniff")
 		if s.cfg.NoIndex {
 			w.Header().Set("X-Robots-Tag", "noindex")
@@ -312,7 +332,7 @@ func (s *Server) gallery(ctx context.Context) (*elem.Element, error) {
 // site is what pages need, with today's menu. On error the menu lacks the
 // events' entries but is still usable, for the 404 page.
 func (s *Server) site(ctx context.Context) (pages.Site, error) {
-	st := pages.Site{BaseURL: s.cfg.BaseURL, Menu: pages.Menu()}
+	st := pages.Site{BaseURL: s.cfg.BaseURL, Menu: pages.Menu(), Umami: s.umami}
 
 	entries, err := s.cfg.Store.Menu(ctx)
 	if err != nil {

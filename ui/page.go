@@ -18,6 +18,8 @@ type PageProps struct {
 	Meta    Meta
 	// Menu is the main menu, in order.
 	Menu []MenuItem
+	// Umami is the analytics site; the zero value loads no tracker.
+	Umami Umami
 }
 
 // Page is a whole HTML document: head, header, the body nodes, footer and
@@ -45,10 +47,13 @@ func Page(p PageProps, body ...elem.Node) *elem.Element {
 		}))
 	}
 
-	head = append(head,
-		elem.Link(attrs.Props{attrs.Rel: "stylesheet", attrs.Href: static.URL("site.css")}),
-		elem.Script(attrs.Props{attrs.Src: umamiScript, "data-website-id": umamiSiteID, "data-domains": umamiDomains, attrs.Defer: "true"}),
-	)
+	head = append(head, elem.Link(attrs.Props{attrs.Rel: "stylesheet", attrs.Href: static.URL("site.css")}))
+
+	if u := p.Umami; u.On() {
+		head = append(head, elem.Script(attrs.Props{
+			attrs.Src: umamiScript, "data-website-id": u.SiteID, "data-domains": u.Domain, attrs.Defer: "true",
+		}))
+	}
 
 	// The lightbox is the site's only own script, and loads only where a
 	// gallery is, so a page author cannot forget or misplace it.

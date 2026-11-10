@@ -17,29 +17,41 @@ const (
 	CalendarOrigin = "https://calendar.google.com"
 )
 
-// The Umami site this site reports to. The v2 tracker lives at /script.js
-// (/umami.js was v1's and is gone) and posts its beacons to /api/send
-// beside itself, so UmamiOrigin covers both the script and connect-src.
-const (
-	umamiScript = UmamiOrigin + "/script.js"
-	umamiSiteID = "168bd9f6-fec6-40dc-95b5-b0e4082c7a98"
-	// umamiDomains limits reporting to the live site: beta and local runs
-	// show the same pages, and must not count as visits.
-	umamiDomains = "aspargesgaarden.no"
-)
+// The v2 tracker lives at /script.js (/umami.js was v1's and is gone) and
+// posts its beacons to /api/send beside itself, so UmamiOrigin covers both
+// the script and connect-src.
+const umamiScript = UmamiOrigin + "/script.js"
+
+// Umami is the analytics site pages report to. The zero value is off: no
+// tracker on the pages, and its origin out of the CSP. The server makes one
+// at start and hands it to every page and to CSP, so the two agree.
+type Umami struct {
+	// SiteID is the website's id on the Umami server.
+	SiteID string
+	// Domain is the one host the tracker reports from (data-domains): a
+	// copy of the pages anywhere else, a local run say, stays silent.
+	Domain string
+}
+
+// On reports whether pages carry the tracker.
+func (u Umami) On() bool { return u.SiteID != "" }
 
 // loadOrigins lists, per kind of load, the outside origins allowed. CSP and
 // the tests over rendered pages and built CSS both read it.
-var loadOrigins = map[string][]string{
-	"script-src":  {UmamiOrigin},
-	"connect-src": {UmamiOrigin},
-	"frame-src":   {CalendarOrigin},
+func loadOrigins(u Umami) map[string][]string {
+	o := map[string][]string{"frame-src": {CalendarOrigin}}
+	if u.On() {
+		o["script-src"] = []string{UmamiOrigin}
+		o["connect-src"] = []string{UmamiOrigin}
+	}
+
+	return o
 }
 
 // CSP is the Content-Security-Policy of every public response. It enforces
 // what the tests check: own files only, plus loadOrigins.
-func CSP() string {
-	return csp(loadOrigins, false, "'self'")
+func CSP(u Umami) string {
+	return csp(loadOrigins(u), false, "'self'")
 }
 
 // AdminCSP is the policy of the admin app and its API: own files only, no
@@ -82,17 +94,18 @@ func csp(origins map[string][]string, ownFrames bool, lock string) string {
 }
 
 // ExternalLoadAllowed reports whether a page may load ref (a script, frame,
-// stylesheet, image, font…) given the CSP directive that governs it. Own
-// URLs (relative, same origin) are always allowed.
-func ExternalLoadAllowed(directive, ref string) bool {
-	u, err := url.Parse(ref)
+// stylesheet, image, font…) given the CSP directive that governs it and
+// the analytics setting. Own URLs (relative, same origin) are always
+// allowed.
+func ExternalLoadAllowed(u Umami, directive, ref string) bool {
+	r, err := url.Parse(ref)
 	if err != nil {
 		return false
 	}
 
-	if u.Scheme == "" && u.Host == "" {
+	if r.Scheme == "" && r.Host == "" {
 		return true
 	}
 
-	return slices.Contains(loadOrigins[directive], u.Scheme+"://"+u.Host)
+	return slices.Contains(loadOrigins(u)[directive], r.Scheme+"://"+r.Host)
 }

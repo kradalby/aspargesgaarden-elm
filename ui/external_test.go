@@ -1,17 +1,28 @@
 package ui
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 )
+
+// testUmami is analytics switched on, as the live site has it.
+var testUmami = Umami{SiteID: "00000000-0000-4000-8000-000000000000", Domain: "aspargesgaarden.no"}
 
 func TestCSP(t *testing.T) {
 	require.Equal(t,
 		"default-src 'self'; script-src 'self' https://umami.kradalby.no; connect-src 'self' https://umami.kradalby.no; "+
 			"frame-src https://calendar.google.com; img-src 'self'; font-src 'self'; style-src 'self'; object-src 'none'; "+
 			"base-uri 'self'; form-action 'self'; frame-ancestors 'self'",
-		CSP())
+		CSP(testUmami))
+
+	// Without a site to report to, the tracker's origin is not allowed.
+	require.Equal(t,
+		"default-src 'self'; script-src 'self'; connect-src 'self'; "+
+			"frame-src https://calendar.google.com; img-src 'self'; font-src 'self'; style-src 'self'; object-src 'none'; "+
+			"base-uri 'self'; form-action 'self'; frame-ancestors 'self'",
+		CSP(Umami{}))
 }
 
 func TestAdminCSP(t *testing.T) {
@@ -42,7 +53,11 @@ func TestExternalLoadAllowed(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.directive+" "+tt.ref, func(t *testing.T) {
-			require.Equal(t, tt.want, ExternalLoadAllowed(tt.directive, tt.ref))
+			require.Equal(t, tt.want, ExternalLoadAllowed(testUmami, tt.directive, tt.ref))
+
+			if strings.Contains(tt.ref, "umami") {
+				require.False(t, ExternalLoadAllowed(Umami{}, tt.directive, tt.ref), "analytics off")
+			}
 		})
 	}
 }

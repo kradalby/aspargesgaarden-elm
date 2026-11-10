@@ -17,6 +17,7 @@ func testPage(path string) string {
 		BaseURL: "https://aspargesgaarden.no",
 		Meta:    Meta{Title: "Muligheter", Description: "Lokaler & mat", Path: path},
 		Menu:    testMenu,
+		Umami:   testUmami,
 	}, Container(Headline("Muligheter"), elem.P(nil, elem.Text("Tekst")))).Render()
 }
 
@@ -45,7 +46,14 @@ func TestPageLoadsLightboxOnlyWithGallery(t *testing.T) {
 // then the rebuild copied v1's /umami.js, which the v2 server no longer has.
 func TestPageLoadsUmami(t *testing.T) {
 	require.Contains(t, testPage("/"),
-		`<script data-domains="aspargesgaarden.no" data-website-id="168bd9f6-fec6-40dc-95b5-b0e4082c7a98" defer src="https://umami.kradalby.no/script.js"></script>`)
+		`<script data-domains="aspargesgaarden.no" data-website-id="00000000-0000-4000-8000-000000000000" defer src="https://umami.kradalby.no/script.js"></script>`)
+}
+
+// No site to report to, no tracker: it would only log rejected beacons.
+func TestPageWithoutUmami(t *testing.T) {
+	page := Page(PageProps{BaseURL: "https://aspargesgaarden.no", Meta: Meta{Title: "x"}}).Render()
+	require.NotContains(t, page, "umami")
+	require.NotContains(t, page, "data-website-id")
 }
 
 // The tracker posts to /api/send next to its own address (Umami v2, unless
@@ -53,9 +61,13 @@ func TestPageLoadsUmami(t *testing.T) {
 func TestUmamiFitsTheCSP(t *testing.T) {
 	beacon := umamiScript[:strings.LastIndex(umamiScript, "/")] + "/api/send"
 
-	require.True(t, ExternalLoadAllowed("script-src", umamiScript))
-	require.True(t, ExternalLoadAllowed("connect-src", beacon))
-	require.Contains(t, CSP(), "script-src 'self' "+UmamiOrigin+";")
-	require.Contains(t, CSP(), "connect-src 'self' "+UmamiOrigin+";")
+	require.True(t, ExternalLoadAllowed(testUmami, "script-src", umamiScript))
+	require.True(t, ExternalLoadAllowed(testUmami, "connect-src", beacon))
+	require.Contains(t, CSP(testUmami), "script-src 'self' "+UmamiOrigin+";")
+	require.Contains(t, CSP(testUmami), "connect-src 'self' "+UmamiOrigin+";")
+
+	// Off, the policy holds no Umami origin at all.
+	require.NotContains(t, CSP(Umami{}), UmamiOrigin)
+	require.False(t, ExternalLoadAllowed(Umami{}, "script-src", umamiScript))
 	require.NotContains(t, testPage("/"), "data-host-url", "a beacon host elsewhere would need its own connect-src")
 }

@@ -369,7 +369,7 @@ func TestImages(t *testing.T) {
 	rec := f.get(t, "/img/x.jpeg")
 	require.Equal(t, http.StatusOK, rec.Code)
 	require.Equal(t, "photo", rec.Body.String())
-	require.Equal(t, ui.CSP(), rec.Header().Get("Content-Security-Policy"))
+	require.Equal(t, ui.CSP(ui.Umami{}), rec.Header().Get("Content-Security-Policy"))
 }
 
 func TestEveryResponseCarriesCSP(t *testing.T) {
@@ -378,9 +378,33 @@ func TestEveryResponseCarriesCSP(t *testing.T) {
 	for _, target := range []string{"/", "/facilities", "/finnes-ikke", "/arrangementer", "/julemarked", "/galleri", static.URL("site.css"), static.URL("gallery.js")} {
 		rec := f.get(t, target)
 
-		require.Equal(t, ui.CSP(), rec.Header().Get("Content-Security-Policy"), target)
+		require.Equal(t, ui.CSP(ui.Umami{}), rec.Header().Get("Content-Security-Policy"), target)
 		require.Equal(t, "nosniff", rec.Header().Get("X-Content-Type-Options"), target)
 	}
+}
+
+// With a site id, every page carries the tracker for the configured host,
+// and the CSP lets exactly it through; without one, neither.
+func TestUmamiFollowsTheSetting(t *testing.T) {
+	f := newFixture(t, false)
+	f.srv = New(Config{
+		BaseURL: "https://beta.aspargesgaarden.no", Store: f.store, Images: f.images, Now: f.clock.now,
+		UmamiSiteID: "11111111-2222-4333-8444-555555555555",
+	})
+	f.h = f.srv.Public()
+
+	on := ui.Umami{SiteID: "11111111-2222-4333-8444-555555555555", Domain: "beta.aspargesgaarden.no"}
+
+	for _, target := range []string{"/", "/arrangementer", "/finnes-ikke"} {
+		rec := f.get(t, target)
+		require.Equal(t, ui.CSP(on), rec.Header().Get("Content-Security-Policy"), target)
+		require.Contains(t, rec.Body.String(),
+			`data-domains="beta.aspargesgaarden.no" data-website-id="11111111-2222-4333-8444-555555555555"`, target)
+	}
+
+	off := newFixture(t, false).get(t, "/")
+	require.NotContains(t, off.Body.String(), ui.UmamiOrigin)
+	require.NotContains(t, off.Header().Get("Content-Security-Policy"), ui.UmamiOrigin)
 }
 
 func TestStatic(t *testing.T) {
