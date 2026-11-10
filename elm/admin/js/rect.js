@@ -66,7 +66,10 @@ export class CropperBase extends HTMLElement {
   connectedCallback() {
     if (!this.shadowRoot) this.attachShadow({ mode: "open" });
     this.schedule("build");
-    this.ro ||= new ResizeObserver(() => this.ready && this.onResize());
+    // A frame later: rebuilding inside the callback resizes what it watches.
+    this.ro ||= new ResizeObserver(() =>
+      requestAnimationFrame(() => this.ready && this.onResize()),
+    );
     this.ro.observe(this);
   }
 

@@ -159,7 +159,7 @@ Two Playwright suites, from the pinned nixpkgs, against a local server.
 Neither touches the network once its tools are built.
 
 ```bash
-nix develop -c e2e/admin/run.sh    # admin in Chromium at 1280 and 390 px, against serve --dev
+nix develop -c e2e/admin/run.sh    # admin in Chromium and WebKit at 1280 and 390 px, against serve --dev
 nix develop -c e2e/gallery/run.sh  # gallery and lightbox in Chromium, Firefox and WebKit
 ```
 
@@ -173,6 +173,6 @@ Run them after changing the admin (`elm/admin`, `server/admin*`,
 `docs/admin-api.md`) or the gallery (`ui/gallery.go`, `elm/gallery`), and both
 before a deploy. They are not in CI: they run the local loop, whose first
 `go generate` downloads Elm and npm packages that the offline Nix build
-pins, and the gallery suite needs three browser engines and software GL.
+pins, and both suites need several browser engines and software GL.
 That is a lot of setup on every push for checks that only matter when those
 parts change.

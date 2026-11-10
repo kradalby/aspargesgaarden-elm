@@ -18,7 +18,7 @@ const test = base.extend({
     expect(res.ok()).toBe(true);
     await use(await res.json());
   },
-  page: async ({ page, seed, brokenImages }, use) => {
+  page: async ({ page, seed, brokenImages, browserName }, use) => {
     expect(seed.course).toBeGreaterThan(0);
     const problems = [];
     page.on("console", (m) => {
@@ -34,6 +34,14 @@ const test = base.extend({
       // Playwright reading the preview frame tries to run its own script in
       // it; the sandbox (no allow-scripts) refuses, as it should.
       if (m.text().startsWith("Blocked script execution in 'about:srcdoc'"))
+        return;
+      // WebKit reports its own <select> styling as refused by the CSP
+      // (any <select> does, on any page with style-src 'self'); Chromium
+      // still checks the app's own styles.
+      if (
+        browserName === "webkit" &&
+        m.text().startsWith("Refused to apply a stylesheet because its hash")
+      )
         return;
       problems.push(m.text());
     });
@@ -967,6 +975,10 @@ test("the mouse wheel over the photo leaves the frame alone", async ({
   page,
   seed,
 }) => {
+  test.skip(
+    test.info().project.name === "phone-webkit",
+    "Playwright has no mouse wheel in mobile WebKit",
+  );
   await page.goto(`/admin/arrangementer/${seed.course}`);
   await page.getByRole("button", { name: "Beskjær" }).click();
   const crop = page.getByRole("dialog", { name: "Beskjær bildet" });
@@ -1159,4 +1171,28 @@ test.describe(() => {
       "1 bilde trenger hjelp",
     );
   });
+});
+
+// Safari on an iPad never asks before a tab is closed, and may drop a tab
+// she has left; a draft she has typed in is saved when the tab is hidden.
+test("a draft is saved when she leaves the tab", async ({ page }) => {
+  await page.goto("/admin/arrangementer/ny");
+  await page.getByLabel("Tittel").fill("Sommerfest");
+  const created = page.waitForResponse(
+    (r) =>
+      r.url().endsWith("/admin/api/events") && r.request().method() === "POST",
+  );
+  await page.evaluate(() => {
+    Object.defineProperty(document, "visibilityState", {
+      value: "hidden",
+      configurable: true,
+    });
+    document.dispatchEvent(new Event("visibilitychange"));
+  });
+  expect((await created).status()).toBe(201);
+  await expect(page).toHaveURL(/\/admin\/arrangementer\/\d+$/);
+  await expect(
+    page.getByText("Kladden er lagret. Den vises ikke på nettsiden.").first(),
+  ).toBeVisible();
+  await expect(page.getByText("Ikke lagret")).toHaveCount(0);
 });

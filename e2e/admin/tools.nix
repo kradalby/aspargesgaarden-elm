@@ -6,4 +6,7 @@ let
 in
 {
   playwright = pkgs.playwright-test;
+  # WebKit needs an EGL display even headless; a host without GL drivers
+  # (no /run/opengl-driver) gets Mesa's software one.
+  mesa = pkgs.mesa;
 }

@@ -11,12 +11,23 @@ class AspFit extends HTMLElement {
   constructor() {
     super();
     this.frameY = 0;
+    // Where she has the old page, read as Elm swaps in the new one. The
+    // frame runs no script (WebKit then fires no scroll events there), so
+    // its position is read, not followed.
+    new MutationObserver((ms) => {
+      const w = ms[0].target.contentWindow;
+      if (w) this.frameY = w.scrollY;
+    }).observe(this, { subtree: true, attributeFilter: ["srcdoc"] });
     // load does not bubble, but an ancestor sees it while it is captured.
     this.addEventListener("load", (e) => this.restore(e.target), true);
   }
 
   connectedCallback() {
-    this.ro ||= new ResizeObserver(() => this.fit());
+    // Its own height changes in fit(), so it waits a frame rather than
+    // resizing inside the observer's callback.
+    this.ro ||= new ResizeObserver(() =>
+      requestAnimationFrame(() => this.fit()),
+    );
     this.ro.observe(this);
     this.fit();
   }
@@ -38,9 +49,6 @@ class AspFit extends HTMLElement {
     const y = this.frameY;
     w.scrollTo({ top: y, behavior: "instant" });
     const put = w.scrollY;
-    w.addEventListener("scroll", () => (this.frameY = w.scrollY), {
-      passive: true,
-    });
     // The site's fonts can arrive after load and make the page taller than
     // it was when it was put back; try again then, unless she has scrolled.
     w.document.fonts.ready.then(() => {

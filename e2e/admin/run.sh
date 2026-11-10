@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# Browser tests of the admin app (elm/admin) in Chromium at desktop and
-# phone size, with Playwright's test runner from the pinned nixpkgs.
+# Browser tests of the admin app (elm/admin) in Chromium and WebKit at
+# desktop and phone size, with Playwright's test runner from the pinned
+# nixpkgs.
 #
 #   nix develop -c e2e/admin/run.sh [playwright args]   e.g. -g crop --project phone
 #
@@ -17,7 +18,7 @@ out=${OUT:-$here/out}
 port=${PORT:-18096}
 cd "$root"
 
-tools=$(nix build --impure --no-link --print-out-paths -f "$here/tools.nix" playwright)
+tools=$(nix build --impure --no-link --print-out-paths -f "$here/tools.nix" playwright mesa)
 playwright=$(sed -n 1p <<<"$tools")/bin/playwright
 # The specs are ES modules, which find "@playwright/test" through a
 # node_modules folder only (NODE_PATH does not apply); git ignores it.
@@ -25,6 +26,13 @@ ln -sfn "$(sed -n 1p <<<"$tools")/lib/node_modules" "$here/node_modules"
 # The dev shell's libraries (newer glibc) break the browsers' own.
 unset LD_LIBRARY_PATH
 ulimit -c 0
+# Headless WebKit still needs an EGL display; without the host's GL drivers
+# it gets Mesa's software one.
+if [ ! -d /run/opengl-driver ]; then
+  mesa=$(sed -n 2p <<<"$tools")
+  export __EGL_VENDOR_LIBRARY_FILENAMES=$mesa/share/glvnd/egl_vendor.d/50_mesa.json
+  export LIBGL_DRIVERS_PATH=$mesa/lib/dri GBM_BACKENDS_PATH=$mesa/lib/gbm EGL_PLATFORM=surfaceless
+fi
 mkdir -p "$out"
 
 if [ -z "${BASE:-}" ]; then
