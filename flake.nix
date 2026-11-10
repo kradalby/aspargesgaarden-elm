@@ -233,7 +233,14 @@
           };
         };
 
-        asparges = (withStatic goBuild).overrideAttrs (_: {
+        asparges = (withStatic goBuild).overrideAttrs (old: {
+          # Every subcommand that touches photos shells out to vips; the
+          # wrapper carries the slim one, so serve, import and images work
+          # wherever the binary runs.
+          nativeBuildInputs = (old.nativeBuildInputs or [ ]) ++ [ pkgs.makeWrapper ];
+          postFixup = (old.postFixup or "") + ''
+            wrapProgram $out/bin/asparges --prefix PATH : ${lib.getBin vips}/bin
+          '';
           meta = {
             description = "aspargesgaarden.no web server";
             homepage = "https://github.com/kradalby/aspargesgaarden-elm";

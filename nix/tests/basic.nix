@@ -74,26 +74,18 @@ let
     EOF
   '';
 
-  node =
-    noindex:
-    { config, lib, ... }:
-    {
-      imports = [ module ];
-      services.asparges = {
-        enable = true;
-        baseURL = "https://beta.aspargesgaarden.no";
-        inherit noindex;
-      };
-      # No control server here: tsnet just keeps retrying in the background.
-      systemd.services.asparges.environment.TS_NO_LOGS_NO_SUPPORT = "1";
-      # A deployer runs import and images warm as the service user, with the
-      # same vips the unit uses.
-      environment.systemPackages = [
-        config.services.asparges.package
-        (lib.getBin vips)
-        pkgs.curl
-      ];
+  node = noindex: {
+    imports = [ module ];
+    services.asparges = {
+      enable = true;
+      baseURL = "https://beta.aspargesgaarden.no";
+      inherit noindex;
     };
+    # No control server here: tsnet just keeps retrying in the background.
+    systemd.services.asparges.environment.TS_NO_LOGS_NO_SUPPORT = "1";
+    # Nothing for vips: the module's CLI has to find it by itself.
+    environment.systemPackages = [ pkgs.curl ];
+  };
 in
 {
   name = "asparges-basic";
@@ -198,6 +190,8 @@ in
         assert h.get("x-robots-tag") == "noindex", h
 
     with subtest("import an old checkout as the service user"):
+        # vips comes with the package, not from the system.
+        site.fail("command -v vips")
         # import wants serve stopped: a running one keeps its rendered pages.
         site.systemctl("stop asparges.service")
         as_service(site, "asparges import ${oldSite}")
@@ -220,9 +214,13 @@ in
             assert h["cache-control"] == "public, max-age=31536000, immutable", (url, h)
             ctype = {"avif": "image/avif", "webp": "image/webp", "jpg": "image/jpeg"}[ext]
             assert h["content-type"] == ctype, (url, h)
-            # The bytes are what the name says, as vips itself reads them.
-            loader = m.succeed("vipsheader -f vips-loader /tmp/body").strip()
-            assert loader == {"avif": "heifload", "webp": "webpload", "jpg": "jpegload"}[ext], (url, loader)
+            # The bytes are what the name says.
+            magic = bytes.fromhex("".join(m.succeed("od -An -tx1 -N12 /tmp/body").split()))
+            assert {
+                "avif": magic[4:12] == b"ftypavif",
+                "webp": magic[:4] == b"RIFF" and magic[8:12] == b"WEBP",
+                "jpg": magic[:3] == b"\xff\xd8\xff",
+            }[ext], (url, magic)
             found.setdefault(ext, []).append(url)
         assert set(found) == {"avif", "webp", "jpg"}, found
         return found
@@ -237,7 +235,7 @@ in
         before = variants(site, "/arrangementer/2030/julemarked")
         # Holds the camera-sized photo, up to its widest AVIF.
         gallery = variants(site, "/galleri")
-        site.succeed("runuser -u asparges -- asparges images check")
+        as_service(site, "asparges images check")
         no_errors(site)
         # Peak memory of the unit's cgroup, children included, against its cap.
         peak = site.succeed("systemctl show -P MemoryPeak asparges.service").strip()
@@ -280,7 +278,7 @@ in
         after = variants(site, "/arrangementer/2030/julemarked")
         assert after == before, (before, after)
         assert variants(site, "/galleri") == gallery
-        site.succeed("runuser -u asparges -- asparges images check")
+        as_service(site, "asparges images check")
         no_errors(site)
   '';
 }

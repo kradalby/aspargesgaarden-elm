@@ -24,7 +24,7 @@ in
       type = lib.types.package;
       default = self.packages.${pkgs.stdenv.hostPlatform.system}.default;
       defaultText = lib.literalExpression "asparges flake package";
-      description = "The asparges package to run.";
+      description = "The asparges package to run. It must find vips on its own, as the flake's wrapped binary does.";
     };
 
     user = lib.mkOption {
@@ -129,6 +129,10 @@ in
     };
     users.groups.${cfg.group} = { };
 
+    # import and images seed and maintain the state directory: run them as
+    # the service user, e.g. sudo -u asparges asparges images check.
+    environment.systemPackages = [ cfg.package ];
+
     systemd.services.asparges = {
       description = "asparges, the aspargesgaarden.no web server";
       wantedBy = [ "multi-user.target" ];
@@ -140,10 +144,6 @@ in
         "network-online.target"
         "nss-lookup.target"
       ];
-
-      # Photos are built by the vips CLI, looked up on PATH; asparges refuses
-      # to start without it.
-      path = [ (lib.getBin self.packages.${pkgs.stdenv.hostPlatform.system}.vips) ];
 
       serviceConfig = {
         # vips children count against this: two builds of a large photo plus
