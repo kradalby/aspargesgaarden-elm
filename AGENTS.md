@@ -11,7 +11,7 @@ conventions (Go, Nix, Elm, git, services, secrets) are in
   (one file per component, typed props); no template language, no HTML
   strings. A new piece of markup is a component, with a golden test.
 - **One image API.** Every photo on a page is `ui.Picture`, fed an
-  `images.ImageRef` that only `images/` makes. `TestPagesBuildNoRawImages`
+  `images.Ref` that only `images/` makes. `TestPagesBuildNoRawImages`
   fails on a raw `<img>`. Each photo kind has one widest-box constant in
   `images/`; `TestLayoutsWithinSharpWidth` fails when a layout draws a kind
   wider.
@@ -41,7 +41,8 @@ conventions (Go, Nix, Elm, git, services, secrets) are in
   `go.mod`, `elm2nix` after an `elm.json`, the `yarn.<app>` hash in
   `flakehashes.json` after a `yarn.lock`.
 - **The admin API is a contract.** `docs/admin-api.md` describes it; change
-  both together.
+  both together. `TestEveryCodeAndFieldIsDocumented` fails when the server
+  can send a code or field the document does not name.
 
 ## Elm apps
 

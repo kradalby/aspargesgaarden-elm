@@ -69,8 +69,8 @@ go run ./cmd/asparges serve --dev --data-dir /tmp/asparges \
 Open <http://127.0.0.1:8090/> and the admin at
 <http://127.0.0.1:8090/admin/>. `--dev` runs without Tailscale: the admin and
 metrics share the loopback listener and everyone is "Utvikler". The import
-fills an empty data directory with the test fixture (five events, a
-gallery); without it the site starts empty and the admin fills it.
+fills an empty data directory with the test fixture (events and a gallery);
+without it the site starts empty and the admin fills it.
 
 - `go generate ./static` again after changing classes in Go or Elm code
   (Tailwind emits only the classes it finds), a font, a photo master or an
@@ -88,7 +88,8 @@ gallery); without it the site starts empty and the admin fills it.
   `flakehashes.json` (the build's error prints it).
 
 `nix fmt` formats everything; the pre-commit hooks (`prek install`) run it,
-golangci-lint and `go test`.
+golangci-lint, `go test -race -short`, `vendorhash check` and the stock file
+checks (whitespace, large files, private keys).
 
 ## Running it
 
