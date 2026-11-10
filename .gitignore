@@ -33,3 +33,8 @@ result-*
 # Gallery browser test screenshots (e2e/gallery/run.sh)
 /e2e/gallery/out/
 __pycache__/
+
+# admin front end, built by e2e/build.sh
+/elm/admin/out/
+/e2e/screens/
+/e2e/test-results/
