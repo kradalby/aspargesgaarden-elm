@@ -5,6 +5,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -82,4 +83,13 @@ func TestE2EHooks(t *testing.T) {
 	require.NoError(t, err)
 	require.GreaterOrEqual(t, after.UpdatedAt.Sub(before.UpdatedAt), time.Second, "a second editor is always seen")
 	require.Equal(t, before.PriceText, after.PriceText)
+
+	// An old import's banner, under today's floor of 800.
+	rec := httptest.NewRecorder()
+	hooks.ServeHTTP(rec, httptest.NewRequestWithContext(t.Context(), "POST", "/__crop/2", strings.NewReader(`{"banner":{"x":0,"y":0,"w":700,"h":394}}`)))
+	require.Equal(t, http.StatusNoContent, rec.Code, rec.Body.String())
+
+	p, err := store.Photo(t.Context(), 2)
+	require.NoError(t, err)
+	require.Equal(t, site.Rect{X: 0, Y: 0, W: 700, H: 394}, p.Crops[site.CropBanner])
 }

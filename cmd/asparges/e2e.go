@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
@@ -42,7 +43,8 @@ func (c *e2eClock) advance(d time.Duration) {
 // e2eHooks answers the admin browser tests' hooks (the front end's e2e/),
 // so they run against the real server: POST /__reset replaces everything
 // with their seed data, POST /__touch/{id} saves an event as a second
-// editor would. Only `serve --dev --e2e-fixtures` mounts them.
+// editor would, POST /__crop/{id} stores crops unchecked. Only
+// `serve --dev --e2e-fixtures` mounts them.
 func e2eHooks(store *site.Store, imgs *images.Store, srv *server.Server, fixtures string, clock *e2eClock) http.Handler {
 	mux := http.NewServeMux()
 
@@ -77,6 +79,35 @@ func e2eHooks(store *site.Store, imgs *images.Store, srv *server.Server, fixture
 		}
 
 		srv.Changed()
+		w.WriteHeader(http.StatusNoContent)
+	})
+
+	mux.HandleFunc("POST /__crop/{id}", func(w http.ResponseWriter, r *http.Request) {
+		id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+
+		var crops map[site.CropKind]site.Rect
+		if err := json.NewDecoder(r.Body).Decode(&crops); err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+
+		// The store checks only the frame, so this keeps a crop under today's
+		// floor, as an old import may have.
+		p, err := store.Photo(r.Context(), id)
+		if err == nil {
+			err = store.SetCrops(r.Context(), id, crops)
+		}
+
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		srv.Changed(p.SHA256)
 		w.WriteHeader(http.StatusNoContent)
 	})
 

@@ -5,7 +5,8 @@
 //
 //   node e2e/admin/fake-server.mjs --port 18097
 //
-// Test hooks (not part of the contract): POST /__reset, POST /__touch/<id>.
+// Test hooks (not part of the contract): POST /__reset, POST /__touch/<id>,
+// POST /__crop/<id> (crops stored unchecked, as an old import left them).
 import { createServer } from "node:http";
 import { readFile } from "node:fs/promises";
 import { join, dirname } from "node:path";
@@ -19,12 +20,14 @@ const arg = (name, def) => {
 const port = Number(arg("port", 18097));
 
 const MAX_UPLOAD = 40 * 1024 * 1024;
-// As images.Kind: shape as whole numbers, and the narrowest crop allowed.
+// As images.Kind: shape as whole numbers, the narrowest crop allowed and
+// the widest box the pages draw it in (SharpWidth).
 const KINDS = {
-  card: { an: 4, ad: 5, min: 480 },
-  banner: { an: 16, ad: 9, min: 800 },
-  share: { an: 40, ad: 21, min: 1200 },
+  card: { an: 4, ad: 5, min: 480, sharp: 768 },
+  banner: { an: 16, ad: 9, min: 800, sharp: 896 },
+  share: { an: 40, ad: 21, min: 1200, sharp: 1200 },
 };
+const FULL = { min: 480, sharp: 992 };
 const MAX_PIXELS = 100_000_000;
 // Variants a photo's sizes take; any count would do, the app shows it as is.
 const VARIANTS = 12;
@@ -194,9 +197,25 @@ function photoJson(p) {
         p.crops[k] || centredCrop(k, p.width, p.height),
       ]),
     ),
+    quality: quality(p),
     status: p.status,
   };
 }
+
+// The server's quality, without its width ladder: what the pages draw for
+// a kind is its crop, or the whole photo where it has none it can use; a
+// share without a crop is not drawn at all.
+function quality(p) {
+  const out = { full: { ...rule(FULL), soft: p.width < FULL.sharp } };
+  for (const [k, kind] of Object.entries(KINDS)) {
+    const c = p.crops[k];
+    const w = c && c.w >= kind.min ? c.w : k === "share" ? null : p.width;
+    out[k] = { ...rule(kind), soft: w !== null && w < kind.sharp };
+  }
+  return out;
+}
+
+const rule = ({ min, sharp }) => ({ minWidth: min, sharpWidth: sharp });
 
 const months = [
   "januar",
@@ -697,6 +716,8 @@ async function api(req, res, path, url) {
       const keep = {};
       for (const [k, c] of Object.entries(body || {})) {
         const kind = KINDS[k];
+        // The photo's own crop, unchanged, is kept without a check.
+        if (kind && JSON.stringify(c) === JSON.stringify(p.crops[k])) continue;
         const centred = kind && centredCrop(k, p.width, p.height);
         // The centred rectangle the photo shows for a kind it is too small
         // for comes back with the rest: accepted, nothing stored.
@@ -803,6 +824,13 @@ const server = createServer(async (req, res) => {
     if (req.method === "POST" && (t = /^\/__touch\/(\d+)$/.exec(p))) {
       const e = db.events.get(Number(t[1]));
       if (e) e.updatedAt = now();
+      return send(res, 204, "", "text/plain");
+    }
+    if (req.method === "POST" && (t = /^\/__crop\/(\d+)$/.exec(p))) {
+      const photo = db.photos.get(Number(t[1]));
+      const body = await json(req, res);
+      if (body === undefined) return;
+      if (photo) Object.assign(photo.crops, body);
       return send(res, 204, "", "text/plain");
     }
     if (p.startsWith("/admin/api/"))
