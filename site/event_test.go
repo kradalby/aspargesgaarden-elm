@@ -201,6 +201,14 @@ func TestSplit(t *testing.T) {
 	}
 }
 
+func TestSplitUndatedDraftFirst(t *testing.T) {
+	events := append(allLegacy(), Event{ID: 99, Title: "Ny kladd"})
+
+	upcoming, past := Split(events, oslo("2026-11-10 12:00"))
+	require.Equal(t, []int64{99, 12, 11}, ids(upcoming))
+	require.NotContains(t, ids(past), int64(99))
+}
+
 func TestNextDate(t *testing.T) {
 	course := legacyEvents[10].event
 	market := legacyEvents[11].event
@@ -338,6 +346,32 @@ func TestRevise(t *testing.T) {
 		require.ErrorIs(t, err, ErrTitleRequired)
 		require.ErrorIs(t, err, ErrMainPhotoRequired)
 	})
+}
+
+func TestApply(t *testing.T) {
+	prev := legacyEvents[11].event
+	prev.MainPhoto = &Photo{ID: 1, Alt: "Bålfat på tunet"}
+	prev, err := prev.Publish(oslo("2026-10-10 12:00"))
+	require.NoError(t, err)
+
+	// What Revise refuses, Apply still shows: no title, a bad time, and a
+	// changed slug on a published event (kept, as a save would keep it).
+	next := prev
+	next.Title, next.StartTime, next.Slug = "", "25:00", "noe-annet"
+	_, err = Revise(&prev, next)
+	require.Error(t, err)
+
+	got := Apply(&prev, next)
+	require.Equal(t, prev.Slug, got.Slug)
+	require.Equal(t, prev.Year, got.Year)
+	require.Equal(t, Published, got.Status)
+	require.Empty(t, got.Title)
+	require.Equal(t, "25:00", got.StartTime)
+
+	fresh := Apply(nil, Event{Title: "Påskemarked", Start: d("2027-03-27")})
+	require.Equal(t, "paskemarked", fresh.Slug)
+	require.Equal(t, 2027, fresh.Year)
+	require.Equal(t, Draft, fresh.Status)
 }
 
 func TestValidate(t *testing.T) {

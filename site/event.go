@@ -66,6 +66,22 @@ func (e Event) SlugFrozen() bool { return !e.PublishedAt.IsZero() }
 // made from the title and the year follows the start date; after it, both are
 // kept and an attempt to change the slug fails.
 func Revise(prev *Event, next Event) (Event, error) {
+	if prev != nil && prev.SlugFrozen() && next.Slug != "" && next.Slug != prev.Slug {
+		return Event{}, fieldErr(FieldSlug, fmt.Errorf("%w: %q is published", ErrSlugFrozen, prev.Slug))
+	}
+
+	next = Apply(prev, next)
+
+	if err := next.Validate(); err != nil {
+		return Event{}, err
+	}
+
+	return next, nil
+}
+
+// Apply is Revise without the rules: the event as it would be stored. The
+// admin previews drafts with it, which may break any rule while being typed.
+func Apply(prev *Event, next Event) Event {
 	if prev == nil {
 		next.Status, next.PublishedAt = Draft, time.Time{}
 	} else {
@@ -73,9 +89,6 @@ func Revise(prev *Event, next Event) (Event, error) {
 	}
 
 	if next.SlugFrozen() {
-		if next.Slug != "" && next.Slug != prev.Slug {
-			return Event{}, fmt.Errorf("%w: %q is published", ErrSlugFrozen, prev.Slug)
-		}
 		next.Slug, next.Year = prev.Slug, prev.Year
 	} else {
 		if next.Slug == "" {
@@ -86,11 +99,7 @@ func Revise(prev *Event, next Event) (Event, error) {
 
 	next.ExtraDates = slices.SortedFunc(slices.Values(next.ExtraDates), Date.Compare)
 
-	if err := next.Validate(); err != nil {
-		return Event{}, err
-	}
-
-	return next, nil
+	return next
 }
 
 // Validate checks the rules every stored event keeps, plus Publishable when
@@ -99,39 +108,43 @@ func (e Event) Validate() error {
 	var errs []error
 
 	if e.Slug != "" {
-		errs = append(errs, ValidateSlug(e.Slug))
+		errs = append(errs, fieldErr(FieldSlug, ValidateSlug(e.Slug)))
 	}
 
-	for _, t := range []string{e.StartTime, e.EndTime} {
-		if t != "" && !ValidClock(t) {
-			errs = append(errs, fmt.Errorf("%w: %q", ErrInvalidTime, t))
+	for _, t := range []struct {
+		f     Field
+		clock string
+	}{{FieldStartTime, e.StartTime}, {FieldEndTime, e.EndTime}} {
+		if t.clock != "" && !ValidClock(t.clock) {
+			errs = append(errs, fieldErr(t.f, fmt.Errorf("%w: %q", ErrInvalidTime, t.clock)))
 		}
 	}
 
 	if !e.End.IsZero() && (e.Start.IsZero() || e.End.Before(e.Start)) {
-		errs = append(errs, ErrEndBeforeStart)
+		errs = append(errs, fieldErr(FieldEnd, ErrEndBeforeStart))
 	}
 
 	sameDay := e.End.IsZero() || e.End == e.Start
 	if sameDay && e.StartTime != "" && e.EndTime != "" && e.EndTime <= e.StartTime {
-		errs = append(errs, fmt.Errorf("%w: %s-%s", ErrEndBeforeStart, e.StartTime, e.EndTime))
+		errs = append(errs, fieldErr(FieldEndTime, fmt.Errorf("%w: %s-%s", ErrEndBeforeStart, e.StartTime, e.EndTime)))
 	}
 
 	for i, d := range e.ExtraDates {
 		if e.Start.IsZero() || !d.After(e.Start) || (i > 0 && d == e.ExtraDates[i-1]) {
-			errs = append(errs, fmt.Errorf("%w: %s", ErrExtraDate, d))
+			errs = append(errs, fieldErr(FieldExtraDates, fmt.Errorf("%w: %s", ErrExtraDate, d)))
 			break
 		}
 	}
 
 	if e.TicketURL != "" && !validLink(e.TicketURL) {
-		errs = append(errs, fmt.Errorf("%w: %q", ErrTicketURL, e.TicketURL))
+		errs = append(errs, fieldErr(FieldTicketURL, fmt.Errorf("%w: %q", ErrTicketURL, e.TicketURL)))
 	}
 
 	seen := map[int64]bool{}
 	for _, p := range e.photos() {
+		// The second use of a photo is always among the further photos.
 		if seen[p.ID] {
-			errs = append(errs, fmt.Errorf("%w: %d", ErrDuplicatePhoto, p.ID))
+			errs = append(errs, &FieldError{Field: FieldExtraPhotos, PhotoID: p.ID, Err: fmt.Errorf("%w: %d", ErrDuplicatePhoto, p.ID)})
 		}
 		seen[p.ID] = true
 	}
@@ -158,24 +171,24 @@ func (e Event) Publishable() error {
 	var errs []error
 
 	if strings.TrimSpace(e.Title) == "" {
-		errs = append(errs, ErrTitleRequired)
+		errs = append(errs, fieldErr(FieldTitle, ErrTitleRequired))
 	}
 
 	if e.Start.IsZero() {
-		errs = append(errs, ErrStartRequired)
+		errs = append(errs, fieldErr(FieldStart, ErrStartRequired))
 	}
 
 	if e.Slug == "" {
-		errs = append(errs, fmt.Errorf("%w: empty", ErrSlugInvalid))
+		errs = append(errs, fieldErr(FieldSlug, fmt.Errorf("%w: empty", ErrSlugInvalid)))
 	}
 
 	if e.MainPhoto == nil {
-		errs = append(errs, ErrMainPhotoRequired)
+		errs = append(errs, fieldErr(FieldMainPhoto, ErrMainPhotoRequired))
 	}
 
 	for _, p := range e.photos() {
 		if strings.TrimSpace(p.Alt) == "" {
-			errs = append(errs, fmt.Errorf("%w: photo %d", ErrAltRequired, p.ID))
+			errs = append(errs, e.photoErr(p.ID, ErrAltRequired))
 		}
 	}
 
@@ -272,7 +285,9 @@ func (e Event) NextDate(now time.Time) Date {
 // dropped a multi-day event to past after its first day.
 func Split(events []Event, now time.Time) (upcoming, past []Event) {
 	for _, e := range events {
-		if e.IsOver(now) {
+		// Only a draft in the admin's preview lacks a date: it is shown
+		// first among what is coming, where its date will put it.
+		if !e.Start.IsZero() && e.IsOver(now) {
 			past = append(past, e)
 		} else {
 			upcoming = append(upcoming, e)

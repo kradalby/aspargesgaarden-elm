@@ -30,4 +30,5 @@ var (
 	ErrPhotographerURL   = errors.New("photographer link must be an http or https address")
 	ErrPhotographerTaken = errors.New("a photographer with that name exists")
 	ErrPhotographerInUse = errors.New("photographer is credited on a photo")
+	ErrStale             = errors.New("event was saved by someone else since it was loaded")
 )

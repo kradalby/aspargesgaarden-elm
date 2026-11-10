@@ -194,11 +194,41 @@ func writeEventChildren(ctx context.Context, q *dbsqlc.Queries, id int64, e Even
 			EventID: id, PhotoID: p.ID, Role: role, Position: int64(i),
 		})
 		if db.IsForeignKeyViolation(err) {
-			return fmt.Errorf("photo %d: %w", p.ID, ErrNotFound)
+			return e.photoErr(p.ID, ErrNotFound)
 		}
 		if err != nil {
 			return fmt.Errorf("adding photo %d to event %d: %w", p.ID, id, err)
 		}
+
+		if err := writePhotoMeta(ctx, q, e, p); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// writePhotoMeta stores the alt text and credit the event form edits with
+// it. An unchanged photo is left alone, so its pages' lastmod stays put.
+func writePhotoMeta(ctx context.Context, q *dbsqlc.Queries, e Event, p Photo) error {
+	row, err := q.GetPhoto(ctx, p.ID)
+	if err != nil {
+		return fmt.Errorf("loading photo %d: %w", p.ID, err)
+	}
+
+	ref := photographerRef(p.Photographer)
+	if row.Alt == p.Alt && row.PhotographerID == ref {
+		return nil
+	}
+
+	_, err = q.UpdatePhotoMeta(ctx, dbsqlc.UpdatePhotoMetaParams{
+		Alt: p.Alt, PhotographerID: ref, UpdatedAt: e.UpdatedAt.Unix(), ID: p.ID,
+	})
+	if db.IsForeignKeyViolation(err) {
+		return e.photoErr(p.ID, fmt.Errorf("photographer %d: %w", ref.Int64, ErrNotFound))
+	}
+	if err != nil {
+		return fmt.Errorf("updating photo %d: %w", p.ID, err)
 	}
 
 	return nil
@@ -206,7 +236,7 @@ func writeEventChildren(ctx context.Context, q *dbsqlc.Queries, id int64, e Even
 
 func eventWriteErr(err error, e Event) error {
 	if db.IsUniqueViolation(err) {
-		return fmt.Errorf("%w: %d/%s", ErrSlugTaken, e.Year, e.Slug)
+		return fieldErr(FieldSlug, fmt.Errorf("%w: %d/%s", ErrSlugTaken, e.Year, e.Slug))
 	}
 
 	return fmt.Errorf("writing event %q: %w", e.Title, err)
@@ -459,33 +489,7 @@ func (s *Store) UpdatePhoto(ctx context.Context, p Photo) (Photo, error) {
 
 // SetCrop sets the crop of one kind on a photo.
 func (s *Store) SetCrop(ctx context.Context, photoID int64, kind CropKind, r Rect) error {
-	return s.db.InTx(ctx, func(q *dbsqlc.Queries) error {
-		row, err := q.GetPhoto(ctx, photoID)
-		if errors.Is(err, sql.ErrNoRows) {
-			return fmt.Errorf("photo %d: %w", photoID, ErrNotFound)
-		}
-		if err != nil {
-			return fmt.Errorf("loading photo %d: %w", photoID, err)
-		}
-
-		if err := photoFromRow(row).CheckCrop(kind, r); err != nil {
-			return err
-		}
-
-		if err := q.UpsertPhotoCrop(ctx, dbsqlc.UpsertPhotoCropParams{
-			PhotoID: photoID, Kind: string(kind),
-			X: int64(r.X), Y: int64(r.Y), W: int64(r.W), H: int64(r.H),
-		}); err != nil {
-			return fmt.Errorf("setting %s crop of photo %d: %w", kind, photoID, err)
-		}
-
-		// A new crop changes the pages that show the photo.
-		if err := q.TouchPhoto(ctx, dbsqlc.TouchPhotoParams{UpdatedAt: s.now().Unix(), ID: photoID}); err != nil {
-			return fmt.Errorf("touching photo %d: %w", photoID, err)
-		}
-
-		return nil
-	})
+	return s.SetCrops(ctx, photoID, map[CropKind]Rect{kind: r})
 }
 
 // DeletePhoto removes a photo that no event or gallery uses; its crops go with
