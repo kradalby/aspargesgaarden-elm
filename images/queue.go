@@ -220,7 +220,7 @@ func (s *Store) prepare(ctx context.Context, sha string) error {
 		}
 
 		n += len(w.specs)
-		if err := s.buildGroup(ctx, p, orig, w.g, w.specs); err != nil {
+		if err := s.buildGroup(ctx, p, orig, w.g, w.specs, s.path); err != nil {
 			errs = append(errs, fmt.Errorf("%s: %w", w.g.kind, err))
 		}
 	}

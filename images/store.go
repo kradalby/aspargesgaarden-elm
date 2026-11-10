@@ -132,8 +132,8 @@ func exists(path string) bool {
 }
 
 // buildGroup builds specs, all of group g of photo p, from the original at
-// orig, in a job slot.
-func (s *Store) buildGroup(ctx context.Context, p Photo, orig string, g group, specs []VariantSpec) error {
+// orig, in a job slot, to the files dst names.
+func (s *Store) buildGroup(ctx context.Context, p Photo, orig string, g group, specs []VariantSpec, dst func(VariantSpec) string) error {
 	select {
 	case s.slots <- struct{}{}:
 	case <-ctx.Done():
@@ -144,12 +144,12 @@ func (s *Store) buildGroup(ctx context.Context, p Photo, orig string, g group, s
 	s.builds.Add(1)
 	start := time.Now()
 
-	err := s.vips.build(ctx, p, orig, g, specs, s.path)
+	err := s.vips.build(ctx, p, orig, g, specs, dst)
 
 	metricBuildSeconds.WithLabelValues(string(g.kind)).Observe(time.Since(start).Seconds())
 
 	for _, sp := range specs {
-		if exists(s.path(sp)) {
+		if exists(dst(sp)) {
 			metricBuilt.WithLabelValues(string(sp.Kind), string(sp.Format)).Inc()
 		}
 	}

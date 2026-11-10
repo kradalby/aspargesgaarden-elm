@@ -5,10 +5,13 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"syscall"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 )
@@ -146,6 +149,76 @@ func TestIntakeDedup(t *testing.T) {
 	entries, err := os.ReadDir(filepath.Dir(path))
 	require.NoError(t, err)
 	require.Len(t, entries, 1)
+}
+
+// Two uploads of the same bytes; the first is cut off in its decode after
+// the second has finished. The second's original must stay.
+func TestIntakeCutOffKeepsOthersOriginal(t *testing.T) {
+	t.Parallel()
+	s := newTestStore(t, newFakeCatalog())
+	ctx := t.Context()
+
+	dir := t.TempDir()
+	first, fifo := filepath.Join(dir, "first"), filepath.Join(dir, "go")
+	require.NoError(t, syscall.Mkfifo(fifo, 0o600))
+
+	mkdir, err := exec.LookPath("mkdir")
+	require.NoError(t, err)
+
+	// The first decode waits for the test, then dies the way a request's end
+	// or an OOM kill ends it; every other call is the real vips.
+	script := filepath.Join(dir, "vips")
+	require.NoError(t, os.WriteFile(script, fmt.Appendf(nil,
+		"#!/bin/sh\nif [ \"$1\" = thumbnail ] && %s %s 2>/dev/null; then read x < %s; kill -KILL $$; fi\nexec %s \"$@\"\n",
+		mkdir, first, fifo, s.vips.vips), 0o700)) //nolint:gosec // a test's own script
+	s.vips.vips = script
+
+	b, err := os.ReadFile(fixture(t, "upright.jpg"))
+	require.NoError(t, err)
+
+	cut := make(chan error, 1)
+
+	go func() {
+		_, err := s.Intake(ctx, bytes.NewReader(b))
+		cut <- err
+	}()
+
+	require.Eventually(t, func() bool { return exists(first) }, time.Minute, 10*time.Millisecond)
+
+	o, err := s.Intake(ctx, bytes.NewReader(b))
+	require.NoError(t, err)
+
+	require.NoError(t, os.WriteFile(fifo, []byte("go\n"), 0o600))
+	require.Error(t, <-cut)
+	require.FileExists(t, s.originalPath(o.SHA256, o.MIME))
+}
+
+// A photo whose original went missing heals when the same file is uploaded
+// again.
+func TestIntakeHealsMissingOriginal(t *testing.T) {
+	t.Parallel()
+	cat := newFakeCatalog()
+	s := newTestStore(t, cat)
+	ctx := t.Context()
+
+	p := photoOf(intake(t, s, "upright.jpg"))
+	cat.put(p)
+	require.NoError(t, os.Remove(s.originalPath(p.SHA256, p.MIME)))
+
+	s.Enqueue(p.SHA256)
+	require.True(t, s.step(ctx))
+
+	st, err := s.Status(ctx, p.SHA256)
+	require.NoError(t, err)
+	require.Equal(t, ReasonMissingOriginal, st.Reason)
+
+	intake(t, s, "upright.jpg")
+	s.Enqueue(p.SHA256) // the upload's Changed
+	require.True(t, s.step(ctx))
+
+	st, err = s.Status(ctx, p.SHA256)
+	require.NoError(t, err)
+	require.Equal(t, StateReady, st.State)
 }
 
 func TestSniff(t *testing.T) {

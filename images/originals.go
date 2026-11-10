@@ -93,30 +93,32 @@ func (s *Store) Intake(ctx context.Context, r io.Reader) (Original, error) {
 		return Original{}, fmt.Errorf("%w: %dx%d is too tall and narrow", ErrUnsupported, o.Width, o.Height)
 	}
 
-	if err := f.Sync(); err != nil {
-		return Original{}, fmt.Errorf("sync upload: %w", err)
-	}
-
-	created, err := s.storeOriginal(f.Name(), o)
-	if err != nil {
-		return Original{}, err
-	}
-
 	// The preview is the full decode that proves the file is sound, and what
-	// the admin shows next, with the thumb its lists show. The row does not
-	// exist yet, so they are built here, not by the worker.
+	// the admin shows next, with the thumb its lists show. They are built
+	// from the upload where it lies, so an upload that fails or is cut off
+	// never touches originals/, which another upload of the same bytes may
+	// rely on.
 	specs := []VariantSpec{pv}
 	if th, ok := thumbSpec(p); ok && th != pv {
 		specs = append(specs, th)
 	}
 
-	if err := s.buildGroup(ctx, p, s.originalPath(o.SHA256, o.MIME), groups(p)[0], specs); err != nil {
-		if created {
-			orig := s.originalPath(o.SHA256, o.MIME)
-			_ = os.Remove(orig)
-			_ = os.Remove(filepath.Dir(orig)) // only if empty
-		}
+	work, err := os.MkdirTemp(tmp, "intake-")
+	if err != nil {
+		return Original{}, fmt.Errorf("intake dir: %w", err)
+	}
+	defer os.RemoveAll(work)
 
+	built := func(sp VariantSpec) string { return filepath.Join(work, sp.file()) }
+	if err := s.buildGroup(ctx, p, f.Name(), groups(p)[0], specs, built); err != nil {
+		return Original{}, err
+	}
+
+	if err := f.Sync(); err != nil {
+		return Original{}, fmt.Errorf("sync upload: %w", err)
+	}
+
+	if err := s.store(f.Name(), o, specs, built); err != nil {
 		return Original{}, err
 	}
 
@@ -125,39 +127,48 @@ func (s *Store) Intake(ctx context.Context, r io.Reader) (Original, error) {
 	return o, nil
 }
 
-// storeOriginal moves a checked upload to its content address. created is
-// false when the same content was already there. Either way the photo is
+// store moves a checked upload to its content address, unless the same
+// content is there already, and its built files into place. The photo is
 // fresh until the worker finds its row: the caller is about to write it,
 // and a forget queued by an earlier delete of the same bytes must not take
 // the original from under it.
-func (s *Store) storeOriginal(tmp string, o Original) (bool, error) {
+func (s *Store) store(upload string, o Original, specs []VariantSpec, built func(VariantSpec) string) error {
 	s.files.Lock()
 	defer s.files.Unlock()
 
 	s.fresh[o.SHA256] = true
 
 	dst := s.originalPath(o.SHA256, o.MIME)
-	if exists(dst) {
-		return false, nil
-	}
+	if !exists(dst) {
+		if err := os.MkdirAll(filepath.Dir(dst), dirPerm); err != nil {
+			return fmt.Errorf("originals dir: %w", err)
+		}
 
-	if err := os.MkdirAll(filepath.Dir(dst), dirPerm); err != nil {
-		return false, fmt.Errorf("originals dir: %w", err)
-	}
+		if err := os.Rename(upload, dst); err != nil {
+			return fmt.Errorf("store original: %w", err)
+		}
 
-	if err := os.Rename(tmp, dst); err != nil {
-		return false, fmt.Errorf("store original: %w", err)
-	}
-
-	// Originals cannot be rebuilt: make the rename and a new prefix folder
-	// durable before the caller records the photo.
-	for _, d := range []string{filepath.Dir(dst), filepath.Join(s.root, "originals")} {
-		if err := syncDir(d); err != nil {
-			return true, err
+		// Originals cannot be rebuilt: make the rename and a new prefix
+		// folder durable before the caller records the photo.
+		for _, d := range []string{filepath.Dir(dst), filepath.Join(s.root, "originals")} {
+			if err := syncDir(d); err != nil {
+				return err
+			}
 		}
 	}
 
-	return true, nil
+	for _, sp := range specs {
+		if err := os.MkdirAll(filepath.Dir(s.path(sp)), dirPerm); err != nil {
+			return fmt.Errorf("variant dir: %w", err)
+		}
+
+		//nolint:gosec // both paths are derived from a VariantSpec, never from input
+		if err := os.Rename(built(sp), s.path(sp)); err != nil {
+			return fmt.Errorf("move into place: %w", err)
+		}
+	}
+
+	return nil
 }
 
 // sniff names the type from magic bytes. libvips must later agree (see
