@@ -11,7 +11,10 @@ require (
 	github.com/prometheus/client_golang v1.25.0
 	github.com/stretchr/testify v1.12.1
 	github.com/tailscale/squibble v0.0.0-20260831233316-9a4c8961e6f5
+	github.com/yuin/goldmark v1.8.7
+	golang.org/x/net v0.60.0
 	golang.org/x/sync v0.25.0
+	golang.org/x/text v0.43.0
 	modernc.org/sqlite v1.61.1
 	tailscale.com v1.104.5
 )
@@ -64,11 +67,9 @@ require (
 	go4.org/netipx v0.0.0-20260823151212-3075585bcbeb // indirect
 	golang.org/x/crypto v0.58.0 // indirect
 	golang.org/x/exp v0.0.0-20260908205506-85c1c2202aba // indirect
-	golang.org/x/net v0.60.0 // indirect
 	golang.org/x/oauth2 v0.37.0 // indirect
 	golang.org/x/sys v0.49.0 // indirect
 	golang.org/x/term v0.47.0 // indirect
-	golang.org/x/text v0.43.0 // indirect
 	golang.org/x/time v0.16.0 // indirect
 	golang.zx2c4.com/wintun v0.0.0-20230126152724-0fa3db229ce2 // indirect
 	golang.zx2c4.com/wireguard/windows v1.1.1 // indirect

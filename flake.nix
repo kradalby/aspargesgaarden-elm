@@ -81,10 +81,13 @@
             settings.formatter.prettier.options = [ "--no-editorconfig" ];
             # fmtExclude only trims the check's source; `nix fmt` walks the
             # working tree, so it needs the same paths as treefmt excludes.
-            settings.global.excludes = lib.concatMap (p: [
-              p
-              "${p}/**"
-            ]) legacy;
+            # Golden files are byte-exact renderer output, one tag per line.
+            settings.global.excludes =
+              lib.concatMap (p: [
+                p
+                "${p}/**"
+              ]) legacy
+              ++ [ "**/testdata/**" ];
           };
         };
 
