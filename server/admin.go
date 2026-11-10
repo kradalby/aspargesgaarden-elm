@@ -88,7 +88,7 @@ func (s *Server) Admin() http.Handler {
 	mux := http.NewServeMux()
 	s.adminAPI(mux)
 	mux.HandleFunc("/admin/api/", func(w http.ResponseWriter, r *http.Request) {
-		s.writeProblems(w, r, http.StatusNotFound, []problem{{Code: "not_found"}}, nil)
+		s.writeProblems(w, r, http.StatusNotFound, []problem{{Code: codeNotFound}}, nil)
 	})
 	// No method in the pattern: "GET /admin/" would conflict with the
 	// method-less "/admin/api/".
@@ -100,7 +100,7 @@ func (s *Server) Admin() http.Handler {
 
 	csrf := http.NewCrossOriginProtection()
 	csrf.SetDenyHandler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		s.deny(w, r, "cross_origin", "cross-origin write refused")
+		s.deny(w, r, codeCrossOrigin, "cross-origin write refused")
 	}))
 	h := csrf.Handler(mux)
 
@@ -133,7 +133,7 @@ func (s *Server) identify(r *http.Request) (u user, code, reason string) {
 
 	if s.cfg.Dev {
 		if !isLoopbackHost(host) {
-			return user{}, "wrong_host", "host " + host + " is not loopback"
+			return user{}, codeWrongHost, "host " + host + " is not loopback"
 		}
 
 		return user{Name: DevName, Login: "dev"}, "", ""
@@ -141,23 +141,23 @@ func (s *Server) identify(r *http.Request) (u user, code, reason string) {
 
 	tn := s.cfg.Admin.Tailnet
 	if tn == nil {
-		return user{}, "forbidden", "no tailnet to identify callers"
+		return user{}, codeForbidden, "no tailnet to identify callers"
 	}
 
 	st, err := tn.StatusWithoutPeers(ctx)
 	if err != nil || st == nil || st.Self == nil {
 		s.cfg.Log.ErrorContext(ctx, "admin: tailnet status", "err", err)
-		return user{}, "forbidden", "own tailnet names unknown"
+		return user{}, codeForbidden, "own tailnet names unknown"
 	}
 
 	if !ownHost(host, st) {
-		return user{}, "wrong_host", "host " + host + " is not this node"
+		return user{}, codeWrongHost, "host " + host + " is not this node"
 	}
 
 	who, err := tn.WhoIs(ctx, r.RemoteAddr)
 	// The local API answers JSON null as (nil, nil): nobody, not a crash.
 	if err != nil || who == nil || who.UserProfile == nil {
-		return user{}, "forbidden", "caller not identified"
+		return user{}, codeForbidden, "caller not identified"
 	}
 
 	u = user{Name: who.UserProfile.DisplayName, Login: who.UserProfile.LoginName}
@@ -170,7 +170,7 @@ func (s *Server) identify(r *http.Request) (u user, code, reason string) {
 	}
 
 	if !hasAdminCap(who.CapMap) {
-		return u, "forbidden", "no " + string(CapName) + " grant"
+		return u, codeForbidden, "no " + string(CapName) + " grant"
 	}
 
 	return u, "", ""

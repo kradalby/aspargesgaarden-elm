@@ -1,6 +1,7 @@
 package server
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
@@ -121,21 +122,18 @@ func (s *Server) photoStatus(ctx context.Context, sha string) statusJSON {
 	st, err := s.cfg.Admin.Photos.Status(ctx, sha)
 	if err != nil {
 		// Not in the photo store's view yet: it is a moment behind a write.
-		return statusJSON{State: "preparing"}
+		return statusJSON{State: statePreparing}
 	}
 
 	out := statusJSON{Done: st.Ready, Total: st.Total, PreviewReady: st.Preview != ""}
 
 	switch st.State {
 	case images.StateReady:
-		out.State = "ready"
+		out.State = stateReady
 	case images.StateFailed:
-		out.State, out.Reason = "failed", string(st.Reason)
-		if out.Reason == "" {
-			out.Reason = string(images.ReasonInternal)
-		}
+		out.State, out.Reason = stateFailed, cmp.Or(reasons[st.Reason].code, codeInternal)
 	case images.StateQueued, images.StatePreparing:
-		out.State = "preparing"
+		out.State = statePreparing
 	}
 
 	return out
@@ -191,7 +189,7 @@ func (s *Server) uploadPhoto(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
 	if r.ContentLength > maxUploadBody {
-		s.writeProblems(w, r, http.StatusRequestEntityTooLarge, []problem{{Code: "too_large"}}, nil)
+		s.writeProblems(w, r, http.StatusRequestEntityTooLarge, []problem{{Code: codeTooLarge}}, nil)
 		return
 	}
 
@@ -252,28 +250,18 @@ func (s *Server) uploadPhoto(w http.ResponseWriter, r *http.Request) {
 func (s *Server) uploadFailed(w http.ResponseWriter, r *http.Request, err error) {
 	var tooBig *http.MaxBytesError
 
-	code, status := "", 0
+	var code string
+
+	status := http.StatusRequestEntityTooLarge
 
 	switch {
 	case errors.As(err, &tooBig):
-		code, status = "too_large", http.StatusRequestEntityTooLarge
+		code = codeTooLarge
 	case r.Context().Err() != nil:
 		return
 	default:
-		switch images.ReasonOf(err) {
-		case images.ReasonTooLarge:
-			code, status = "too_large", http.StatusRequestEntityTooLarge
-		case images.ReasonNotPhoto:
-			code, status = "unsupported_type", http.StatusUnsupportedMediaType
-		case images.ReasonDamaged:
-			code, status = "damaged", http.StatusUnprocessableEntity
-		case images.ReasonTooSmall:
-			code, status = "too_small", http.StatusUnprocessableEntity
-		case images.ReasonTooManyPixels:
-			code, status = "too_many_pixels", http.StatusUnprocessableEntity
-		case images.ReasonNone, images.ReasonCropOutside, images.ReasonCropAspect,
-			images.ReasonMissingOriginal, images.ReasonInternal:
-		}
+		reason := reasons[images.ReasonOf(err)]
+		code, status = reason.code, reason.status
 	}
 
 	if code == "" {
@@ -330,7 +318,7 @@ func (s *Server) photoStatuses(w http.ResponseWriter, r *http.Request) {
 func (s *Server) preparePhoto(w http.ResponseWriter, r *http.Request, p site.Photo) {
 	st := s.photoStatus(r.Context(), p.SHA256)
 
-	if st.State == "failed" {
+	if st.State == stateFailed {
 		if err := s.cfg.Admin.Photos.Retry(r.Context(), p.SHA256); err != nil {
 			s.apiFail(w, r, err, nil)
 			return
@@ -359,7 +347,7 @@ func (s *Server) updatePhoto(w http.ResponseWriter, r *http.Request, p site.Phot
 	if in.PhotographerID != nil {
 		ph, err := s.cfg.Store.Photographer(r.Context(), *in.PhotographerID)
 		if err != nil {
-			s.apiFail(w, r, &site.FieldError{Field: "photographerId", PhotoID: p.ID, Err: err}, nil)
+			s.apiFail(w, r, &bodyError{key: "photographerId", photoID: p.ID, err: err}, nil)
 			return
 		}
 
@@ -414,7 +402,7 @@ func (s *Server) setCrops(w http.ResponseWriter, r *http.Request, p site.Photo) 
 		}
 
 		if err != nil {
-			errs = append(errs, &site.FieldError{Field: site.Field(k), Err: err})
+			errs = append(errs, &bodyError{key: k, err: err})
 			continue
 		}
 

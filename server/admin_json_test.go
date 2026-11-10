@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -58,7 +59,7 @@ func TestProblems(t *testing.T) {
 				&site.FieldError{Field: "card", Err: images.ErrCropAspect},
 				&site.FieldError{Field: "share", Err: images.ErrTooSmall},
 				&site.FieldError{Field: "banner", Err: images.ErrCropOutside},
-				&site.FieldError{Field: "full", Err: images.ErrKind},
+				&bodyError{key: "full", err: images.ErrKind},
 			),
 			http.StatusUnprocessableEntity,
 			[]problem{
@@ -89,6 +90,48 @@ func TestProblems(t *testing.T) {
 			require.Equal(t, tt.status, status)
 			require.Equal(t, tt.want, got)
 		})
+	}
+}
+
+// The app knows only the words docs/admin-api.md lists: every code the
+// server can send, and every field it names, must be there.
+func TestEveryCodeAndFieldIsDocumented(t *testing.T) {
+	doc, err := os.ReadFile("../docs/admin-api.md")
+	require.NoError(t, err)
+
+	words := []string{codeInternal, codeNotFound, codeForbidden, codeWrongHost, codeCrossOrigin, codeTooLarge}
+	for _, c := range codes {
+		words = append(words, c.code)
+		if c.field != "" {
+			words = append(words, c.field)
+		}
+	}
+
+	for _, r := range reasons {
+		words = append(words, r.code)
+	}
+
+	for _, f := range fields {
+		words = append(words, f)
+	}
+
+	words = append(words, statePreparing, stateReady, stateFailed, "photographerId")
+
+	for _, w := range words {
+		require.Contains(t, string(doc), "`"+w+"`", "%q is not in docs/admin-api.md", w)
+	}
+}
+
+// Each site rule's field reaches the app by its API name, never by a name
+// site happens to use.
+func TestEverySiteFieldHasAnAPIName(t *testing.T) {
+	for _, f := range []site.Field{
+		site.FieldTitle, site.FieldSlug, site.FieldStart, site.FieldStartTime, site.FieldEnd,
+		site.FieldEndTime, site.FieldExtraDates, site.FieldTicketURL, site.FieldMainPhoto,
+		site.FieldExtraPhotos, site.FieldAlt,
+		site.Field(images.Card), site.Field(images.Banner), site.Field(images.Share),
+	} {
+		require.NotEmpty(t, fields[f], "site field %q", f)
 	}
 }
 

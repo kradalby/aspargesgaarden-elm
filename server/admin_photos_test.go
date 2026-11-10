@@ -385,20 +385,33 @@ func TestAdminPhotoStatus(t *testing.T) {
 	ready := a.storedPhoto(t, 'a')
 	building := a.storedPhoto(t, 'b')
 	broken := a.storedPhoto(t, 'c')
+	notPhoto := a.storedPhoto(t, 'd')
+	gone := a.storedPhoto(t, 'e')
 
 	a.photos.status[building.SHA256] = images.Status{State: images.StateQueued, Ready: 0, Total: 0}
 	a.photos.status[broken.SHA256] = images.Status{State: images.StateFailed, Ready: 3, Total: 40, Reason: images.ReasonDamaged, Preview: "/img/x"}
+	a.photos.status[notPhoto.SHA256] = images.Status{State: images.StateFailed, Reason: images.ReasonNotPhoto}
+	a.photos.status[gone.SHA256] = images.Status{State: images.StateFailed, Reason: images.ReasonMissingOriginal}
 
-	rec := a.do(t, "GET", "/admin/api/photos/status?ids="+itoa(ready.ID)+","+itoa(building.ID)+","+itoa(broken.ID)+",999", req{})
+	ids := []int64{ready.ID, building.ID, broken.ID, notPhoto.ID, gone.ID, 999}
+	q := make([]string, len(ids))
+	for i, id := range ids {
+		q[i] = itoa(id)
+	}
+
+	rec := a.do(t, "GET", "/admin/api/photos/status?ids="+strings.Join(q, ","), req{})
 	require.Equal(t, http.StatusOK, rec.Code)
 	require.Equal(t, map[string]map[string]statusJSON{"statuses": {
 		itoa(ready.ID):    {State: "ready", Done: 40, Total: 40, PreviewReady: true},
 		itoa(building.ID): {State: "preparing"},
 		itoa(broken.ID):   {State: "failed", Done: 3, Total: 40, PreviewReady: true, Reason: "damaged"},
+		// The upload's word for it, not the photo store's.
+		itoa(notPhoto.ID): {State: "failed", Reason: "unsupported_type"},
+		itoa(gone.ID):     {State: "failed", Reason: "internal"},
 	}}, decode[map[string]map[string]statusJSON](t, rec))
 
-	ids := strings.Repeat("1,", maxStatusIDs+1)
-	require.Equal(t, http.StatusBadRequest, a.do(t, "GET", "/admin/api/photos/status?ids="+ids, req{}).Code)
+	tooMany := strings.Repeat("1,", maxStatusIDs+1)
+	require.Equal(t, http.StatusBadRequest, a.do(t, "GET", "/admin/api/photos/status?ids="+tooMany, req{}).Code)
 	require.Equal(t, http.StatusBadRequest, a.do(t, "GET", "/admin/api/photos/status?ids=a", req{}).Code)
 
 	// Prepare starts a failed photo again, and leaves the others be.

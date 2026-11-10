@@ -169,12 +169,13 @@ polling (see [Photo status](#photo-status)).
   "Klargjør bildet … 12 av 46" from them.
 - `previewReady`: the preview and thumb sizes exist. Built first, so the user
   can see and crop the photo while the rest is still being made.
-- `reason`: `""` unless `failed`. Codes the app explains:
-  - `damaged`: the file could not be read as a picture (truncated, corrupt).
-  - `too_small`: smaller than the smallest size the site uses (480 px wide).
-  - `internal`: anything else (vips crashed, timed out, disk full). Worth a
-    retry.
-    Any other code is shown like `internal`.
+- `reason`: `""` unless `failed`. What is wrong with the photo itself has
+  the upload's code for it (see [Photos](#photos)): `damaged` (the file
+  could not be read as a picture: truncated, corrupt), `too_small` (smaller
+  than the smallest size the site uses, 480 px wide), and the rarer
+  `unsupported_type`, `too_large` and `too_many_pixels`. `internal` is
+  anything else (vips crashed, timed out, disk full, the stored original is
+  gone): worth a retry. Any other code is shown like `internal`.
 - A `failed` photo can still be referred to by events and the gallery; the
   public pages fall back to building on request. Publishing is never blocked
   by a photo's status.

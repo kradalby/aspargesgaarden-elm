@@ -25,6 +25,72 @@ type problem struct {
 	PhotoID int64  `json:"photoId,omitempty"`
 }
 
+// The admin API's words live here: every code, field, photo state and
+// reason the server sends, each as docs/admin-api.md lists it. Nothing is
+// passed on as another package names it, so a rename there cannot change
+// what the app reads.
+
+// Codes besides the rule errors in codes.
+const (
+	codeInternal    = "internal"
+	codeNotFound    = "not_found"
+	codeForbidden   = "forbidden"
+	codeWrongHost   = "wrong_host"
+	codeCrossOrigin = "cross_origin"
+	codeTooLarge    = "too_large"
+)
+
+// fields names the part of a form a site rule is about.
+var fields = map[site.Field]string{
+	site.FieldTitle:           "title",
+	site.FieldSlug:            "slug",
+	site.FieldStart:           "start",
+	site.FieldStartTime:       "startTime",
+	site.FieldEnd:             "end",
+	site.FieldEndTime:         "endTime",
+	site.FieldExtraDates:      "extraDates",
+	site.FieldTicketURL:       "ticketUrl",
+	site.FieldMainPhoto:       "mainPhoto",
+	site.FieldExtraPhotos:     "extraPhotos",
+	site.FieldAlt:             "alt",
+	site.Field(images.Card):   "card",
+	site.Field(images.Banner): "banner",
+	site.Field(images.Share):  "share",
+}
+
+// The states of a photo's sizes (PhotoStatus).
+const (
+	statePreparing = "preparing"
+	stateReady     = "ready"
+	stateFailed    = "failed"
+)
+
+// reasons names what is wrong with a photo the app can explain: why an
+// upload was refused, with the status it gets, and why a photo failed. An
+// images.Reason not here is "internal".
+var reasons = map[images.Reason]struct {
+	code   string
+	status int
+}{
+	images.ReasonTooLarge:      {codeTooLarge, http.StatusRequestEntityTooLarge},
+	images.ReasonNotPhoto:      {"unsupported_type", http.StatusUnsupportedMediaType},
+	images.ReasonDamaged:       {"damaged", http.StatusUnprocessableEntity},
+	images.ReasonTooSmall:      {"too_small", http.StatusUnprocessableEntity},
+	images.ReasonTooManyPixels: {"too_many_pixels", http.StatusUnprocessableEntity},
+}
+
+// bodyError is a problem with a key of the request body itself, named as
+// the app sent it.
+type bodyError struct {
+	key     string
+	photoID int64
+	err     error
+}
+
+func (e *bodyError) Error() string { return e.key + ": " + e.err.Error() }
+
+func (e *bodyError) Unwrap() error { return e.err }
+
 // codes maps every rule error to its code and status. A rule without a
 // field of its own gets the field shown here unless its error names one.
 var codes = []struct {
@@ -34,8 +100,8 @@ var codes = []struct {
 	field  string
 }{
 	{errBadRequest, "bad_request", http.StatusBadRequest, ""},
-	{site.ErrNotFound, "not_found", http.StatusNotFound, ""},
-	{images.ErrNotFound, "not_found", http.StatusNotFound, ""},
+	{site.ErrNotFound, codeNotFound, http.StatusNotFound, ""},
+	{images.ErrNotFound, codeNotFound, http.StatusNotFound, ""},
 	{site.ErrStale, "conflict", http.StatusConflict, ""},
 	{site.ErrInvalidDate, "invalid_date", http.StatusUnprocessableEntity, ""},
 	{site.ErrInvalidTime, "invalid_time", http.StatusUnprocessableEntity, ""},
@@ -58,7 +124,7 @@ var codes = []struct {
 	{images.ErrKind, "crop_kind", http.StatusUnprocessableEntity, ""},
 	{images.ErrCropOutside, "crop_outside", http.StatusUnprocessableEntity, ""},
 	{images.ErrCropAspect, "crop_aspect", http.StatusUnprocessableEntity, ""},
-	// Uploads map their own errors (uploadProblem); here it is a crop.
+	// Uploads map their own errors (uploadFailed); here it is a crop.
 	{images.ErrTooSmall, "crop_too_small", http.StatusUnprocessableEntity, ""},
 }
 
@@ -74,7 +140,7 @@ func problems(err error) (int, []problem) {
 	for _, leaf := range leaves(err) {
 		p, st, ok := classify(leaf)
 		if !ok {
-			return http.StatusInternalServerError, []problem{{Code: "internal"}}
+			return http.StatusInternalServerError, []problem{{Code: codeInternal}}
 		}
 
 		if status == 0 {
@@ -95,9 +161,16 @@ func classify(err error) (problem, int, bool) {
 
 		p := problem{Code: c.code, Field: c.field}
 
-		var fe *site.FieldError
-		if errors.As(err, &fe) {
-			p.Field, p.PhotoID = string(fe.Field), fe.PhotoID
+		var (
+			be *bodyError
+			fe *site.FieldError
+		)
+
+		switch {
+		case errors.As(err, &be):
+			p.Field, p.PhotoID = be.key, be.photoID
+		case errors.As(err, &fe):
+			p.Field, p.PhotoID = fields[fe.Field], fe.PhotoID
 		}
 
 		return p, c.status, true
