@@ -16,6 +16,7 @@ import (
 
 	"github.com/kradalby/asparges/pages"
 	"github.com/kradalby/asparges/render"
+	"github.com/kradalby/asparges/seo"
 	"github.com/kradalby/asparges/site"
 	"github.com/kradalby/asparges/static"
 	"github.com/kradalby/asparges/ui"
@@ -53,6 +54,11 @@ type Config struct {
 	// NoIndex keeps the site out of search engines (the beta site): every
 	// response says noindex and robots.txt shuts crawlers out.
 	NoIndex bool
+	// IndexNowKey is served at /<key>.txt; empty serves none.
+	IndexNowKey string
+	// IndexNowEndpoint receives the addresses Changed affects; empty sends
+	// nothing (--dev, --noindex, tests).
+	IndexNowEndpoint string
 }
 
 // Images is the photo store (images.Store) as the server uses it.
@@ -67,8 +73,9 @@ type Images interface {
 
 // Server answers the public site, keeping rendered pages until a change.
 type Server struct {
-	cfg   Config
-	pages *render.Store
+	cfg      Config
+	pages    *render.Store
+	indexNow *seo.IndexNow // nil when off
 }
 
 // New returns a Server; cfg.Store, cfg.Images and cfg.Now are required.
@@ -77,14 +84,18 @@ func New(cfg Config) *Server {
 		cfg.Log = slog.Default()
 	}
 
-	return &Server{cfg: cfg, pages: render.New(cfg.Now)}
+	s := &Server{cfg: cfg, pages: render.New(cfg.Now)}
+	s.indexNow = s.newIndexNow()
+
+	return s
 }
 
 // Changed is the one call every admin write makes once it has committed:
 // events, photos, crops, photographers, the gallery. It names the photos
 // that were uploaded, recropped or newly published, so their variants are
 // built now rather than on first view; every kept page is dropped and
-// renders afresh on its next request.
+// renders afresh on its next request. Search engines hear of the pages
+// that changed.
 func (s *Server) Changed(photos ...string) {
 	s.cfg.Images.Changed()
 
@@ -93,6 +104,10 @@ func (s *Server) Changed(photos ...string) {
 	}
 
 	s.pages.Invalidate()
+
+	if s.indexNow != nil {
+		s.indexNow.Notify()
+	}
 }
 
 // Public returns the handler for the local listener. In production nginx

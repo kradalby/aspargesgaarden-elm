@@ -20,6 +20,43 @@ func (s *Server) seoRoutes(mux *http.ServeMux) {
 	})
 	mux.HandleFunc("GET /sitemap.xml", s.sitemap)
 	mux.HandleFunc("GET /llms.txt", s.llms)
+
+	if key := s.cfg.IndexNowKey; key != "" {
+		mux.HandleFunc("GET /"+key+".txt", func(w http.ResponseWriter, _ *http.Request) {
+			text(w, "text/plain; charset=utf-8", []byte(key))
+		})
+	}
+}
+
+func (s *Server) newIndexNow() *seo.IndexNow {
+	if s.cfg.IndexNowEndpoint == "" || s.cfg.IndexNowKey == "" {
+		return nil
+	}
+
+	n, err := seo.NewIndexNow(seo.IndexNowConfig{
+		Endpoint: s.cfg.IndexNowEndpoint,
+		Key:      s.cfg.IndexNowKey,
+		BaseURL:  s.cfg.BaseURL,
+		Pages:    s.indexable,
+		Log:      s.cfg.Log,
+	})
+	if err != nil {
+		s.cfg.Log.Error("indexnow off", "err", err)
+		return nil
+	}
+
+	return n
+}
+
+// Run does the server's background work until ctx ends: telling search
+// engines about changed pages, when that is on.
+func (s *Server) Run(ctx context.Context) error {
+	if s.indexNow == nil {
+		<-ctx.Done()
+		return nil
+	}
+
+	return s.indexNow.Run(ctx)
 }
 
 func text(w http.ResponseWriter, ctype string, body []byte) {

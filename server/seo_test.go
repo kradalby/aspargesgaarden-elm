@@ -1,11 +1,17 @@
 package server
 
 import (
+	"context"
+	"encoding/json"
 	"encoding/xml"
 	"net/http"
+	"net/http/httptest"
 	"strings"
+	"sync"
 	"testing"
+	"time"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/kradalby/asparges/site"
@@ -112,6 +118,71 @@ func TestNoIndex(t *testing.T) {
 	require.NotContains(t, robots, "Allow")
 
 	require.Len(t, f.sitemap(t).URLs, 7, "the sitemap is still served")
+}
+
+func TestIndexNowKeyFile(t *testing.T) {
+	key := "0123456789abcdef0123456789abcdef"
+	f := newFixture(t, false, func(c *Config) { c.IndexNowKey = key })
+
+	rec := f.get(t, "/"+key+".txt")
+	require.Equal(t, http.StatusOK, rec.Code)
+	require.Equal(t, "text/plain; charset=utf-8", rec.Header().Get("Content-Type"))
+	require.Equal(t, key, rec.Body.String())
+
+	require.Equal(t, http.StatusNotFound, f.get(t, "/ffffffffffffffffffffffffffffffff.txt").Code)
+}
+
+// An admin save reaches IndexNow through Changed alone: the worker works
+// out which addresses changed.
+func TestChangedPingsIndexNow(t *testing.T) {
+	var (
+		mu  sync.Mutex
+		got [][]string
+	)
+
+	engine := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var body struct {
+			URLList []string `json:"urlList"`
+		}
+		_ = json.NewDecoder(r.Body).Decode(&body)
+
+		mu.Lock()
+		got = append(got, body.URLList)
+		mu.Unlock()
+	}))
+	t.Cleanup(engine.Close)
+
+	f := newFixture(t, false, func(c *Config) {
+		c.IndexNowKey, c.IndexNowEndpoint = "0123456789abcdef0123456789abcdef", engine.URL
+	})
+	e := f.publish(t, site.Event{Title: "Vårkonsert", Start: date("2027-05-19")})
+
+	ctx, cancel := context.WithCancel(t.Context())
+	done := make(chan error)
+
+	go func() { done <- f.srv.Run(ctx) }()
+
+	t.Cleanup(func() {
+		cancel()
+		require.NoError(t, <-done)
+	})
+
+	// Edit until one lands after the worker has its starting point.
+	require.EventuallyWithT(t, func(c *assert.CollectT) {
+		f.clock.set(f.clock.now().Add(time.Minute))
+		e.Summary = f.clock.now().String()
+		_, err := f.store.UpdateEvent(t.Context(), e)
+		assert.NoError(c, err)
+		f.srv.Changed()
+
+		mu.Lock()
+		defer mu.Unlock()
+
+		assert.Contains(c, got, []string{
+			"https://aspargesgaarden.no/arrangementer",
+			"https://aspargesgaarden.no/arrangementer/2027/varkonsert",
+		})
+	}, 5*time.Second, 10*time.Millisecond)
 }
 
 func TestLLMsTxt(t *testing.T) {

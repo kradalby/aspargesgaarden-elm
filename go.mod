@@ -3,6 +3,7 @@ module github.com/kradalby/asparges
 go 1.27.3
 
 require (
+	github.com/cenkalti/backoff/v5 v5.0.3
 	github.com/chasefleming/elem-go v0.37.0
 	github.com/google/go-cmp v0.7.0
 	github.com/juanfont/headscale v0.29.7
@@ -44,6 +45,7 @@ require (
 	github.com/huin/goupnp v1.3.0 // indirect
 	github.com/jsimonetti/rtnetlink v1.4.2 // indirect
 	github.com/klauspost/compress v1.20.1 // indirect
+	github.com/kylelemons/godebug v1.1.0 // indirect
 	github.com/mattn/go-isatty v0.0.24 // indirect
 	github.com/mdlayher/netlink v1.11.2 // indirect
 	github.com/mdlayher/socket v0.7.0 // indirect
