@@ -75,3 +75,8 @@ type Photographer struct {
 	NameKey string `db:"name_key"`
 	Url     string `db:"url"`
 }
+
+type Setting struct {
+	Name  string `db:"name"`
+	Value string `db:"value"`
+}
