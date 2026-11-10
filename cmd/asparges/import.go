@@ -187,7 +187,7 @@ func (im importer) event(ctx context.Context, file string, have map[string]bool)
 	}
 
 	if publish {
-		if e, err = im.store.Publish(ctx, e.ID); err != nil {
+		if e, err = im.store.Publish(ctx, e.ID, e.UpdatedAt); err != nil {
 			return err
 		}
 	}
@@ -326,7 +326,7 @@ func (im importer) photo(ctx context.Context, op oldPhoto, alt string) (site.Pho
 		}
 
 		if err == nil {
-			err = im.store.SetCrop(ctx, p.ID, k, r)
+			err = im.store.SetCrops(ctx, p.ID, map[images.Kind]images.Rect{k: r})
 		}
 
 		if err != nil {

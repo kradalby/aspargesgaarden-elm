@@ -118,7 +118,7 @@ func (f *fixture) publish(t *testing.T, e site.Event) site.Event {
 	e, err = f.store.CreateEvent(ctx, e)
 	require.NoError(t, err)
 
-	e, err = f.store.Publish(ctx, e.ID)
+	e, err = f.store.Publish(ctx, e.ID, e.UpdatedAt)
 	require.NoError(t, err)
 
 	return e

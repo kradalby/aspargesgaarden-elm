@@ -70,7 +70,7 @@ func e2eHooks(store *site.Store, imgs *images.Store, srv *server.Server, fixture
 
 		e, err := store.Event(r.Context(), id)
 		if err == nil {
-			_, err = store.UpdateEvent(r.Context(), e)
+			_, err = store.UpdateEvent(r.Context(), e, e.UpdatedAt)
 		}
 
 		if err != nil && !errors.Is(err, site.ErrNotFound) {
@@ -186,7 +186,7 @@ func e2eReset(ctx context.Context, store *site.Store, imgs *images.Store, fixtur
 		return nil, err
 	}
 
-	if _, err := store.Publish(ctx, course.ID); err != nil {
+	if _, err := store.Publish(ctx, course.ID, course.UpdatedAt); err != nil {
 		return nil, err
 	}
 
@@ -221,7 +221,7 @@ func e2eWipe(ctx context.Context, store *site.Store) error {
 	}
 
 	for _, p := range photos {
-		if err := store.DeletePhoto(ctx, p.ID); err != nil {
+		if _, err := store.RemovePhoto(ctx, p.ID); err != nil {
 			return err
 		}
 	}

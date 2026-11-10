@@ -98,15 +98,15 @@ func TestStorePublishLifecycle(t *testing.T) {
 	e, err := s.CreateEvent(ctx, Event{Title: "Julemarked", Start: d("2026-11-14"), End: d("2026-11-15")})
 	require.NoError(t, err)
 
-	_, err = s.Publish(ctx, e.ID)
+	_, err = s.Publish(ctx, e.ID, e.UpdatedAt)
 	require.ErrorIs(t, err, ErrMainPhotoRequired)
 
 	p := addPhoto(t, s, 'a', "")
 	e.MainPhoto = &p
-	e, err = s.UpdateEvent(ctx, e)
+	e, err = s.UpdateEvent(ctx, e, e.UpdatedAt)
 	require.NoError(t, err)
 
-	_, err = s.Publish(ctx, e.ID)
+	_, err = s.Publish(ctx, e.ID, e.UpdatedAt)
 	require.ErrorIs(t, err, ErrAltRequired)
 
 	p.Alt = "Bålfat på tunet"
@@ -117,7 +117,7 @@ func TestStorePublishLifecycle(t *testing.T) {
 	require.ErrorIs(t, err, ErrNotFound, "a draft is not public")
 
 	clock.t = oslo("2026-10-11 09:00")
-	pub, err := s.Publish(ctx, e.ID)
+	pub, err := s.Publish(ctx, e.ID, e.UpdatedAt)
 	require.NoError(t, err)
 	require.Equal(t, Published, pub.Status)
 	require.Equal(t, clock.t.UTC(), pub.PublishedAt)
@@ -129,21 +129,21 @@ func TestStorePublishLifecycle(t *testing.T) {
 
 	// The address is frozen now.
 	pub.Slug = "julemarked-2026"
-	_, err = s.UpdateEvent(ctx, pub)
+	_, err = s.UpdateEvent(ctx, pub, pub.UpdatedAt)
 	require.ErrorIs(t, err, ErrSlugFrozen)
 
 	// An edit that would break the live page is refused.
 	pub.Slug = ""
 	pub.Title = ""
-	_, err = s.UpdateEvent(ctx, pub)
+	_, err = s.UpdateEvent(ctx, pub, pub.UpdatedAt)
 	require.ErrorIs(t, err, ErrTitleRequired)
 
-	_, err = s.Unpublish(ctx, e.ID)
+	hidden, err := s.Unpublish(ctx, e.ID, pub.UpdatedAt)
 	require.NoError(t, err)
 	_, err = s.PublishedEvent(ctx, 2026, "julemarked")
 	require.ErrorIs(t, err, ErrNotFound)
 
-	again, err := s.Publish(ctx, e.ID)
+	again, err := s.Publish(ctx, e.ID, hidden.UpdatedAt)
 	require.NoError(t, err)
 	require.Equal(t, pub.PublishedAt, again.PublishedAt, "first publish time is kept")
 
@@ -166,7 +166,7 @@ func TestStoreCopyAndEvergreen(t *testing.T) {
 		ShowInMenu: true, MenuLabel: "Julemarked", MainPhoto: &p,
 	})
 	require.NoError(t, err)
-	e, err = s.Publish(ctx, e.ID)
+	e, err = s.Publish(ctx, e.ID, e.UpdatedAt)
 	require.NoError(t, err)
 
 	newest, err := s.NewestPublishedEvent(ctx, "julemarked")
@@ -184,11 +184,11 @@ func TestStoreCopyAndEvergreen(t *testing.T) {
 
 	// Same slug in the same year is taken.
 	cp.Start = d("2026-12-05")
-	_, err = s.UpdateEvent(ctx, cp)
+	_, err = s.UpdateEvent(ctx, cp, cp.UpdatedAt)
 	require.ErrorIs(t, err, ErrSlugTaken)
 
 	cp.Start, cp.End = d("2027-11-13"), d("2027-11-14")
-	cp, err = s.UpdateEvent(ctx, cp)
+	cp, err = s.UpdateEvent(ctx, cp, cp.UpdatedAt)
 	require.NoError(t, err)
 	require.Equal(t, 2027, cp.Year)
 
@@ -196,10 +196,10 @@ func TestStoreCopyAndEvergreen(t *testing.T) {
 	cp2, err := s.CopyEvent(ctx, e.ID)
 	require.NoError(t, err)
 	cp2.Start = d("2027-12-01")
-	_, err = s.UpdateEvent(ctx, cp2)
+	_, err = s.UpdateEvent(ctx, cp2, cp2.UpdatedAt)
 	require.ErrorIs(t, err, ErrSlugTaken)
 
-	_, err = s.Publish(ctx, cp.ID)
+	_, err = s.Publish(ctx, cp.ID, cp.UpdatedAt)
 	require.NoError(t, err)
 
 	newest, err = s.NewestPublishedEvent(ctx, "julemarked")
@@ -252,11 +252,14 @@ func TestStorePhotos(t *testing.T) {
 	b := addPhoto(t, s, 'b', "")
 
 	clock.t = start.Add(time.Hour)
-	require.ErrorIs(t, s.SetCrop(ctx, a.ID, images.Card, images.Rect{X: 3000, W: 2400, H: 3000}), images.ErrCropOutside)
-	require.ErrorIs(t, s.SetCrop(ctx, a.ID, "full", images.Rect{W: 1, H: 1}), images.ErrKind)
-	require.ErrorIs(t, s.SetCrop(ctx, 999, images.Card, images.Rect{W: 1, H: 1}), ErrNotFound)
-	require.NoError(t, s.SetCrop(ctx, a.ID, images.Card, images.Rect{X: 800, W: 2400, H: 3000}))
-	require.NoError(t, s.SetCrop(ctx, a.ID, images.Share, images.Rect{Y: 450, W: 4000, H: 2100}))
+	crop := func(id int64, k images.Kind, r images.Rect) error {
+		return s.SetCrops(ctx, id, map[images.Kind]images.Rect{k: r})
+	}
+	require.ErrorIs(t, crop(a.ID, images.Card, images.Rect{X: 3000, W: 2400, H: 3000}), images.ErrCropOutside)
+	require.ErrorIs(t, crop(a.ID, "full", images.Rect{W: 1, H: 1}), images.ErrKind)
+	require.ErrorIs(t, crop(999, images.Card, images.Rect{W: 1, H: 1}), ErrNotFound)
+	require.NoError(t, crop(a.ID, images.Card, images.Rect{X: 800, W: 2400, H: 3000}))
+	require.NoError(t, crop(a.ID, images.Share, images.Rect{Y: 450, W: 4000, H: 2100}))
 
 	a, err := s.Photo(ctx, a.ID)
 	require.NoError(t, err)
@@ -292,10 +295,13 @@ func TestStorePhotos(t *testing.T) {
 	// In use by an event: cannot be deleted until the event is gone.
 	e, err := s.CreateEvent(ctx, Event{Title: "Kurs", MainPhoto: &b})
 	require.NoError(t, err)
-	require.ErrorIs(t, s.DeletePhoto(ctx, b.ID), ErrPhotoInUse)
+	_, err = s.RemovePhoto(ctx, b.ID)
+	require.ErrorIs(t, err, ErrPhotoInUse)
 	require.NoError(t, s.DeleteEvent(ctx, e.ID))
-	require.NoError(t, s.DeletePhoto(ctx, b.ID))
-	require.ErrorIs(t, s.DeletePhoto(ctx, b.ID), ErrNotFound)
+	_, err = s.RemovePhoto(ctx, b.ID)
+	require.NoError(t, err)
+	_, err = s.RemovePhoto(ctx, b.ID)
+	require.ErrorIs(t, err, ErrNotFound)
 }
 
 func TestStoreGallery(t *testing.T) {
@@ -331,8 +337,6 @@ func TestStoreGallery(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, clock.t.UTC(), at)
 
-	require.ErrorIs(t, s.DeletePhoto(ctx, a.ID), ErrPhotoInUse)
-
 	require.ErrorIs(t, s.SetGallery(ctx, []int64{a.ID, a.ID}), ErrDuplicatePhoto)
 	require.ErrorIs(t, s.SetGallery(ctx, []int64{a.ID, 999}), ErrNotFound)
 	gallery, err = s.Gallery(ctx)
@@ -340,7 +344,8 @@ func TestStoreGallery(t *testing.T) {
 	require.Equal(t, []int64{c.ID, a.ID, b.ID}, photoIDs(gallery), "a failed reorder changes nothing")
 
 	require.NoError(t, s.SetGallery(ctx, []int64{b.ID}))
-	require.NoError(t, s.DeletePhoto(ctx, a.ID))
+	_, err = s.RemovePhoto(ctx, a.ID)
+	require.NoError(t, err)
 	gallery, err = s.Gallery(ctx)
 	require.NoError(t, err)
 	require.Equal(t, []int64{b.ID}, photoIDs(gallery))

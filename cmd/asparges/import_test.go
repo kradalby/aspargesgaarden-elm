@@ -161,7 +161,7 @@ func TestImportIsIdempotent(t *testing.T) {
 
 	edited := events[0]
 	edited.Title = "Endret i admin"
-	_, err = store.UpdateEvent(ctx, edited)
+	_, err = store.UpdateEvent(ctx, edited, edited.UpdatedAt)
 	require.NoError(t, err)
 
 	before, err := store.Events(ctx)

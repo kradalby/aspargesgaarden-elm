@@ -14,46 +14,6 @@ import (
 	"github.com/kradalby/asparges/images"
 )
 
-// UpdateEventSeen is UpdateEvent for an editor who loaded the event when it
-// was last saved at seen: if anyone saved it since, nothing is written and
-// the error is ErrStale.
-func (s *Store) UpdateEventSeen(ctx context.Context, e Event, seen time.Time) (Event, error) {
-	return s.modify(ctx, e.ID, unchangedSince(seen, func(prev Event) (Event, error) {
-		return Revise(&prev, e)
-	}))
-}
-
-// PublishSeen is Publish with UpdateEventSeen's precondition.
-func (s *Store) PublishSeen(ctx context.Context, id int64, seen time.Time) (Event, error) {
-	return s.modify(ctx, id, unchangedSince(seen, func(prev Event) (Event, error) {
-		return prev.Publish(s.now())
-	}))
-}
-
-// UnpublishSeen is Unpublish with UpdateEventSeen's precondition.
-func (s *Store) UnpublishSeen(ctx context.Context, id int64, seen time.Time) (Event, error) {
-	return s.modify(ctx, id, unchangedSince(seen, func(prev Event) (Event, error) {
-		return prev.Unpublish(), nil
-	}))
-}
-
-// unchangedSince runs change only if the stored event is the one the editor
-// saw. It runs inside modify's transaction, so no save slips in between.
-//
-// shortcut: updated_at has whole seconds, so a second save within the same
-// second as the one the editor loaded passes; add a version counter to
-// events if two editors ever meet that.
-func unchangedSince(seen time.Time, change func(Event) (Event, error)) func(Event) (Event, error) {
-	return func(prev Event) (Event, error) {
-		if prev.UpdatedAt.Unix() != seen.Unix() {
-			return Event{}, fmt.Errorf("event %d saved at %s, editor has %s: %w",
-				prev.ID, prev.UpdatedAt.Format(time.RFC3339), seen.UTC().Format(time.RFC3339), ErrStale)
-		}
-
-		return change(prev)
-	}
-}
-
 // PhotoBySHA256 loads the photo whose original has this content hash.
 func (s *Store) PhotoBySHA256(ctx context.Context, sha256 string) (Photo, error) {
 	row, err := s.db.Queries().GetPhotoBySha256(ctx, sha256)

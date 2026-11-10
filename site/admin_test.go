@@ -23,29 +23,29 @@ func TestStoreSeenPreconditions(t *testing.T) {
 	// Someone else saves first.
 	theirs := e
 	theirs.PriceText = "Gratis"
-	_, err = s.UpdateEventSeen(ctx, theirs, loaded)
+	_, err = s.UpdateEvent(ctx, theirs, loaded)
 	require.NoError(t, err)
 	clock.t = clock.t.Add(time.Minute)
 
 	mine := e
 	mine.PriceText = "50 kr"
-	_, err = s.UpdateEventSeen(ctx, mine, loaded)
+	_, err = s.UpdateEvent(ctx, mine, loaded)
 	require.ErrorIs(t, err, ErrStale)
-	_, err = s.PublishSeen(ctx, e.ID, loaded)
+	_, err = s.Publish(ctx, e.ID, loaded)
 	require.ErrorIs(t, err, ErrStale)
-	_, err = s.UnpublishSeen(ctx, e.ID, loaded)
+	_, err = s.Unpublish(ctx, e.ID, loaded)
 	require.ErrorIs(t, err, ErrStale)
 
 	stored, err := s.Event(ctx, e.ID)
 	require.NoError(t, err)
 	require.Equal(t, "Gratis", stored.PriceText, "a stale save writes nothing")
 
-	pub, err := s.PublishSeen(ctx, e.ID, stored.UpdatedAt)
+	pub, err := s.Publish(ctx, e.ID, stored.UpdatedAt)
 	require.NoError(t, err)
 	require.Equal(t, Published, pub.Status)
 
 	clock.t = clock.t.Add(time.Minute)
-	hidden, err := s.UnpublishSeen(ctx, e.ID, pub.UpdatedAt)
+	hidden, err := s.Unpublish(ctx, e.ID, pub.UpdatedAt)
 	require.NoError(t, err)
 	require.Equal(t, Draft, hidden.Status)
 }

@@ -114,7 +114,7 @@ func TestAdminEventLists(t *testing.T) {
 		e.MainPhoto = &site.Photo{ID: main.ID, Alt: "Låven"}
 		e, err := a.store.CreateEvent(ctx, e)
 		require.NoError(t, err)
-		_, err = a.store.Publish(ctx, e.ID)
+		_, err = a.store.Publish(ctx, e.ID, e.UpdatedAt)
 		require.NoError(t, err)
 	}
 

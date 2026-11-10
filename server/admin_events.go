@@ -295,7 +295,7 @@ func (s *Server) updateEvent(w http.ResponseWriter, r *http.Request, prev site.E
 	e, err := s.toEvent(r.Context(), in, true)
 	if err == nil {
 		e.ID = prev.ID
-		e, err = s.cfg.Store.UpdateEventSeen(r.Context(), e, parseSeen(in.UpdatedAt))
+		e, err = s.cfg.Store.UpdateEvent(r.Context(), e, parseSeen(in.UpdatedAt))
 	}
 
 	s.eventWritten(w, r, e, err, "event saved")
@@ -307,7 +307,7 @@ func (s *Server) publishEvent(w http.ResponseWriter, r *http.Request, prev site.
 		return
 	}
 
-	e, err := s.cfg.Store.PublishSeen(r.Context(), prev.ID, seen)
+	e, err := s.cfg.Store.Publish(r.Context(), prev.ID, seen)
 	s.eventWritten(w, r, e, err, "event published")
 }
 
@@ -317,7 +317,7 @@ func (s *Server) unpublishEvent(w http.ResponseWriter, r *http.Request, prev sit
 		return
 	}
 
-	e, err := s.cfg.Store.UnpublishSeen(r.Context(), prev.ID, seen)
+	e, err := s.cfg.Store.Unpublish(r.Context(), prev.ID, seen)
 	s.eventWritten(w, r, e, err, "event unpublished")
 }
 

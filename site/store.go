@@ -95,23 +95,25 @@ func (s *Store) CreateEvent(ctx context.Context, e Event) (Event, error) {
 }
 
 // UpdateEvent saves an edit of an existing event; see Revise for the rules.
-func (s *Store) UpdateEvent(ctx context.Context, e Event) (Event, error) {
-	return s.modify(ctx, e.ID, func(prev Event) (Event, error) {
+// seen is the UpdatedAt the editor loaded: if anyone saved the event since,
+// nothing is written and the error is ErrStale.
+func (s *Store) UpdateEvent(ctx context.Context, e Event, seen time.Time) (Event, error) {
+	return s.modify(ctx, e.ID, seen, func(prev Event) (Event, error) {
 		return Revise(&prev, e)
 	})
 }
 
 // Publish makes the event public; it fails with what is missing if it is not
-// ready.
-func (s *Store) Publish(ctx context.Context, id int64) (Event, error) {
-	return s.modify(ctx, id, func(prev Event) (Event, error) {
+// ready. seen is as for UpdateEvent.
+func (s *Store) Publish(ctx context.Context, id int64, seen time.Time) (Event, error) {
+	return s.modify(ctx, id, seen, func(prev Event) (Event, error) {
 		return prev.Publish(s.now())
 	})
 }
 
-// Unpublish hides a published event.
-func (s *Store) Unpublish(ctx context.Context, id int64) (Event, error) {
-	return s.modify(ctx, id, func(prev Event) (Event, error) {
+// Unpublish hides a published event. seen is as for UpdateEvent.
+func (s *Store) Unpublish(ctx context.Context, id int64, seen time.Time) (Event, error) {
+	return s.modify(ctx, id, seen, func(prev Event) (Event, error) {
 		return prev.Unpublish(), nil
 	})
 }
@@ -142,12 +144,22 @@ func (s *Store) DeleteEvent(ctx context.Context, id int64) error {
 }
 
 // modify loads event id, lets change produce its next state, and stores it,
-// all in one transaction so two admins cannot interleave.
-func (s *Store) modify(ctx context.Context, id int64, change func(Event) (Event, error)) (Event, error) {
+// all in one transaction so two admins cannot interleave: the event must
+// still be the one the editor saw.
+//
+// shortcut: updated_at has whole seconds, so a second save within the same
+// second as the one the editor loaded passes; add a version counter to
+// events if two editors ever meet that.
+func (s *Store) modify(ctx context.Context, id int64, seen time.Time, change func(Event) (Event, error)) (Event, error) {
 	err := s.db.InTx(ctx, func(q *dbsqlc.Queries) error {
 		prev, err := s.event(ctx, q, id)
 		if err != nil {
 			return err
+		}
+
+		if prev.UpdatedAt.Unix() != seen.Unix() {
+			return fmt.Errorf("event %d saved at %s, editor has %s: %w",
+				prev.ID, prev.UpdatedAt.Format(time.RFC3339), seen.UTC().Format(time.RFC3339), ErrStale)
 		}
 
 		next, err := change(prev)
@@ -486,29 +498,6 @@ func (s *Store) UpdatePhoto(ctx context.Context, p Photo) (Photo, error) {
 	}
 
 	return s.Photo(ctx, p.ID)
-}
-
-// SetCrop sets the crop of one kind on a photo.
-func (s *Store) SetCrop(ctx context.Context, photoID int64, kind images.Kind, r images.Rect) error {
-	return s.SetCrops(ctx, photoID, map[images.Kind]images.Rect{kind: r})
-}
-
-// DeletePhoto removes a photo that no event or gallery uses; its crops go with
-// it. The original file is images/' to clean up.
-func (s *Store) DeletePhoto(ctx context.Context, id int64) error {
-	n, err := s.db.Queries().DeletePhoto(ctx, id)
-	if db.IsForeignKeyViolation(err) {
-		return fmt.Errorf("photo %d: %w", id, ErrPhotoInUse)
-	}
-	if err != nil {
-		return fmt.Errorf("deleting photo %d: %w", id, err)
-	}
-
-	if n == 0 {
-		return fmt.Errorf("photo %d: %w", id, ErrNotFound)
-	}
-
-	return nil
 }
 
 // Gallery lists the gallery's photos in order.

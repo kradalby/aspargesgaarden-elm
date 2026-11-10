@@ -83,7 +83,7 @@ func TestSitemapLastmodFollowsEdits(t *testing.T) {
 
 	f.clock.set(oslo("2026-11-11 09:15"))
 	e.Summary = "Nå med flere utstillere."
-	_, err = f.store.UpdateEvent(t.Context(), e)
+	_, err = f.store.UpdateEvent(t.Context(), e, e.UpdatedAt)
 	require.NoError(t, err)
 
 	for _, u := range f.sitemap(t).URLs {
@@ -174,8 +174,10 @@ func TestChangedPingsIndexNow(t *testing.T) {
 	require.EventuallyWithT(t, func(c *assert.CollectT) {
 		f.clock.set(f.clock.now().Add(time.Minute))
 		e.Summary = f.clock.now().String()
-		_, err := f.store.UpdateEvent(t.Context(), e)
-		assert.NoError(c, err)
+		saved, err := f.store.UpdateEvent(t.Context(), e, e.UpdatedAt)
+		if assert.NoError(c, err) {
+			e = saved
+		}
 		f.srv.Changed()
 
 		mu.Lock()
