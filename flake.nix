@@ -145,9 +145,39 @@
             mainProgram = "asparges";
           };
         });
+
+        # images: the slim vips the service shells out to, and the build-time
+        # variants of the photos embedded in the binary (static/photos-src).
+        # imagesbuild is its own binary: asparges embeds its output, so cannot
+        # make it. It reuses asparges' vendor tree and sees only images/, so
+        # unrelated Go edits do not rebuild the variants.
+        vips = pkgs.callPackage ./nix/vips.nix { };
+        imagesbuild = asparges.overrideAttrs (_: {
+          pname = "asparges-imagesbuild";
+          src = lib.fileset.toSource {
+            root = ./.;
+            fileset = lib.fileset.unions [
+              ./go.mod
+              ./go.sum
+              ./cmd/imagesbuild
+              (lib.fileset.fileFilter (f: f.hasExt "go" && !lib.hasSuffix "_test.go" f.name) ./images)
+            ];
+          };
+          subPackages = [ "cmd/imagesbuild" ];
+          inherit (asparges) goModules;
+          meta.mainProgram = "imagesbuild";
+        });
+        photoVariants =
+          pkgs.runCommand "asparges-photo-variants" { nativeBuildInputs = [ (lib.getBin vips) ]; }
+            ''
+              ${lib.getExe imagesbuild} --src ${./static/photos-src} --out $out --url-prefix /static/photos
+            '';
       in
       {
         packages.default = asparges;
+        packages.vips = vips;
+        packages.imagesbuild = imagesbuild;
+        packages.photo-variants = photoVariants;
         formatter = fc.formatter common;
         devShells.default = pkgs.mkShell {
           packages = [
@@ -172,7 +202,7 @@
             pkgs.tailwindcss_4
             pkgs.woff2
 
-            pkgs.vips
+            (lib.getBin vips)
           ];
           shellHook = ''
             # Never fetch a toolchain: a go.mod ahead of nixpkgs' Go must be a
@@ -182,7 +212,17 @@
         };
         checks = {
           build = asparges;
-          gotest = withStatic (fc.goTest (common // { goRace = true; }));
+          gotest = withStatic (
+            fc.goTest (
+              common
+              // {
+                goRace = true;
+                # The images tests run the real vips on testdata/.
+                nativeCheckInputs = [ (lib.getBin vips) ];
+              }
+            )
+          );
+          photo-variants = photoVariants;
           golangci-lint = withStatic (fc.goLint common);
           formatting = fc.goFormat common;
           # db/dbsqlc is sqlc output with no //go:generate directive, so the
