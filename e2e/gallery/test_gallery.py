@@ -184,7 +184,7 @@ def test_shows_alt_text_and_credit(desktop):
     expect(page.locator(SHOWN)).to_have_attribute("alt", "Blomster fra @bondenshage")
     expect(page.locator("[role=dialog] figcaption")).to_contain_text("Blomster fra @bondenshage")
     credit = page.locator("[role=dialog] figcaption a")
-    expect(credit).to_have_text("Fotograf: Lucky Thirteen")
+    expect(credit).to_have_text("Foto: Lucky Thirteen")
     expect(credit).to_have_attribute("href", "https://luckythirteen.no/")
 
 

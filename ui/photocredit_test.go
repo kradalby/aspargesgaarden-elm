@@ -32,6 +32,6 @@ func TestPhotoCreditHiddenBarLetsTapsThrough(t *testing.T) {
 func TestPhotoCreditWithoutPhotographer(t *testing.T) {
 	got := PhotoCredit(Photographer{}, elem.Span(nil)).Render()
 
-	require.NotContains(t, got, "av ")
+	require.NotContains(t, got, "Foto:")
 	require.NotContains(t, got, "group-hover")
 }

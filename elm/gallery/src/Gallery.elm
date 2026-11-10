@@ -384,7 +384,7 @@ credit id photo =
         Just { name, link } ->
             let
                 label =
-                    "Fotograf: " ++ name
+                    "Foto: " ++ name
             in
             case link of
                 Nothing ->

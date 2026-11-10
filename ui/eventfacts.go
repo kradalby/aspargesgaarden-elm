@@ -24,7 +24,7 @@ func EventFacts(p EventFactsProps) elem.Node {
 	}
 
 	if p.TicketURL != "" {
-		kids = append(kids, ButtonLink(ButtonLinkProps{Href: p.TicketURL, Label: "Kjøp billett", External: true}))
+		kids = append(kids, ButtonLink(ButtonLinkProps{Href: p.TicketURL, Label: "Billetter", External: true}))
 	}
 
 	return elem.Div(attrs.Props{attrs.Class: "bg-brown/20 px-6 pt-6 pb-4 my-6"}, kids...)

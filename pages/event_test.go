@@ -20,7 +20,7 @@ func TestEvent(t *testing.T) {
 	require.Contains(t, got, `href="https://fabnite.com/julemarked"`)
 	require.Contains(t, got, "/"+strings.Repeat("a", 64)+"/banner-")
 	require.Contains(t, got, "/"+strings.Repeat("b", 64)+"/full-")
-	require.Contains(t, got, "av Marianne Ous")
+	require.Contains(t, got, "Foto: Marianne Ous")
 	require.Contains(t, got, `<p class="pb-4 text-xl text-sort">Mer enn 30`)
 	require.NotContains(t, got, "Arrangementet er")
 }

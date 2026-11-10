@@ -19,7 +19,7 @@ func PhotoCredit(by Photographer, picture elem.Node) elem.Node {
 	kids := []elem.Node{picture}
 
 	if by.Name != "" {
-		var name elem.Node = elem.Text("av " + by.Name)
+		var name elem.Node = elem.Text("Foto: " + by.Name)
 		if by.Website != "" {
 			name = elem.A(attrs.Props{
 				attrs.Href:   by.Website,
