@@ -246,66 +246,6 @@ func (q *Queries) InsertEventPhoto(ctx context.Context, arg InsertEventPhotoPara
 	return err
 }
 
-const listAllEventDates = `-- name: ListAllEventDates :many
-SELECT event_id, date FROM event_dates ORDER BY event_id, date
-`
-
-func (q *Queries) ListAllEventDates(ctx context.Context) ([]EventDate, error) {
-	rows, err := q.db.QueryContext(ctx, listAllEventDates)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []EventDate
-	for rows.Next() {
-		var i EventDate
-		if err := rows.Scan(&i.EventID, &i.Date); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Close(); err != nil {
-		return nil, err
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
-const listAllEventPhotos = `-- name: ListAllEventPhotos :many
-SELECT event_id, photo_id, role, position FROM event_photos
-ORDER BY event_id, position
-`
-
-func (q *Queries) ListAllEventPhotos(ctx context.Context) ([]EventPhoto, error) {
-	rows, err := q.db.QueryContext(ctx, listAllEventPhotos)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []EventPhoto
-	for rows.Next() {
-		var i EventPhoto
-		if err := rows.Scan(
-			&i.EventID,
-			&i.PhotoID,
-			&i.Role,
-			&i.Position,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Close(); err != nil {
-		return nil, err
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
 const listEventDates = `-- name: ListEventDates :many
 SELECT event_id, date FROM event_dates
 WHERE event_id IN (/*SLICE:event_ids*/?)
