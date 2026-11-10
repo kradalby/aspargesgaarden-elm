@@ -91,7 +91,7 @@ func newRootCmd(a *app) *ff.Command {
 		Name:        "asparges",
 		Usage:       "asparges <SUBCOMMAND> [FLAGS]",
 		Flags:       fs,
-		Subcommands: []*ff.Command{newServeCmd(a, fs), newImagesCmd(a, fs), newImportCmd(a, fs)},
+		Subcommands: []*ff.Command{newServeCmd(a, fs), newImportCmd(a, fs)},
 	}
 }
 
@@ -209,8 +209,7 @@ func serve(ctx context.Context, log *slog.Logger, cfg serveConfig) error {
 
 	store := site.NewStore(d, now)
 
-	imgs, err := images.New(cfg.dataDir, store.Catalog(), images.WithLogger(log),
-		images.WithSweep(func(ctx context.Context) error { return sweepUnusedPhotos(ctx, log, store) }))
+	imgs, err := images.New(cfg.dataDir, store.Catalog(), images.WithLogger(log))
 	if err != nil {
 		return fmt.Errorf("photo store: %w", err)
 	}
@@ -262,6 +261,7 @@ func serve(ctx context.Context, log *slog.Logger, cfg serveConfig) error {
 	g.Go(func() error { return srv.ListenAndServe(ctx) })
 	g.Go(func() error { return imgs.Run(ctx) })
 	g.Go(func() error { return public.Run(ctx) })
+	g.Go(func() error { return sweepUnusedPhotos(ctx, log, store, public) })
 
 	return g.Wait()
 }
@@ -272,19 +272,32 @@ func serve(ctx context.Context, log *slog.Logger, cfg serveConfig) error {
 // by mistake can be put back.
 const unusedPhotoAge = 7 * 24 * time.Hour
 
-// sweepUnusedPhotos runs before each reconcile, so the photo store removes
-// the deleted photos' files in the same pass.
-func sweepUnusedPhotos(ctx context.Context, log *slog.Logger, store *site.Store) error {
-	gone, err := store.DeleteUnusedPhotos(ctx, unusedPhotoAge)
-	if err != nil {
-		return err
-	}
+// sweepEvery spaces the unused-photo sweeps after the one at start.
+const sweepEvery = 24 * time.Hour
 
-	if len(gone) > 0 {
-		log.InfoContext(ctx, "deleted unused photos", "count", len(gone), "sha256", gone)
-	}
+// sweepUnusedPhotos deletes unused photos at start and every sweepEvery.
+// Changed hands their sha256s to the photo store, which removes their files.
+func sweepUnusedPhotos(ctx context.Context, log *slog.Logger, store *site.Store, srv *server.Server) error {
+	t := time.NewTicker(sweepEvery)
+	defer t.Stop()
 
-	return nil
+	for {
+		gone, err := store.DeleteUnusedPhotos(ctx, unusedPhotoAge)
+
+		switch {
+		case err != nil && ctx.Err() == nil:
+			log.ErrorContext(ctx, "delete unused photos", "err", err)
+		case len(gone) > 0:
+			log.InfoContext(ctx, "deleted unused photos", "count", len(gone), "sha256", gone)
+			srv.Changed(gone...)
+		}
+
+		select {
+		case <-ctx.Done():
+			return nil
+		case <-t.C:
+		}
+	}
 }
 
 // openData opens the database in the state directory, creating both.

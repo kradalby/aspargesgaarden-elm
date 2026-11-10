@@ -40,7 +40,6 @@ type Store struct {
 	vips      *vips
 	now       func() time.Time
 	maxUpload int64
-	sweep     func(context.Context) error
 	jobs      chan struct{}
 	builds    atomic.Int64 // group builds started; tests read it
 
@@ -81,12 +80,6 @@ func WithClock(now func() time.Time) Option {
 	return func(s *Store) error { s.now = now; return nil }
 }
 
-// WithSweep runs sweep before each scheduled reconcile, so photo rows it
-// deletes from the catalogue lose their files in the same pass.
-func WithSweep(sweep func(context.Context) error) Option {
-	return func(s *Store) error { s.sweep = sweep; return nil }
-}
-
 // WithJobs sets how many variant groups may build at once.
 func WithJobs(n int) Option {
 	return func(s *Store) error {
@@ -122,10 +115,8 @@ func New(root string, cat Catalog, opts ...Option) (*Store, error) {
 		}
 	}
 
-	for _, d := range []string{"originals", "variants", "tmp"} {
-		if err := os.MkdirAll(filepath.Join(root, d), dirPerm); err != nil {
-			return nil, fmt.Errorf("create image folder: %w", err)
-		}
+	if err := clean(root); err != nil {
+		return nil, err
 	}
 
 	v, err := newVips(filepath.Join(root, "tmp"))
@@ -136,6 +127,36 @@ func New(root string, cat Catalog, opts ...Option) (*Store, error) {
 	s.vips = v
 
 	return s, nil
+}
+
+// clean creates the folders and empties what no running process can own
+// before New returns: work files of a killed one, and variants of another
+// pipeline version, which nothing links to.
+func clean(root string) error {
+	for _, d := range []string{"originals", "variants", "tmp"} {
+		if err := os.MkdirAll(filepath.Join(root, d), dirPerm); err != nil {
+			return fmt.Errorf("create image folder: %w", err)
+		}
+	}
+
+	for _, d := range []string{"tmp", "variants"} {
+		entries, err := os.ReadDir(filepath.Join(root, d))
+		if err != nil {
+			return fmt.Errorf("clean image folder: %w", err)
+		}
+
+		for _, e := range entries {
+			if d == "variants" && e.Name() == fmt.Sprintf("v%d", PipelineVersion) {
+				continue
+			}
+
+			if err := os.RemoveAll(filepath.Join(root, d, e.Name())); err != nil {
+				return fmt.Errorf("clean image folder: %w", err)
+			}
+		}
+	}
+
+	return nil
 }
 
 func (s *Store) path(spec VariantSpec) string { return filepath.Join(s.root, spec.Path()) }

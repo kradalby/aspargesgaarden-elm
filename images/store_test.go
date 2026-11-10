@@ -142,6 +142,34 @@ func TestNewNeedsVips(t *testing.T) {
 	require.ErrorIs(t, err, ErrNoVips)
 }
 
+// A start leaves no work files of a killed process and no variants of an
+// older pipeline; the current version's files stay.
+func TestNewCleansUp(t *testing.T) {
+	root := t.TempDir()
+	cur := VariantSpec{Photo: testSHA, Kind: Full, Crop: Rect{W: 1200, H: 800}.ID(), Width: 480, Format: JPEG}
+	stale := []string{"tmp/upload-123", "tmp/build-9/scaled.v", "variants/v0/ab/" + testSHA + "/full-00000000-480.jpg"}
+
+	for _, f := range append(stale, cur.Path()) {
+		path := filepath.Join(root, f)
+		require.NoError(t, os.MkdirAll(filepath.Dir(path), dirPerm))
+		require.NoError(t, os.WriteFile(path, []byte("x"), 0o600))
+	}
+
+	_, err := New(root, newFakeCatalog())
+	require.NoError(t, err)
+
+	for _, f := range stale {
+		require.NoFileExists(t, filepath.Join(root, f))
+	}
+
+	require.NoDirExists(t, filepath.Join(root, "variants", "v0"))
+	require.FileExists(t, filepath.Join(root, cur.Path()))
+
+	tmp, err := os.ReadDir(filepath.Join(root, "tmp"))
+	require.NoError(t, err)
+	require.Empty(t, tmp)
+}
+
 func TestEnsureOnlyCurrent(t *testing.T) {
 	cat := newFakeCatalog()
 	s := newTestStore(t, cat)

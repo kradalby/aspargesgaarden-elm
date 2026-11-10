@@ -25,8 +25,7 @@ type Catalog interface {
 	// Photo returns the photo whose original has this sha256, or an error
 	// wrapping ErrNotFound.
 	Photo(ctx context.Context, sha256 string) (Photo, error)
-	// Photos returns every photo. Reconcile deletes what this list does not
-	// explain, so an incomplete answer must be an error, never a short list.
+	// Photos returns every photo; Run builds what they miss at start.
 	Photos(ctx context.Context) ([]Photo, error)
 }
 

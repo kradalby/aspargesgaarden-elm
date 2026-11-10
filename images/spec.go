@@ -1,7 +1,6 @@
 // Package images owns every image file of asparges: the uploaded originals,
-// the web variants derived from them with the vips CLI, their names and URLs,
-// and the cleanup that keeps the folders matching the database. Nothing else
-// reads or writes the image folders.
+// the web variants derived from them with the vips CLI, and their names and
+// URLs. Nothing else reads or writes the image folders.
 package images
 
 import (
@@ -16,7 +15,7 @@ import (
 
 // PipelineVersion names the variants folder. Bump it whenever anything that
 // changes output files changes: vips flags, the encoder settings below, the
-// width ladder or the kinds. Reconcile then deletes the old folder and the
+// width ladder or the kinds. The next start deletes the old folder and the
 // queue rebuilds every photo under the new one.
 const PipelineVersion = 1
 

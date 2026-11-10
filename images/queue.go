@@ -5,12 +5,9 @@ import (
 	"errors"
 	"fmt"
 	"slices"
-	"time"
 )
 
 const (
-	// reconcileEvery spaces the cleanup runs after the one at start.
-	reconcileEvery = 24 * time.Hour
 	// previewWidth is the crop tool's picture: sharp enough to place a crop,
 	// small enough to load at once.
 	previewWidth = 1200
@@ -184,12 +181,10 @@ func (s *Store) step(ctx context.Context) bool {
 }
 
 // Run works the queue until ctx ends, one build at a time, so requests keep
-// the other job slots. At start it reconciles and queues every photo behind
-// any upload, so work lost in a restart, a new pipeline version or a restore
-// is rebuilt without anyone asking. It then reconciles every reconcileEvery.
+// the other job slots. At start it queues every photo behind any upload, so
+// work lost in a restart, a new pipeline version or a restore is rebuilt
+// without anyone asking.
 func (s *Store) Run(ctx context.Context) error {
-	s.reconcileAndLog(ctx)
-
 	photos, err := s.cat.Photos(ctx)
 	if err != nil {
 		s.log.Error("images: list photos to warm", "err", err)
@@ -198,9 +193,6 @@ func (s *Store) Run(ctx context.Context) error {
 	for _, p := range photos {
 		s.enqueue(p.SHA256, tierBacklog)
 	}
-
-	t := time.NewTicker(reconcileEvery)
-	defer t.Stop()
 
 	for {
 		for ctx.Err() == nil {
@@ -212,29 +204,9 @@ func (s *Store) Run(ctx context.Context) error {
 		select {
 		case <-ctx.Done():
 			return nil
-		case <-t.C:
-			s.reconcileAndLog(ctx)
 		case <-s.wake:
 		}
 	}
-}
-
-func (s *Store) reconcileAndLog(ctx context.Context) {
-	if s.sweep != nil {
-		if err := s.sweep(ctx); err != nil {
-			s.log.Error("images: sweep before reconcile", "err", err)
-		}
-
-		s.Changed()
-	}
-
-	rep, err := s.Reconcile(ctx, false)
-	if err != nil {
-		s.log.Error("images: reconcile", "err", err)
-		return
-	}
-
-	s.log.Info("images: reconciled", rep.Attrs()...)
 }
 
 // firstPass is what the admin is waiting for: the crop tool's preview, the
@@ -353,23 +325,6 @@ func (s *Store) warmUntil(ctx context.Context, sha string, pick func(Photo, grou
 	}
 
 	return false, errors.Join(errs...)
-}
-
-// WarmAll builds every missing variant of every photo, in the foreground.
-func (s *Store) WarmAll(ctx context.Context) error {
-	photos, err := s.cat.Photos(ctx)
-	if err != nil {
-		return fmt.Errorf("list photos: %w", err)
-	}
-
-	var errs []error
-	for i, p := range photos {
-		err := s.warm(ctx, p.SHA256, allSpecs)
-		errs = append(errs, err)
-		s.log.Info("images: warmed", "photo", p.SHA256, "n", i+1, "of", len(photos), "ok", err == nil)
-	}
-
-	return errors.Join(errs...)
 }
 
 // State is where a photo's variants are.

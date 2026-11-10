@@ -235,7 +235,6 @@ in
         before = variants(site, "/arrangementer/2030/julemarked")
         # Holds the camera-sized photo, up to its widest AVIF.
         gallery = variants(site, "/galleri")
-        as_service(site, "asparges images check")
         no_errors(site)
         # Peak memory of the unit's cgroup, children included, against its cap.
         peak = site.succeed("systemctl show -P MemoryPeak asparges.service").strip()
@@ -274,11 +273,9 @@ in
         )
         site.systemctl("start asparges.service")
         site.wait_for_open_port(8090)
-        as_service(site, "asparges images warm")
         after = variants(site, "/arrangementer/2030/julemarked")
         assert after == before, (before, after)
         assert variants(site, "/galleri") == gallery
-        as_service(site, "asparges images check")
         no_errors(site)
   '';
 }

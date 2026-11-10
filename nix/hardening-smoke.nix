@@ -1,5 +1,5 @@
-# The service's own sandbox on a real kernel: import, a full variant build and
-# serve --dev under systemd-run with the module's hardening, so a syscall,
+# The service's own sandbox on a real kernel: import, then serve --dev building
+# every variant, under systemd-run with the module's hardening, so a syscall,
 # W^X mapping or decoder path that only one architecture takes fails here and
 # not on deploy. It needs root and a running systemd, so it is a program CI
 # runs on the runner, not a check inside the nix sandbox.
@@ -86,7 +86,10 @@ let
 in
 pkgs.writeShellApplication {
   name = "asparges-hardening-smoke";
-  runtimeInputs = [ pkgs.curl ];
+  runtimeInputs = [
+    pkgs.curl
+    pkgs.gnugrep
+  ];
   # systemd-run is the host's: it has to talk to the running manager.
   text = ''
     systemctl stop asparges-smoke.service 2>/dev/null || true
@@ -95,13 +98,15 @@ pkgs.writeShellApplication {
     # Not --quiet: its summary carries the run's time and memory peak.
     run() { systemd-run --wait --pipe --collect ${props} -- "$@"; }
     run ${asparges} import --data-dir=${data} ${tree}
-    run ${asparges} images warm --data-dir=${data}
 
     systemd-run --unit=asparges-smoke --collect --quiet ${props} -- \
       ${asparges} serve --dev --data-dir=${data} --listen-addr=127.0.0.1:8099
     trap 'systemctl stop asparges-smoke.service; journalctl -u asparges-smoke.service --no-pager | tail -n 50' EXIT
     curl -fsS --retry 30 --retry-delay 1 --retry-all-errors -o /dev/null http://127.0.0.1:8099/
-    curl -fsS -o /dev/null http://127.0.0.1:8099/galleri
+    # serve builds every size at start; each gallery picture answers once built.
+    for u in $(curl -fsS http://127.0.0.1:8099/galleri | grep -o '/img/[^" ,]*' | sort -u); do
+      curl -fsS --retry 120 --retry-delay 1 --retry-all-errors -o /dev/null "http://127.0.0.1:8099$u"
+    done
     systemctl is-active --quiet asparges-smoke.service
     echo "hardening smoke passed"
   '';

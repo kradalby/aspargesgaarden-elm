@@ -40,8 +40,7 @@ type Original struct {
 // so a broken file is rejected now and not at its first build. The same
 // content twice is one file. Errors map to a Reason with ReasonOf.
 //
-// The caller then writes the photos row. Until it exists, Reconcile leaves
-// the original alone for a grace period.
+// The caller then writes the photos row.
 func (s *Store) Intake(ctx context.Context, r io.Reader) (Original, error) {
 	tmp := filepath.Join(s.root, "tmp")
 
@@ -51,7 +50,7 @@ func (s *Store) Intake(ctx context.Context, r io.Reader) (Original, error) {
 	}
 
 	// After the rename there is nothing to remove; a crash leaves it for
-	// Reconcile.
+	// the next start (see clean).
 	defer os.Remove(f.Name())
 	defer f.Close()
 

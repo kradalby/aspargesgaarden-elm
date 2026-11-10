@@ -21,22 +21,6 @@ var (
 		Help:    "Time to serve one variant: hit = file on disk, built = built for this request.",
 		Buckets: prometheus.ExponentialBuckets(0.0005, 4, 10),
 	}, []string{"result"}))
-	metricFiles = register(prometheus.NewGaugeVec(prometheus.GaugeOpts{
-		Name: "asparges_images_files",
-		Help: "Files per image folder at the last reconcile.",
-	}, []string{"dir"}))
-	metricBytes = register(prometheus.NewGaugeVec(prometheus.GaugeOpts{
-		Name: "asparges_images_bytes",
-		Help: "Bytes per image folder at the last reconcile.",
-	}, []string{"dir"}))
-	metricOrphansRemoved = register(prometheus.NewCounterVec(prometheus.CounterOpts{
-		Name: "asparges_images_orphans_removed_total",
-		Help: "Files and folders reconcile deleted because nothing references them.",
-	}, []string{"dir"}))
-	metricMissingOriginals = register(prometheus.NewGauge(prometheus.GaugeOpts{
-		Name: "asparges_images_missing_originals",
-		Help: "Photos in the database whose original file is gone. Needs a restore.",
-	}))
 	metricQueue = register(prometheus.NewGauge(prometheus.GaugeOpts{
 		Name: "asparges_images_queue_length",
 		Help: "Photos waiting for their variants to be built.",

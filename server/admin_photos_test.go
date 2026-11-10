@@ -20,17 +20,19 @@ import (
 	"github.com/kradalby/asparges/site"
 )
 
-// withVips puts the real photo store behind the admin, for uploads.
-func (a *adminFixture) withVips(t *testing.T) *images.Store {
+// withVips puts the real photo store behind the admin, for uploads, and
+// returns its folder.
+func (a *adminFixture) withVips(t *testing.T) string {
 	t.Helper()
 
-	imgs, err := images.New(t.TempDir(), a.store.Catalog())
+	dir := t.TempDir()
+	imgs, err := images.New(dir, a.store.Catalog())
 	require.NoError(t, err, "the tests run the real vips: it must be on PATH")
 
 	a.srv.cfg.Admin.Photos = imgs
 	a.admin = a.srv.Admin()
 
-	return imgs
+	return dir
 }
 
 func multipartBody(t *testing.T, name string, data []byte) ([]byte, string) {
@@ -157,9 +159,11 @@ func TestAdminUploadRefused(t *testing.T) {
 			require.NoError(t, err)
 			require.Empty(t, ps, "nothing recorded")
 
-			rep, err := imgs.Reconcile(t.Context(), true)
-			require.NoError(t, err)
-			require.Zero(t, rep.StaleTmp+rep.GraceOriginals, "nothing left on disk")
+			for _, d := range []string{"originals", "tmp"} {
+				entries, err := os.ReadDir(filepath.Join(imgs, d))
+				require.NoError(t, err)
+				require.Empty(t, entries, "nothing left in %s", d)
+			}
 		})
 	}
 
