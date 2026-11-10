@@ -1,6 +1,6 @@
-# Generated artifacts and binary design sources: the elm2nix-generated
-# registry/elm-srcs, build output, and the grafikk .pxd design bundles are
-# not hand-edited, so the text fixers must leave them alone.
+# The old elm-pages site (src/, public/, grafikk/, …) stays in the tree until
+# the cleanup phase; its generated and binary files are not hand-edited, so the
+# text fixers must leave them alone.
 exclude: |
   (?x)^(
     registry\.dat|
@@ -8,7 +8,9 @@ exclude: |
     grafikk/.*|
     dist/.*|
     \.elm-pages/.*|
-    elm-stuff/.*
+    elm-stuff/.*|
+    result/.*|
+    \.direnv/.*
   )$
 
 repos:
@@ -17,24 +19,42 @@ repos:
     hooks:
       - id: trailing-whitespace
       - id: end-of-file-fixer
-      - id: check-yaml
       - id: check-json
+      - id: check-yaml
       - id: check-toml
       - id: check-merge-conflict
       - id: check-added-large-files
         args: [--maxkb=1000]
-        # Full-resolution course photos feed the responsive image pipeline.
+        # Full-resolution course photos feed the old site's image pipeline.
         exclude: ^public/arrangementer/2026-takkebakstkurs-anita-saga-[12]\.jpeg$
       - id: detect-private-key
       - id: mixed-line-ending
 
-  # elm-format runs as a local hook so it comes from the flake's devShell
-  # (nixpkgs pin), keeping the tool version reproducible. `nix develop`
-  # (or direnv) must be active for it to resolve.
   - repo: local
     hooks:
-      - id: elm-format
-        name: elm-format
-        entry: elm-format --validate
+      - id: treefmt
+        name: treefmt
+        entry: nix fmt --
         language: system
-        files: \.elm$
+        pass_filenames: false
+
+      - id: golangci-lint
+        name: golangci-lint
+        entry: golangci-lint run --new-from-rev=HEAD~1 --fix
+        language: system
+        types: [go]
+        pass_filenames: false
+
+      - id: go-test
+        name: go test
+        entry: go test -race -short -timeout=5m ./...
+        language: system
+        types: [go]
+        pass_filenames: false
+
+      - id: vendorhash
+        name: vendorhash check
+        entry: go run ./cmd/vendorhash check
+        language: system
+        files: ^(go\.mod|go\.sum|flakehashes\.json)$
+        pass_filenames: false

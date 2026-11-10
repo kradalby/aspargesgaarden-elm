@@ -16,3 +16,12 @@ result-*
 *_*w_resize.jpeg
 *.webp
 *.avif
+
+# asparges
+/asparges
+*.db
+*.db-*
+
+# Agent scratch: worktrees and plugin state
+.claude/worktrees/
+.superpowers/
