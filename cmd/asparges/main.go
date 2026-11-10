@@ -27,6 +27,7 @@ import (
 
 	"github.com/kradalby/asparges/db"
 	"github.com/kradalby/asparges/images"
+	"github.com/kradalby/asparges/pages"
 	"github.com/kradalby/asparges/seo"
 	"github.com/kradalby/asparges/server"
 	"github.com/kradalby/asparges/site"
@@ -219,7 +220,7 @@ func serve(ctx context.Context, log *slog.Logger, cfg serveConfig) error {
 		return err
 	}
 
-	admin := server.AdminConfig{Photos: imgs}
+	admin := server.AdminConfig{Photos: imgs, App: pages.AdminHandler()}
 
 	if !cfg.dev {
 		lc := srv.TailscaleLocalClient()
