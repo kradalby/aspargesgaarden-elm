@@ -27,9 +27,9 @@ func Kontakt(s Site) *elem.Element {
 			elem.Div(attrs.Props{attrs.Class: "flex flex-row flex-wrap"},
 				elem.Div(attrs.Props{attrs.Class: "w-full flex flex-col flex-wrap md:w-1/2"},
 					elem.Div(attrs.Props{attrs.Class: "md:pt-2"},
-						ui.InfoLine(ui.IconPhone, "Telefon", seo.Venue.Phone),
-						ui.InfoLine(ui.IconMail, "E-post", "kristine (at) aspargesgaarden (dot) no"),
-						ui.InfoLine(ui.IconLocation, "Adresse", seo.Venue.AddressLine()),
+						ui.InfoLine(ui.IconPhone, "Telefon", seo.Venue.Phone, "tel:"+seo.Venue.PhoneE164),
+						ui.InfoLine(ui.IconMail, "E-post", "kristine (at) aspargesgaarden (dot) no", ""),
+						ui.InfoLine(ui.IconLocation, "Adresse", seo.Venue.AddressLine(), ""),
 					)),
 				elem.Div(attrs.Props{attrs.Class: "w-full md:w-1/2"},
 					elem.IFrame(attrs.Props{

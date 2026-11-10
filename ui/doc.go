@@ -13,7 +13,7 @@
 //	    },
 //	        ui.Container(
 //	            ui.Headline("Kontakt oss"),
-//	            ui.InfoLine(ui.IconPhone, "Telefon", "+47 90 91 98 12"),
+//	            ui.InfoLine(ui.IconPhone, "Telefon", "+47 90 91 98 12", "tel:+4790919812"),
 //	        ),
 //	    )
 //	}
