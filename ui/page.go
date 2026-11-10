@@ -1,6 +1,9 @@
 package ui
 
 import (
+	"slices"
+	"strings"
+
 	"github.com/chasefleming/elem-go"
 	"github.com/chasefleming/elem-go/attrs"
 
@@ -30,14 +33,25 @@ func Page(p PageProps, body ...elem.Node) *elem.Element {
 		elem.Meta(attrs.Props{attrs.Name: "viewport", attrs.Content: "width=device-width, initial-scale=1"}),
 	}, seo.Tags(p.BaseURL, p.Meta)...)
 
+	// The .ico is for browsers without SVG icons; sizes="any" on it would
+	// make Chrome prefer it to the SVG.
 	head = append(head,
-		elem.Link(attrs.Props{attrs.Rel: "icon", attrs.Href: static.URL("favicon.ico"), attrs.Sizes: "any"}),
+		elem.Link(attrs.Props{attrs.Rel: "icon", attrs.Href: static.URL("favicon.ico"), attrs.Sizes: "32x32"}),
 		elem.Link(attrs.Props{attrs.Rel: "icon", attrs.Href: static.URL("favicon.svg"), attrs.Type: "image/svg+xml"}),
 	)
 
-	// Every font is above the fold on every page (menu, headline, text), and
-	// the stylesheet would only ask for them once it has been parsed.
+	// The stylesheet would ask for the fonts only once it has been parsed.
+	// Avenir sets the menu and text of every page; the display font only
+	// headings (font-display), which some pages (the front) have none of,
+	// and an unused preload competes with the page's photo.
+	display := holds(body, func(e *elem.Element) bool {
+		return slices.Contains(strings.Fields(e.Attrs[attrs.Class]), "font-display")
+	})
 	for _, u := range static.FontURLs() {
+		if strings.Contains(u, "Cardillac") && !display {
+			continue
+		}
+
 		head = append(head, elem.Link(attrs.Props{
 			attrs.Rel:         "preload",
 			attrs.Href:        u,

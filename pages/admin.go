@@ -22,7 +22,7 @@ func Admin() *elem.Element {
 		elem.Meta(attrs.Props{attrs.Name: "viewport", attrs.Content: "width=device-width, initial-scale=1"}),
 		elem.Meta(attrs.Props{attrs.Name: "robots", attrs.Content: "noindex, nofollow"}),
 		elem.Title(nil, elem.Text("Aspargesgården admin")),
-		elem.Link(attrs.Props{attrs.Rel: "icon", attrs.Href: static.URL("favicon.ico"), attrs.Sizes: "any"}),
+		elem.Link(attrs.Props{attrs.Rel: "icon", attrs.Href: static.URL("favicon.ico"), attrs.Sizes: "32x32"}),
 		elem.Link(attrs.Props{attrs.Rel: "icon", attrs.Href: static.URL("favicon.svg"), attrs.Type: "image/svg+xml"}),
 	)
 

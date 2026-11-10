@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"slices"
 	"strings"
 	"testing"
 
@@ -40,6 +41,20 @@ func TestPageLoadsLightboxOnlyWithGallery(t *testing.T) {
 	require.NotContains(t, testPage("/"), "gallery.js")
 	require.NotContains(t, page(Gallery(GalleryPage)), "gallery.js", "an empty gallery has nothing to open")
 	require.Equal(t, 1, strings.Count(page(Container(Gallery(GalleryPage, testGallery...), Gallery(GalleryColumn, testGallery[:1]...))), script))
+}
+
+// The display font is preloaded only where a heading uses it; the text
+// fonts on every page.
+func TestPagePreloadsOnlyFontsInUse(t *testing.T) {
+	preloads := func(body ...elem.Node) int {
+		return strings.Count(Page(PageProps{BaseURL: "https://aspargesgaarden.no", Meta: Meta{Title: "x"}}, body...).Render(), `rel="preload"`)
+	}
+	all := static.FontURLs()
+
+	require.True(t, slices.ContainsFunc(all, func(u string) bool { return strings.Contains(u, "Cardillac") }),
+		"Page tells the display font by its file name")
+	require.Equal(t, len(all), preloads(Container(Headline("Galleri"))))
+	require.Equal(t, len(all)-1, preloads(Backdrop("Forside", testPhoto())))
 }
 
 // The old site rendered the Umami tag as an empty <p>, so it never loaded;

@@ -70,8 +70,14 @@ func Gallery(layout GalleryLayout, photos ...GalleryPhoto) elem.Node {
 		sources, img := encodings(p.Photo)
 		largest := slices.MaxFunc(img.variants, func(a, b images.Variant) int { return a.Width - b.Width })
 
-		link := elem.A(attrs.Props{attrs.Href: largest.URL, "data-index": strconv.Itoa(i), attrs.Class: "block"},
-			Picture(PictureProps{Photo: p.Photo, Alt: p.Alt, Layout: pictureLayout, Class: "w-full"}))
+		pic := PictureProps{Photo: p.Photo, Alt: p.Alt, Layout: pictureLayout, Class: "w-full"}
+		// A page-filling gallery's first photo sits under the headline,
+		// above the fold: the page's main image.
+		if layout == GalleryPage && i == 0 {
+			pic.Priority = Hero
+		}
+
+		link := elem.A(attrs.Props{attrs.Href: largest.URL, "data-index": strconv.Itoa(i), attrs.Class: "block"}, Picture(pic))
 		items[i] = PhotoCredit(p.By, link)
 		if item != "" {
 			items[i] = elem.Div(attrs.Props{attrs.Class: item}, items[i])
@@ -125,14 +131,18 @@ type lightboxSource struct {
 
 // holdsGallery reports whether a Gallery is among nodes or their children.
 func holdsGallery(nodes []elem.Node) bool {
-	return slices.ContainsFunc(nodes, func(n elem.Node) bool {
-		e, ok := n.(*elem.Element)
-		if !ok {
-			return false
-		}
-
+	return holds(nodes, func(e *elem.Element) bool {
 		_, gallery := e.Attrs[galleryAttr]
 
-		return gallery || holdsGallery(e.Children)
+		return gallery
+	})
+}
+
+// holds reports whether an element among nodes or their children matches.
+func holds(nodes []elem.Node, match func(*elem.Element) bool) bool {
+	return slices.ContainsFunc(nodes, func(n elem.Node) bool {
+		e, ok := n.(*elem.Element)
+
+		return ok && (match(e) || holds(e.Children, match))
 	})
 }
