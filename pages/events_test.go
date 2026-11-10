@@ -126,7 +126,7 @@ func TestEventsWithNothingComing(t *testing.T) {
 	past := testEvents()[2:]
 
 	require.Contains(t, Events(testSite, past, testNow).Render(),
-		">Ingen kommende arrangementer for øyeblikket. Se noen av våre tidligere arrangementer nedenfor for hva som kan komme i fremtiden!</p>")
+		">Ingen kommende arrangementer for øyeblikket. Se tidligere arrangementer nedenfor for et inntrykk av hva som kan komme.</p>")
 
 	empty := Events(testSite, nil, testNow).Render()
 	require.Contains(t, empty, ">Ingen kommende arrangementer for øyeblikket.</p>")

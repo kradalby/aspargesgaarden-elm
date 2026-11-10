@@ -30,7 +30,7 @@ func Events(s Site, events []site.Event, now time.Time) *elem.Element {
 	} else {
 		empty := "Ingen kommende arrangementer for øyeblikket."
 		if len(past) > 0 {
-			empty += " Se noen av våre tidligere arrangementer nedenfor for hva som kan komme i fremtiden!"
+			empty += " Se tidligere arrangementer nedenfor for et inntrykk av hva som kan komme."
 		}
 
 		body = append(body, ui.Container(elem.P(attrs.Props{attrs.Class: "text-center py-12 text-gray-600"}, elem.Text(empty))))

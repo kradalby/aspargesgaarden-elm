@@ -29,9 +29,9 @@ var facilities = []struct {
 		by:    marianneOus,
 		text: fmt.Sprintf(`# Låven
 
-Drømmer du om låvebryllup så er «høyloftet» perfekt med bøttevis av sjarm. Låven er fra 1906 og har en nydelig patina. Det er høyt under taket, og lyslenker skaper den rette stemningen. Runde bord og gamle spisestuestoler med plass til %d personer, men kan gjøres intim ned til ca 45 personer. Om du liker det elegangt eller rustikt, så er begge deler mulig.
+Drømmer du om låvebryllup, er «høyloftet» perfekt med bøttevis av sjarm. Låven er fra 1906 og har en nydelig patina. Det er høyt under taket, og lyslenker skaper den rette stemningen. Runde bord og gamle spisestuestoler med plass til %d personer, men kan gjøres intim ned til ca. 45 personer. Om du liker det elegant eller rustikt, så er begge deler mulig.
 
-Det er bar, scene, dansegulv, musikkanlegg / mikrofon, prosjektor og lerret, samt belysning som kan dempes etter behov. Toaletter i tilknytning ved låvebrua.
+Det er bar, scene, dansegulv, musikkanlegg / mikrofon, prosjektor og lerret, samt belysning som kan dempes etter behov. Toaletter ved låvebrua.
 `, seo.Venue.Guests("Låven")),
 	},
 	{
@@ -40,9 +40,9 @@ Det er bar, scene, dansegulv, musikkanlegg / mikrofon, prosjektor og lerret, sam
 		by:    hanneGulliksen,
 		text: fmt.Sprintf(`# Fjøset
 
-I ”fjøset” er det spisestue med plassbygde langbord hvor man kan dekke til %d personer. «Møkkarennene» er i dag fyllt med gamle minner, skatter og bruksredskaper. Hvitmalte murvegger sammen med orginale smijernsvinduer, skaper en nydelig atmosfære.
+I «fjøset» er det spisestue med plassbygde langbord hvor man kan dekke til %d personer. «Møkkarennene» er i dag fylt med gamle minner, skatter og bruksredskaper. Hvitmalte murvegger sammen med originale smijernsvinduer skaper en nydelig atmosfære.
 
-Det finnes både musikkanlegg og flere skjermer for lysbildeshow. Den tidligere stallen er gjort om til en intim salong, med bar og scene/ dansegulv. Det finnes også et salongflygel på scenen.
+Det finnes både musikkanlegg og flere skjermer for lysbildeshow. Den tidligere stallen er gjort om til en intim salong, med bar og scene og dansegulv. Det finnes også et salongflygel på scenen.
 
 Flott terrasse utenfor, hvor det er sol fra morgen til kveld.
 `, seo.Venue.Guests("Fjøset")),
@@ -53,7 +53,7 @@ Flott terrasse utenfor, hvor det er sol fra morgen til kveld.
 		by:    auroraHovland,
 		text: `# Kjøkken
 
-I fjøset er det storkjøkken med alt av utstyr. Kokker som er tilknyttet oss lager nydelig mat som er kortreist og av ypperste klasse. De er konkurranse dyktige på pris.
+I fjøset er det storkjøkken med alt av utstyr. Kokker som er tilknyttet oss lager nydelig mat som er kortreist og av ypperste klasse. De er konkurransedyktige på pris.
 
 Vi anbefaler å bruke både kokker og servitører tilknyttet oss. Det skaper ro og profesjonalitet rundt arrangementet, da de kjenner utstyret og gården godt. Vi formidler kontakt til profesjonelle kokker og catering. Det er også mulig å bruke egne kokker mot et depositum. Drikkevarer ordner dere selv.
 `,
@@ -64,9 +64,9 @@ Vi anbefaler å bruke både kokker og servitører tilknyttet oss. Det skaper ro 
 		by:    auroraHovland,
 		text: `# Engelsk lysthus og uteområder
 
-På gården har vi et nydelig engelsk lysthus i hagen som mange bruker som bakgrunn for vielser og fotografering. Det pyntes etter årstider. Vakre uteområder er også til disposisjon. Stor deilig hage hvor det er fint å mingle, eller arrangere aktiviteter. Ved låven er det også terrasse utenfor, hvor det er sol fra morgen til kveld.
+På gården har vi et nydelig engelsk lysthus i hagen som mange bruker som bakgrunn for vielser og fotografering. Det pyntes etter årstider. Vakre uteområder er også til disposisjon. En stor, deilig hage hvor det er fint å mingle eller arrangere aktiviteter. Ved låven er det også terrasse utenfor, hvor det er sol fra morgen til kveld.
 
-Se gjerne på vår [Instagram](https://instagram.com/aspargesgaarden) eller [Galleri](/galleri) for inspirasjon
+Se gjerne på [Instagram-kontoen vår](https://instagram.com/aspargesgaarden) eller [galleriet](/galleri) for inspirasjon.
 `,
 	},
 	{

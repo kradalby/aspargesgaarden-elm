@@ -11,26 +11,26 @@ import (
 const omOssText = `
 Aspargesgården byr på sjarmerende og unike lokaler i landlige omgivelser, ved kysten i Vestfold.
 
-Vi byr på annerledes og stemningsfylte selskapslokaler, hvor låvebryllup er vår spesialitet. Vi ønsker velkommen til alle typer selskap; bryllup, konfirmasjoner, dåp, minnestunder, bursdager, firmasamlinger, kurs, konserter og konferanser.
+Vi byr på annerledes og stemningsfylte selskapslokaler, hvor låvebryllup er vår spesialitet. Vi ønsker velkommen til alle typer selskap: bryllup, konfirmasjoner, dåp, minnestunder, bursdager, firmasamlinger, kurs, konserter og konferanser.
 
-Låven og fjøset rommer det dere trenger av moderne teknisk utstyr, samt komfortable fasiliteter og fremkommelighet for alle! Vi har det du trenger til å dekke et vakkert festbord og skape den rette stemning!
+Låven og fjøset rommer det dere trenger av moderne teknisk utstyr, samt komfortable fasiliteter og fremkommelighet for alle! Vi har det du trenger til å dekke et vakkert festbord og skape den rette stemningen!
 
-Her hos oss kan du velge om du vil gjøre litt- mye- eller ingenting selv!
+Her hos oss kan du velge om du vil gjøre litt, mye eller ingenting selv!
 
-Ta en nærmere kikk på [muligheter om hva vi kan tilby](/lokaler) - og skulle du ha spesielle ønsker; ikke nøl med å ta kontakt! La oss skape den perfekte rammen for ditt arrangement!
+Ta en nærmere kikk på [hva vi kan tilby](/lokaler) – og har du spesielle ønsker, ikke nøl med å ta kontakt! La oss skape den perfekte rammen for ditt arrangement!
 
 
 # Vertskapet
 
 I 2014 flyttet vi fra Sandefjord til idylliske Tjølling og Aspargesgården. Tidligere eiere dyrket asparges her, og gjorde om fjøset til selskapslokaler, derav navnet «Aspargesgården».
 
-Vi -  min mann Anders og jeg, trengte låven til kurs, møter og lager for vår salgsstyrke og Tupperware produkter.
+Vi – min mann Anders og jeg – trengte låven til kurs, møter og lager for vår salgsstyrke og Tupperware-produkter.
 
-Vi har tre voksne barn, og lille Angel, vår søte Bichon Havanais.
+Vi har tre voksne barn, og lille Angel, vår søte bichon havanais.
 
 Jeg har alltid hatt en drøm om å bo på gård, selv om jeg er en skikkelig «byjente». Elsker gamle hus, historie, interiør, hage og å gjøre det vakkert rundt meg. Anders er «handyman» som restaurerer og bygger, og sammen utvikler vi gården kontinuerlig.
 
-Det er en utrolig glede og skape så mange fantastiske øyeblikk, muligheter og opplevelser.
+Det er en utrolig glede å skape så mange fantastiske øyeblikk, muligheter og opplevelser.
 
 Vi ser frem til å ønske mange flere brudepar, selskap, og alle andre som har lyst til å gjøre noe morsomt her på gården velkommen!
 
