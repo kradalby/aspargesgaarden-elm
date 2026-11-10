@@ -50,6 +50,9 @@ type Config struct {
 	// Now is the clock that decides upcoming and past.
 	Now func() time.Time
 	Log *slog.Logger
+	// NoIndex keeps the site out of search engines (the beta site): every
+	// response says noindex and robots.txt shuts crawlers out.
+	NoIndex bool
 }
 
 // Images is the photo store (images.Store) as the server uses it.
@@ -100,6 +103,7 @@ func (s *Server) Public() http.Handler {
 	mux.Handle("GET "+static.Prefix, static.Handler())
 
 	mux.Handle("GET /img/", s.cfg.Images.Handler())
+	s.seoRoutes(mux)
 	mux.HandleFunc("GET /", s.route)
 
 	// --dev runs without tsnet, so its loopback-only listener stands in for
@@ -111,6 +115,9 @@ func (s *Server) Public() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Security-Policy", ui.CSP())
 		w.Header().Set("X-Content-Type-Options", "nosniff")
+		if s.cfg.NoIndex {
+			w.Header().Set("X-Robots-Tag", "noindex")
+		}
 		mux.ServeHTTP(w, r)
 	})
 }

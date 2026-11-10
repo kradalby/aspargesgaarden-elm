@@ -67,7 +67,7 @@ type fixture struct {
 	h      http.Handler
 }
 
-func newFixture(t *testing.T, dev bool) *fixture {
+func newFixture(t *testing.T, dev bool, opts ...func(*Config)) *fixture {
 	t.Helper()
 
 	d, err := db.Open(t.Context(), filepath.Join(t.TempDir(), "test.db"))
@@ -77,7 +77,13 @@ func newFixture(t *testing.T, dev bool) *fixture {
 	clk := &clock{t: oslo("2026-11-10 12:00")}
 	store := site.NewStore(d, clk.now)
 	imgs := &fakeImages{}
-	srv := New(Config{BaseURL: "https://aspargesgaarden.no", Dev: dev, Store: store, Images: imgs, Now: clk.now})
+
+	cfg := Config{BaseURL: "https://aspargesgaarden.no", Dev: dev, Store: store, Images: imgs, Now: clk.now}
+	for _, o := range opts {
+		o(&cfg)
+	}
+
+	srv := New(cfg)
 
 	return &fixture{db: d, srv: srv, store: store, clock: clk, images: imgs, h: srv.Public()}
 }
