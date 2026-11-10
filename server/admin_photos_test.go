@@ -411,7 +411,8 @@ func TestAdminPhotoStatus(t *testing.T) {
 		itoa(broken.ID):   {State: "failed", Done: 3, Total: 40, PreviewReady: true, Reason: "damaged"},
 		// The upload's word for it, not the photo store's.
 		itoa(notPhoto.ID): {State: "failed", Reason: "unsupported_type"},
-		itoa(gone.ID):     {State: "failed", Reason: "internal"},
+		// Gone from disk: uploading the same file again repairs it.
+		itoa(gone.ID): {State: "failed", Reason: "missing_original"},
 	}}, decode[map[string]map[string]statusJSON](t, rec))
 
 	tooMany := strings.Repeat("1,", maxStatusIDs+1)

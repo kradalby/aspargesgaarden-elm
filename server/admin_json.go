@@ -77,6 +77,9 @@ var reasons = map[images.Reason]struct {
 	images.ReasonDamaged:       {"damaged", http.StatusUnprocessableEntity},
 	images.ReasonTooSmall:      {"too_small", http.StatusUnprocessableEntity},
 	images.ReasonTooManyPixels: {"too_many_pixels", http.StatusUnprocessableEntity},
+	// A photo's state only, never an upload's: a retry cannot cure it, the
+	// same file uploaded again does.
+	images.ReasonMissingOriginal: {"missing_original", http.StatusUnprocessableEntity},
 }
 
 // bodyError is a problem with a key of the request body itself, named as

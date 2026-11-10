@@ -173,10 +173,10 @@ polling (see [Photo status](#photo-status)).
   the upload's code for it (see [Photos](#photos)): `damaged` (the file
   could not be read as a picture: truncated, corrupt), `too_small` (smaller
   than the smallest size the site uses, 480 px wide), and the rarer
-  `unsupported_type`, `too_large` and `too_many_pixels`. `internal` is
-  anything else (vips killed for memory or timed out, disk full, the stored
-  original is gone, which uploading the same file again repairs): worth a
-  retry. Any other code is shown like `internal`.
+  `unsupported_type`, `too_large` and `too_many_pixels`. `missing_original`:
+  the stored upload is gone; uploading the same file again repairs it.
+  `internal` is anything else (vips killed for memory or timed out, disk
+  full): worth a retry. Any other code is shown like `internal`.
 - A `failed` photo can still be referred to by events and the gallery; its
   missing sizes are missing on the public pages. Publishing is never blocked
   by a photo's status.
