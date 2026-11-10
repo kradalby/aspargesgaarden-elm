@@ -336,6 +336,28 @@ def test_mounting_moves_nothing(browser):
     assert last == 3  # Elm's closed view: an empty text node, not a box
 
 
+def test_a_picture_not_built_yet_keeps_its_box(browser):
+    """/img/ answers 404 until the server has built a size. The page must not
+    reflow when such a picture fails: WebKit would shrink it to its alt text."""
+    ctx = browser.new_context(viewport={"width": 1280, "height": 800})
+    ctx.route("https://umami.kradalby.no/**", lambda r: r.abort())
+    ctx.route("**/img/**", lambda r: r.fulfill(status=404))
+    page = ctx.new_page()
+    page.goto(BASE + "/galleri", wait_until="load")
+    boxes = page.evaluate(
+        """[...document.querySelectorAll('[data-gallery] img')].map(i => {
+             const r = i.getBoundingClientRect();
+             return [i.complete && i.naturalWidth === 0, r.width, r.height,
+                     +i.getAttribute('width'), +i.getAttribute('height')];
+           })"""
+    )
+    ctx.close()
+    # The first photo is fetched eagerly, so it has failed by load.
+    assert boxes[0][0], boxes[0]
+    for failed, w, h, aw, ah in boxes:
+        assert abs(h - w * ah / aw) <= 1, (failed, w, h, aw, ah)
+
+
 def swipe(page, browser_name, dx, dy=0):
     x, y = 200, 420
     if browser_name == "chromium":

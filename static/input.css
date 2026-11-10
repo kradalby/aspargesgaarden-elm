@@ -18,4 +18,13 @@
     overflow: hidden;
     scrollbar-gutter: stable;
   }
+
+  /* A picture whose file fails (a size the server has not built yet is a
+     404) keeps the box its width and height promise; WebKit shrinks it to
+     its alt text otherwise. :where keeps any class's aspect-ratio ahead. A
+     browser without typed attr() drops the rule and uses the attributes'
+     own hint, as before. */
+  :where(img[width][height]) {
+    aspect-ratio: attr(width type(<number>)) / attr(height type(<number>));
+  }
 }
