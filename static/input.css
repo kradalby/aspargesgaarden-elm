@@ -5,6 +5,7 @@
 @source "../ui/*.go";
 @source "../pages/*.go";
 @source "../markdown/*.go";
+@source "../elm/*/src/**/*.elm";
 
 /* v4 wraps hover in @media (hover: hover); v3 did not, so a tap on a phone
    showed hover styles (photo credit, link colour). Keep the v3 behaviour. */
@@ -80,5 +81,11 @@
   button:not(:disabled),
   [role="button"]:not(:disabled) {
     cursor: pointer;
+  }
+  /* An open gallery lightbox holds the page still under it; the gutter keeps
+     the page from shifting sideways when its scrollbar goes. */
+  html:has([data-lightbox]) {
+    overflow: hidden;
+    scrollbar-gutter: stable;
   }
 }

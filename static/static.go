@@ -1,5 +1,6 @@
 // Package static embeds the site's own files (stylesheet, fonts, logo, icons,
-// fixed-page photos) and serves them under /static/ with content-hashed URLs.
+// fixed-page photos, the Elm apps' scripts) and serves them under /static/
+// with content-hashed URLs.
 //
 // files/ is committed as is. dist/ is built by build.sh: in the Nix build
 // before go:embed runs, and locally through `go generate ./static`.
@@ -42,6 +43,7 @@ var contentTypes = map[string]string{
 	".css":   "text/css; charset=utf-8",
 	".ico":   "image/x-icon",
 	".jpg":   "image/jpeg",
+	".js":    "text/javascript; charset=utf-8",
 	".png":   "image/png",
 	".svg":   "image/svg+xml",
 	".webp":  "image/webp",

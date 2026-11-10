@@ -82,9 +82,9 @@
                 ./static/input.css
                 ./static/fonts-src
               ]
-              # Tailwind scans Go sources for class names (input.css @source
-              # picks the packages); photos stay cached either way.
-              ++ [ (fs.fileFilter (f: f.hasExt "go") ./.) ]
+              # Tailwind scans Go and Elm sources for class names (input.css
+              # @source picks the folders); photos stay cached either way.
+              ++ [ (fs.fileFilter (f: f.hasExt "go" || f.hasExt "elm") ./.) ]
             )
             [
               pkgs.tailwindcss_4
@@ -97,12 +97,57 @@
               (lib.getBin vips)
               imagesbuild
             ];
+
+        # The Elm apps: elm/<app>, each with its own elm.json and the packages
+        # elm2nix pinned next to it (elm-srcs.nix, registry.dat), so apps keep
+        # their dependencies apart. Adding an app is adding its name here.
+        elmApps = [ "gallery" ];
+        elmHome =
+          app:
+          pkgs.elmPackages.fetchElmDeps {
+            elmVersion = "0.19.2";
+            elmPackages = import (./elm + "/${app}/elm-srcs.nix");
+            registryDat = ./elm + "/${app}/registry.dat";
+          };
+        # build.sh's <app> step, offline: <app>.js for static/dist.
+        elmApp =
+          app:
+          (staticStep "elm-${app}" app
+            [ (./elm + "/${app}") ]
+            [
+              pkgs.elmPackages.elm
+              pkgs.esbuild
+            ]
+          ).overrideAttrs
+            (old: {
+              buildCommand = elmHome app + old.buildCommand;
+            });
+        elmTest =
+          app:
+          pkgs.runCommand "asparges-elm-test-${app}"
+            {
+              src = ./elm + "/${app}";
+              nativeBuildInputs = [
+                pkgs.elmPackages.elm
+                pkgs.elmPackages.elm-test-rs
+                pkgs.nodejs # elm-test-rs runs the compiled suite on node
+              ];
+            }
+            ''
+              ${elmHome app}
+              cp -r $src/. . && chmod -R u+w .
+              elm-test-rs --offline --compiler ${pkgs.elmPackages.elm}/bin/elm
+              touch $out
+            '';
+
         withStatic =
           drv:
           drv.overrideAttrs (old: {
             postPatch = (old.postPatch or "") + ''
               mkdir -p static/dist
-              cp -r ${staticCSS}/. ${staticPhotos}/. static/dist/
+              cp -r ${staticCSS}/. ${staticPhotos}/. ${
+                lib.concatMapStringsSep " " (app: "${elmApp app}/.") elmApps
+              } static/dist/
               chmod -R u+w static/dist
             '';
           });
@@ -241,6 +286,7 @@
             }
           );
         }
+        // lib.listToAttrs (map (app: lib.nameValuePair "elm-test-${app}" (elmTest app)) elmApps)
         # NixOS module evaluation needs a Linux system.
         // lib.optionalAttrs pkgs.stdenv.hostPlatform.isLinux {
           module-eval = import ./nix/module-eval.nix {
