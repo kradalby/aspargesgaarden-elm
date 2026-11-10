@@ -41,7 +41,7 @@ var contentTypes = map[string]string{
 	".avif":  "image/avif",
 	".css":   "text/css; charset=utf-8",
 	".ico":   "image/x-icon",
-	".jpeg":  "image/jpeg",
+	".jpg":   "image/jpeg",
 	".png":   "image/png",
 	".svg":   "image/svg+xml",
 	".webp":  "image/webp",
@@ -76,6 +76,9 @@ func load(fsys fs.FS) (map[string]asset, error) {
 			}
 
 			name := strings.TrimPrefix(p, root+"/")
+			if root == "dist" && name == photoManifest {
+				return nil
+			}
 
 			ctype, ok := contentTypes[path.Ext(name)]
 			if !ok {

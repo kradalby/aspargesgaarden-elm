@@ -12,14 +12,21 @@ from what ships.
 ```bash
 nix develop
 go generate ./static        # CSS, WOFF2 fonts, photo variants into static/dist
-go test ./...               # needs static/dist; the first generate takes ~40 s
+go test ./...               # needs static/dist; the first generate takes ~45 s
 go run ./cmd/asparges serve --dev --listen-addr 127.0.0.1:8090 \
   --base-url http://127.0.0.1:8090 --data-dir /tmp/asparges
 ```
 
 - Changed Go markup or classes: rerun `go generate ./static` (Tailwind only
-  emits classes it finds in `ui/`, `pages/`, `markdown/`; fonts and photos
-  are skipped unless their source is newer), then restart `go run`.
+  emits classes it finds in `ui/`, `pages/`, `markdown/`; fonts are skipped
+  unless their source is newer, photo variants unless missing), then restart
+  `go run`.
+- Fixed-page photos: one master per photo in `static/photos-src/`
+  (`<name>.jpg`, at most ~2400 px and under 1 MB). The photo step runs
+  `go run ./cmd/imagesbuild`, the same `images` pipeline that builds uploaded
+  photos, into `static/dist/photos/` with a `manifest.json`; pages ask for
+  `static.Photo("<name>")`. A replaced master gets new variant names, and the
+  old ones are removed on the next generate.
 - Changed markup on purpose: `UPDATE_GOLDEN=1 go test ./...`, then review
   the diff of the `testdata/*.html` golden files.
 - Avenir's 400 weight is Medium; switch to Roman by changing the one

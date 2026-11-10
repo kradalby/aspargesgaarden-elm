@@ -2,10 +2,12 @@ package images
 
 import (
 	"context"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 )
@@ -51,6 +53,52 @@ func TestBuildStatic(t *testing.T) {
 	entries, err := os.ReadDir(out)
 	require.NoError(t, err)
 	require.Len(t, entries, 2, "variants and the manifest, no work files")
+}
+
+func TestBuildStaticIncremental(t *testing.T) {
+	t.Parallel()
+
+	src, out := t.TempDir(), t.TempDir()
+	copyFixture(t, "upright.jpg", filepath.Join(src, "a.jpg"))
+	copyFixture(t, "orient6.jpg", filepath.Join(src, "b.jpg"))
+
+	refs, err := BuildStatic(context.Background(), src, out, "/p")
+	require.NoError(t, err)
+
+	first := filepath.Join(out, strings.TrimPrefix(refs["a"].Variants[0].URL, "/p/"))
+	old := time.Unix(1, 0)
+	require.NoError(t, os.Chtimes(first, old, old))
+
+	junk := filepath.Join(out, "v0", "x", "stale.avif")
+	require.NoError(t, os.MkdirAll(filepath.Dir(junk), 0o750))
+	require.NoError(t, os.WriteFile(junk, nil, 0o600))
+	require.NoError(t, os.Remove(filepath.Join(src, "b.jpg")))
+
+	refs2, err := BuildStatic(context.Background(), src, out, "/p")
+	require.NoError(t, err)
+	require.Equal(t, map[string]Ref{"a": refs["a"]}, refs2)
+
+	st, err := os.Stat(first)
+	require.NoError(t, err)
+	require.Equal(t, old, st.ModTime(), "a current variant is not rebuilt")
+
+	var files []string
+	require.NoError(t, filepath.WalkDir(out, func(p string, d fs.DirEntry, err error) error {
+		if err == nil && !d.IsDir() {
+			rel, _ := filepath.Rel(out, p)
+			files = append(files, filepath.ToSlash(rel))
+		}
+
+		return err
+	}))
+
+	want := append(make([]string, 0, 1+len(refs["a"].Variants)), ManifestFile)
+	for _, v := range refs["a"].Variants {
+		want = append(want, strings.TrimPrefix(v.URL, "/p/"))
+	}
+
+	require.ElementsMatch(t, want, files, "b's variants and the junk are gone")
+	require.NoDirExists(t, filepath.Join(out, "v0"))
 }
 
 func TestBuildStaticRejects(t *testing.T) {

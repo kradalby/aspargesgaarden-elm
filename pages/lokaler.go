@@ -21,7 +21,7 @@ var facilities = []struct {
 	text       string
 }{
 	{
-		photo: "muligheter/loven",
+		photo: "loven",
 		alt:   "Bordplassering på staffeli i den pyntede låven",
 		by:    marianneOus,
 		text: `# Låven
@@ -32,7 +32,7 @@ Det er bar, scene, dansegulv, musikkanlegg / mikrofon, prosjektor og lerret, sam
 `,
 	},
 	{
-		photo: "muligheter/fjoset",
+		photo: "fjoset",
 		alt:   "Langbord dekket til fest i fjøset",
 		by:    hanneGulliksen,
 		text: `# Fjøset
@@ -45,7 +45,7 @@ Flott terrasse utenfor, hvor det er sol fra morgen til kveld.
 `,
 	},
 	{
-		photo: "muligheter/kjokken",
+		photo: "kjokken",
 		alt:   "Champagne og glass på et tønnebord foran steinmuren",
 		by:    auroraHovland,
 		text: `# Kjøkken
@@ -56,7 +56,7 @@ Vi anbefaler å bruke både kokker og servitører tilknyttet oss. Det skaper ro 
 `,
 	},
 	{
-		photo: "muligheter/lysthus",
+		photo: "lysthus",
 		alt:   "Det engelske lysthuset i hagen en sommerkveld",
 		by:    auroraHovland,
 		text: `# Engelsk lysthus og uteområder
@@ -67,7 +67,7 @@ Se gjerne på vår [Instagram](https://instagram.com/aspargesgaarden) eller [Gal
 `,
 	},
 	{
-		photo: "muligheter/skafferiet",
+		photo: "skafferiet",
 		alt:   "Festbord pyntet med lys, blomster og bordnummer",
 		by:    auroraHovland,
 		text: `# «Skafferiet»

@@ -5,9 +5,10 @@
 #
 #   build.sh [OUT [css] [fonts] [photos]]    default: dist, all three
 #
-# Needs tailwindcss (v4), woff2_compress and vips on PATH. Run from static/.
-# Fonts and photos are only rebuilt when their source is newer. Nix runs the
-# photo step in its own derivation so a Go edit never re-encodes photos.
+# Needs tailwindcss (v4), woff2_compress, vips, and imagesbuild or go on PATH.
+# Run from static/. Fonts are rebuilt when their source is newer, photo
+# variants when missing. Nix runs the photo step in its own derivation so a
+# Go edit never re-encodes photos.
 set -euo pipefail
 
 out=${1:-dist}
@@ -34,26 +35,13 @@ fonts() {
   done
 }
 
-# shortcut: a fixed width ladder per photo; the images package's build-time
-# manifest replaces this step together with photos.go.
+# The images package's pipeline, the one that builds uploaded photos too:
+# Full variants of every master plus the manifest static.Photo reads. Nix
+# puts imagesbuild on PATH; locally it runs from source.
 photos() {
-  local widths="480 800 1200 1600 2000 2500"
-  find photos-src -name '*.jpeg' | sort | while read -r src; do
-    local rel=${src#photos-src/}
-    local base=$out/photos/${rel%.jpeg}
-    mkdir -p "$(dirname "$base")"
-    local master
-    master=$(vipsheader -f width "$src")
-    for w in $widths; do
-      [ "$w" -le "$master" ] || continue
-      for fmt in "avif[Q=50,effort=4,keep=none]" "webp[Q=75,keep=none]" "jpeg[Q=80,optimize_coding,interlace,keep=none]"; do
-        local ext=${fmt%%\[*}
-        local dst=$base-$w.$ext
-        [ "$dst" -nt "$src" ] && continue
-        vips thumbnail "$src" "$dst${fmt#"$ext"}" "$w" --height 100000 --size down --export-profile srgb
-      done
-    done
-  done
+  local ib=(imagesbuild)
+  command -v imagesbuild >/dev/null || ib=(go run ../cmd/imagesbuild)
+  "${ib[@]}" --src photos-src --out "$out/photos" --url-prefix /static/photos
 }
 
 mkdir -p "$out"

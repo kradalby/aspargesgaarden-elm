@@ -1,24 +1,21 @@
 package static
 
 import (
-	"bytes"
-	"cmp"
 	"fmt"
-	"image/jpeg"
-	"path"
-	"slices"
-	"strconv"
+	"io/fs"
 	"strings"
 
 	"github.com/kradalby/asparges/images"
 )
 
-// shortcut: photos are read back from build.sh's file names; the images
-// package's build-time manifest replaces this file, keeping Photo's signature.
-var photos = mustPhotos(assets)
+// photoManifest is the images package's build-time manifest in dist/. It is
+// read here and not served.
+const photoManifest = "photos/" + images.ManifestFile
 
-func mustPhotos(a map[string]asset) map[string]images.Ref {
-	p, err := indexPhotos(a)
+var photos = mustPhotos(embedded, assets)
+
+func mustPhotos(fsys fs.FS, a map[string]asset) map[string]images.Ref {
+	p, err := indexPhotos(fsys, a)
 	if err != nil {
 		panic("static: " + err.Error())
 	}
@@ -26,63 +23,36 @@ func mustPhotos(a map[string]asset) map[string]images.Ref {
 	return p
 }
 
-// indexPhotos groups photos/<name>-<width>.<ext> into one Ref per name.
-func indexPhotos(a map[string]asset) (map[string]images.Ref, error) {
-	refs := map[string]images.Ref{}
-	sizedBy := map[string]int{} // width of the JPEG each Ref's size came from
+// indexPhotos reads the manifest and points every variant at its hashed
+// URL, so photos are cached like every other embedded file.
+func indexPhotos(fsys fs.FS, a map[string]asset) (map[string]images.Ref, error) {
+	b, err := fs.ReadFile(fsys, "dist/"+photoManifest)
+	if err != nil {
+		return nil, fmt.Errorf("dist/%s missing: run go generate ./static: %w", photoManifest, err)
+	}
 
-	for file, as := range a {
-		rest, ok := strings.CutPrefix(file, "photos/")
-		if !ok {
-			continue
-		}
-
-		ext := path.Ext(rest)
-		base := strings.TrimSuffix(rest, ext)
-		i := strings.LastIndexByte(base, '-')
-
-		width, err := strconv.Atoi(base[i+1:])
-		if i < 0 || err != nil {
-			return nil, fmt.Errorf("photo %s: want <name>-<width>.<ext>", file)
-		}
-
-		name := base[:i]
-
-		ref := refs[name]
-		ref.Variants = append(ref.Variants, images.Variant{
-			Format: images.Format(strings.TrimPrefix(ext, ".")),
-			Width:  width,
-			URL:    url(file, as.hash),
-		})
-
-		if ext == ".jpeg" && width > sizedBy[name] {
-			sizedBy[name] = width
-
-			cfg, err := jpeg.DecodeConfig(bytes.NewReader(as.data))
-			if err != nil {
-				return nil, fmt.Errorf("photo %s: %w", file, err)
-			}
-
-			ref.Width, ref.Height = cfg.Width, cfg.Height
-		}
-
-		refs[name] = ref
+	refs, err := images.ParseManifest(b)
+	if err != nil {
+		return nil, err
 	}
 
 	for name, ref := range refs {
-		if ref.Width == 0 {
-			return nil, fmt.Errorf("photo %s: no JPEG variant to size it by", name)
-		}
+		for i, v := range ref.Variants {
+			file, ok := strings.CutPrefix(v.URL, Prefix)
 
-		slices.SortFunc(ref.Variants, func(a, b images.Variant) int {
-			return cmp.Or(cmp.Compare(a.Format, b.Format), cmp.Compare(a.Width, b.Width))
-		})
+			as, embedded := a[file]
+			if !ok || !embedded {
+				return nil, fmt.Errorf("photo %s: %s is not embedded", name, v.URL)
+			}
+
+			ref.Variants[i].URL = url(file, as.hash)
+		}
 	}
 
 	return refs, nil
 }
 
-// Photo returns the embedded photo built from photos-src/<name>.jpeg. Names
+// Photo returns the embedded photo built from photos-src/<name>.jpg. Names
 // are constants next to the page that shows them, so an unknown one panics.
 func Photo(name string) images.Ref {
 	ref, ok := photos[name]

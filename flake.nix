@@ -90,7 +90,13 @@
               pkgs.tailwindcss_4
               pkgs.woff2
             ];
-        staticPhotos = staticStep "photos" "photos" [ ./static/photos-src ] [ pkgs.vips ];
+        staticPhotos =
+          staticStep "photos" "photos"
+            [ ./static/photos-src ]
+            [
+              (lib.getBin vips)
+              imagesbuild
+            ];
         withStatic =
           drv:
           drv.overrideAttrs (old: {
@@ -138,7 +144,7 @@
           };
         };
 
-        asparges = (withStatic (fc.goBuild common)).overrideAttrs (_: {
+        asparges = (withStatic goBuild).overrideAttrs (_: {
           meta = {
             description = "aspargesgaarden.no web server";
             homepage = "https://github.com/kradalby/aspargesgaarden-elm";
@@ -146,13 +152,14 @@
           };
         });
 
-        # images: the slim vips the service shells out to, and the build-time
-        # variants of the photos embedded in the binary (static/photos-src).
-        # imagesbuild is its own binary: asparges embeds its output, so cannot
-        # make it. It reuses asparges' vendor tree and sees only images/, so
-        # unrelated Go edits do not rebuild the variants.
+        # images: the slim vips the service shells out to, and imagesbuild,
+        # which runs the images pipeline in staticPhotos. It is its own binary
+        # because asparges embeds its output, so it starts from the plain Go
+        # build (no withStatic), reuses that vendor tree and sees only images/:
+        # unrelated Go edits do not re-encode the photos.
         vips = pkgs.callPackage ./nix/vips.nix { };
-        imagesbuild = asparges.overrideAttrs (_: {
+        goBuild = fc.goBuild common;
+        imagesbuild = goBuild.overrideAttrs (_: {
           pname = "asparges-imagesbuild";
           src = lib.fileset.toSource {
             root = ./.;
@@ -164,20 +171,15 @@
             ];
           };
           subPackages = [ "cmd/imagesbuild" ];
-          inherit (asparges) goModules;
+          inherit (goBuild) goModules;
           meta.mainProgram = "imagesbuild";
         });
-        photoVariants =
-          pkgs.runCommand "asparges-photo-variants" { nativeBuildInputs = [ (lib.getBin vips) ]; }
-            ''
-              ${lib.getExe imagesbuild} --src ${./static/photos-src} --out $out --url-prefix /static/photos
-            '';
       in
       {
         packages.default = asparges;
         packages.vips = vips;
         packages.imagesbuild = imagesbuild;
-        packages.photo-variants = photoVariants;
+        packages.photo-variants = staticPhotos;
         formatter = fc.formatter common;
         devShells.default = pkgs.mkShell {
           packages = [
@@ -222,7 +224,7 @@
               }
             )
           );
-          photo-variants = photoVariants;
+          photo-variants = staticPhotos;
           golangci-lint = withStatic (fc.goLint common);
           formatting = fc.goFormat common;
           # db/dbsqlc is sqlc output with no //go:generate directive, so the
