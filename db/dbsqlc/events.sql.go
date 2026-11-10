@@ -15,35 +15,36 @@ INSERT INTO events (
     year, slug, title, summary, body_md,
     start_date, start_time, end_date, end_time,
     price_text, ticket_url, show_in_menu, menu_label,
-    status, cancelled, published_at, created_at, updated_at
+    status, cancelled, published_at, created_at, updated_at, slug_from_title
 ) VALUES (
     ?, ?, ?, ?, ?,
     ?, ?, ?, ?,
     ?, ?, ?, ?,
-    ?, ?, ?, ?, ?
+    ?, ?, ?, ?, ?, ?
 )
 RETURNING id
 `
 
 type CreateEventParams struct {
-	Year        sql.NullInt64 `db:"year"`
-	Slug        string        `db:"slug"`
-	Title       string        `db:"title"`
-	Summary     string        `db:"summary"`
-	BodyMd      string        `db:"body_md"`
-	StartDate   string        `db:"start_date"`
-	StartTime   string        `db:"start_time"`
-	EndDate     string        `db:"end_date"`
-	EndTime     string        `db:"end_time"`
-	PriceText   string        `db:"price_text"`
-	TicketUrl   string        `db:"ticket_url"`
-	ShowInMenu  int64         `db:"show_in_menu"`
-	MenuLabel   string        `db:"menu_label"`
-	Status      string        `db:"status"`
-	Cancelled   int64         `db:"cancelled"`
-	PublishedAt sql.NullInt64 `db:"published_at"`
-	CreatedAt   int64         `db:"created_at"`
-	UpdatedAt   int64         `db:"updated_at"`
+	Year          sql.NullInt64 `db:"year"`
+	Slug          string        `db:"slug"`
+	Title         string        `db:"title"`
+	Summary       string        `db:"summary"`
+	BodyMd        string        `db:"body_md"`
+	StartDate     string        `db:"start_date"`
+	StartTime     string        `db:"start_time"`
+	EndDate       string        `db:"end_date"`
+	EndTime       string        `db:"end_time"`
+	PriceText     string        `db:"price_text"`
+	TicketUrl     string        `db:"ticket_url"`
+	ShowInMenu    int64         `db:"show_in_menu"`
+	MenuLabel     string        `db:"menu_label"`
+	Status        string        `db:"status"`
+	Cancelled     int64         `db:"cancelled"`
+	PublishedAt   sql.NullInt64 `db:"published_at"`
+	CreatedAt     int64         `db:"created_at"`
+	UpdatedAt     int64         `db:"updated_at"`
+	SlugFromTitle int64         `db:"slug_from_title"`
 }
 
 func (q *Queries) CreateEvent(ctx context.Context, arg CreateEventParams) (int64, error) {
@@ -66,6 +67,7 @@ func (q *Queries) CreateEvent(ctx context.Context, arg CreateEventParams) (int64
 		arg.PublishedAt,
 		arg.CreatedAt,
 		arg.UpdatedAt,
+		arg.SlugFromTitle,
 	)
 	var id int64
 	err := row.Scan(&id)
@@ -103,7 +105,7 @@ func (q *Queries) DeleteEventPhotos(ctx context.Context, eventID int64) error {
 }
 
 const getEvent = `-- name: GetEvent :one
-SELECT id, year, slug, title, summary, body_md, start_date, start_time, end_date, end_time, price_text, ticket_url, show_in_menu, menu_label, status, cancelled, published_at, created_at, updated_at FROM events WHERE id = ?
+SELECT id, year, slug, title, summary, body_md, start_date, start_time, end_date, end_time, price_text, ticket_url, show_in_menu, menu_label, status, cancelled, published_at, created_at, updated_at, slug_from_title FROM events WHERE id = ?
 `
 
 func (q *Queries) GetEvent(ctx context.Context, id int64) (Event, error) {
@@ -129,12 +131,13 @@ func (q *Queries) GetEvent(ctx context.Context, id int64) (Event, error) {
 		&i.PublishedAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.SlugFromTitle,
 	)
 	return i, err
 }
 
 const getNewestPublishedEventBySlug = `-- name: GetNewestPublishedEventBySlug :one
-SELECT id, year, slug, title, summary, body_md, start_date, start_time, end_date, end_time, price_text, ticket_url, show_in_menu, menu_label, status, cancelled, published_at, created_at, updated_at FROM events
+SELECT id, year, slug, title, summary, body_md, start_date, start_time, end_date, end_time, price_text, ticket_url, show_in_menu, menu_label, status, cancelled, published_at, created_at, updated_at, slug_from_title FROM events
 WHERE status = 'published' AND slug = ?
 ORDER BY start_date DESC, id DESC
 LIMIT 1
@@ -164,12 +167,13 @@ func (q *Queries) GetNewestPublishedEventBySlug(ctx context.Context, slug string
 		&i.PublishedAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.SlugFromTitle,
 	)
 	return i, err
 }
 
 const getPublishedEventByYearSlug = `-- name: GetPublishedEventByYearSlug :one
-SELECT id, year, slug, title, summary, body_md, start_date, start_time, end_date, end_time, price_text, ticket_url, show_in_menu, menu_label, status, cancelled, published_at, created_at, updated_at FROM events
+SELECT id, year, slug, title, summary, body_md, start_date, start_time, end_date, end_time, price_text, ticket_url, show_in_menu, menu_label, status, cancelled, published_at, created_at, updated_at, slug_from_title FROM events
 WHERE status = 'published' AND year = ? AND slug = ?
 `
 
@@ -201,6 +205,7 @@ func (q *Queries) GetPublishedEventByYearSlug(ctx context.Context, arg GetPublis
 		&i.PublishedAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.SlugFromTitle,
 	)
 	return i, err
 }
@@ -328,7 +333,7 @@ func (q *Queries) ListEventPhotoIDs(ctx context.Context, eventID int64) ([]int64
 }
 
 const listEvents = `-- name: ListEvents :many
-SELECT id, year, slug, title, summary, body_md, start_date, start_time, end_date, end_time, price_text, ticket_url, show_in_menu, menu_label, status, cancelled, published_at, created_at, updated_at FROM events ORDER BY start_date DESC, id DESC
+SELECT id, year, slug, title, summary, body_md, start_date, start_time, end_date, end_time, price_text, ticket_url, show_in_menu, menu_label, status, cancelled, published_at, created_at, updated_at, slug_from_title FROM events ORDER BY start_date DESC, id DESC
 `
 
 // Every event, drafts included, for the admin overview.
@@ -361,6 +366,7 @@ func (q *Queries) ListEvents(ctx context.Context) ([]Event, error) {
 			&i.PublishedAt,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.SlugFromTitle,
 		); err != nil {
 			return nil, err
 		}
@@ -376,7 +382,7 @@ func (q *Queries) ListEvents(ctx context.Context) ([]Event, error) {
 }
 
 const listPublishedEvents = `-- name: ListPublishedEvents :many
-SELECT id, year, slug, title, summary, body_md, start_date, start_time, end_date, end_time, price_text, ticket_url, show_in_menu, menu_label, status, cancelled, published_at, created_at, updated_at FROM events WHERE status = 'published' ORDER BY start_date, id
+SELECT id, year, slug, title, summary, body_md, start_date, start_time, end_date, end_time, price_text, ticket_url, show_in_menu, menu_label, status, cancelled, published_at, created_at, updated_at, slug_from_title FROM events WHERE status = 'published' ORDER BY start_date, id
 `
 
 // Upcoming vs past depends on the clock and on the extra dates, so the split
@@ -410,6 +416,7 @@ func (q *Queries) ListPublishedEvents(ctx context.Context) ([]Event, error) {
 			&i.PublishedAt,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.SlugFromTitle,
 		); err != nil {
 			return nil, err
 		}
@@ -425,7 +432,7 @@ func (q *Queries) ListPublishedEvents(ctx context.Context) ([]Event, error) {
 }
 
 const listPublishedMenuEvents = `-- name: ListPublishedMenuEvents :many
-SELECT id, year, slug, title, summary, body_md, start_date, start_time, end_date, end_time, price_text, ticket_url, show_in_menu, menu_label, status, cancelled, published_at, created_at, updated_at FROM events
+SELECT id, year, slug, title, summary, body_md, start_date, start_time, end_date, end_time, price_text, ticket_url, show_in_menu, menu_label, status, cancelled, published_at, created_at, updated_at, slug_from_title FROM events
 WHERE status = 'published' AND show_in_menu = 1
 ORDER BY start_date, id
 `
@@ -459,6 +466,7 @@ func (q *Queries) ListPublishedMenuEvents(ctx context.Context) ([]Event, error) 
 			&i.PublishedAt,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.SlugFromTitle,
 		); err != nil {
 			return nil, err
 		}
@@ -478,29 +486,31 @@ UPDATE events SET
     year = ?, slug = ?, title = ?, summary = ?, body_md = ?,
     start_date = ?, start_time = ?, end_date = ?, end_time = ?,
     price_text = ?, ticket_url = ?, show_in_menu = ?, menu_label = ?,
-    status = ?, cancelled = ?, published_at = ?, updated_at = ?
+    status = ?, cancelled = ?, published_at = ?, updated_at = ?,
+    slug_from_title = ?
 WHERE id = ?
 `
 
 type UpdateEventParams struct {
-	Year        sql.NullInt64 `db:"year"`
-	Slug        string        `db:"slug"`
-	Title       string        `db:"title"`
-	Summary     string        `db:"summary"`
-	BodyMd      string        `db:"body_md"`
-	StartDate   string        `db:"start_date"`
-	StartTime   string        `db:"start_time"`
-	EndDate     string        `db:"end_date"`
-	EndTime     string        `db:"end_time"`
-	PriceText   string        `db:"price_text"`
-	TicketUrl   string        `db:"ticket_url"`
-	ShowInMenu  int64         `db:"show_in_menu"`
-	MenuLabel   string        `db:"menu_label"`
-	Status      string        `db:"status"`
-	Cancelled   int64         `db:"cancelled"`
-	PublishedAt sql.NullInt64 `db:"published_at"`
-	UpdatedAt   int64         `db:"updated_at"`
-	ID          int64         `db:"id"`
+	Year          sql.NullInt64 `db:"year"`
+	Slug          string        `db:"slug"`
+	Title         string        `db:"title"`
+	Summary       string        `db:"summary"`
+	BodyMd        string        `db:"body_md"`
+	StartDate     string        `db:"start_date"`
+	StartTime     string        `db:"start_time"`
+	EndDate       string        `db:"end_date"`
+	EndTime       string        `db:"end_time"`
+	PriceText     string        `db:"price_text"`
+	TicketUrl     string        `db:"ticket_url"`
+	ShowInMenu    int64         `db:"show_in_menu"`
+	MenuLabel     string        `db:"menu_label"`
+	Status        string        `db:"status"`
+	Cancelled     int64         `db:"cancelled"`
+	PublishedAt   sql.NullInt64 `db:"published_at"`
+	UpdatedAt     int64         `db:"updated_at"`
+	SlugFromTitle int64         `db:"slug_from_title"`
+	ID            int64         `db:"id"`
 }
 
 func (q *Queries) UpdateEvent(ctx context.Context, arg UpdateEventParams) error {
@@ -522,6 +532,7 @@ func (q *Queries) UpdateEvent(ctx context.Context, arg UpdateEventParams) error 
 		arg.Cancelled,
 		arg.PublishedAt,
 		arg.UpdatedAt,
+		arg.SlugFromTitle,
 		arg.ID,
 	)
 	return err

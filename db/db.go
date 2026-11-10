@@ -45,6 +45,13 @@ var schema = &squibble.Schema{
     value TEXT NOT NULL
 ) WITHOUT ROWID;`),
 		},
+		{
+			Source: "7a8d1b74975279810b002c7c1a615cbe118ecfecc88f90ae57ac7662c373661f",
+			Target: "e1cd24d3375aad77a05d966425975e8cd3133740471d1b86e0563b8eba44afa6",
+			// Existing events keep the slug they have: nobody can tell now
+			// whether it was typed.
+			Apply: squibble.Exec(`ALTER TABLE events ADD COLUMN slug_from_title INTEGER NOT NULL DEFAULT 0 CHECK (slug_from_title IN (0, 1));`),
+		},
 	},
 }
 

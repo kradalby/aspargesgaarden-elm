@@ -3,12 +3,12 @@ INSERT INTO events (
     year, slug, title, summary, body_md,
     start_date, start_time, end_date, end_time,
     price_text, ticket_url, show_in_menu, menu_label,
-    status, cancelled, published_at, created_at, updated_at
+    status, cancelled, published_at, created_at, updated_at, slug_from_title
 ) VALUES (
     ?, ?, ?, ?, ?,
     ?, ?, ?, ?,
     ?, ?, ?, ?,
-    ?, ?, ?, ?, ?
+    ?, ?, ?, ?, ?, ?
 )
 RETURNING id;
 
@@ -17,7 +17,8 @@ UPDATE events SET
     year = ?, slug = ?, title = ?, summary = ?, body_md = ?,
     start_date = ?, start_time = ?, end_date = ?, end_time = ?,
     price_text = ?, ticket_url = ?, show_in_menu = ?, menu_label = ?,
-    status = ?, cancelled = ?, published_at = ?, updated_at = ?
+    status = ?, cancelled = ?, published_at = ?, updated_at = ?,
+    slug_from_title = ?
 WHERE id = ?;
 
 -- name: DeleteEvent :execrows

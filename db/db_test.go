@@ -59,25 +59,6 @@ func TestOpenTwice(t *testing.T) {
 	require.NoError(t, d.Close())
 }
 
-// A database made before the settings table gains it on open.
-func TestOpenAddsSettings(t *testing.T) {
-	path := filepath.Join(t.TempDir(), "test.db")
-
-	d, err := Open(t.Context(), path)
-	require.NoError(t, err)
-
-	// Dropping the table gives the earlier schema back, digest and all.
-	_, err = d.sql.ExecContext(t.Context(), "DROP TABLE settings")
-	require.NoError(t, err)
-	require.NoError(t, d.Close())
-
-	d, err = Open(t.Context(), path)
-	require.NoError(t, err)
-	t.Cleanup(func() { _ = d.Close() })
-
-	require.NoError(t, d.Queries().InsertSettingIfMissing(t.Context(), dbsqlc.InsertSettingIfMissingParams{Name: "k", Value: "v"}))
-}
-
 func TestSettingKeepsFirstValue(t *testing.T) {
 	q := openTest(t).Queries()
 

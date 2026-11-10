@@ -9,25 +9,26 @@ import (
 )
 
 type Event struct {
-	ID          int64         `db:"id"`
-	Year        sql.NullInt64 `db:"year"`
-	Slug        string        `db:"slug"`
-	Title       string        `db:"title"`
-	Summary     string        `db:"summary"`
-	BodyMd      string        `db:"body_md"`
-	StartDate   string        `db:"start_date"`
-	StartTime   string        `db:"start_time"`
-	EndDate     string        `db:"end_date"`
-	EndTime     string        `db:"end_time"`
-	PriceText   string        `db:"price_text"`
-	TicketUrl   string        `db:"ticket_url"`
-	ShowInMenu  int64         `db:"show_in_menu"`
-	MenuLabel   string        `db:"menu_label"`
-	Status      string        `db:"status"`
-	Cancelled   int64         `db:"cancelled"`
-	PublishedAt sql.NullInt64 `db:"published_at"`
-	CreatedAt   int64         `db:"created_at"`
-	UpdatedAt   int64         `db:"updated_at"`
+	ID            int64         `db:"id"`
+	Year          sql.NullInt64 `db:"year"`
+	Slug          string        `db:"slug"`
+	Title         string        `db:"title"`
+	Summary       string        `db:"summary"`
+	BodyMd        string        `db:"body_md"`
+	StartDate     string        `db:"start_date"`
+	StartTime     string        `db:"start_time"`
+	EndDate       string        `db:"end_date"`
+	EndTime       string        `db:"end_time"`
+	PriceText     string        `db:"price_text"`
+	TicketUrl     string        `db:"ticket_url"`
+	ShowInMenu    int64         `db:"show_in_menu"`
+	MenuLabel     string        `db:"menu_label"`
+	Status        string        `db:"status"`
+	Cancelled     int64         `db:"cancelled"`
+	PublishedAt   sql.NullInt64 `db:"published_at"`
+	CreatedAt     int64         `db:"created_at"`
+	UpdatedAt     int64         `db:"updated_at"`
+	SlugFromTitle int64         `db:"slug_from_title"`
 }
 
 type EventDate struct {

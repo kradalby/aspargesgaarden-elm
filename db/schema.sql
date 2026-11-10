@@ -13,6 +13,9 @@
 -- /arrangementer/{year}/{slug}; both are frozen once published_at is set, so
 -- links never break. year is NULL until the event has a date, and NULLs are
 -- distinct in a unique index, so undated drafts (fresh copies) never collide.
+-- slug_from_title is 1 while the slug is made from the title and follows it
+-- until first publish; 0 once someone chose the slug (typed, or kept by a
+-- copy).
 CREATE TABLE events (
     id           INTEGER PRIMARY KEY,
     year         INTEGER,
@@ -38,6 +41,7 @@ CREATE TABLE events (
     published_at INTEGER,
     created_at   INTEGER NOT NULL,
     updated_at   INTEGER NOT NULL,
+    slug_from_title INTEGER NOT NULL DEFAULT 0 CHECK (slug_from_title IN (0, 1)),
     CHECK (status = 'draft' OR (
         published_at IS NOT NULL AND year IS NOT NULL
         AND slug <> '' AND trim(title) <> '' AND start_date <> ''
