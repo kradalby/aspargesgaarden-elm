@@ -1,11 +1,7 @@
 package main
 
 import (
-	"image"
-	"image/color"
-	"image/jpeg"
 	"log/slog"
-	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -19,155 +15,10 @@ import (
 	"github.com/kradalby/asparges/site"
 )
 
-// oldCheckout writes a small copy of the old site: files named as the real
-// ones, with their quirks (trailing commas, a wrong date in a name, "ca.").
-func oldCheckout(t *testing.T) string {
-	t.Helper()
-
-	root := t.TempDir()
-	write := func(name, content string) {
-		t.Helper()
-
-		path := filepath.Join(root, filepath.FromSlash(name))
-		require.NoError(t, os.MkdirAll(filepath.Dir(path), 0o750))
-		require.NoError(t, os.WriteFile(path, []byte(content), 0o600))
-	}
-
-	shade := uint8(0)
-	photo := func(name string, w, h int) {
-		t.Helper()
-
-		shade += 20
-		img := image.NewRGBA(image.Rect(0, 0, w, h))
-		for i := range img.Pix {
-			img.Pix[i] = shade
-		}
-		img.Set(0, 0, color.White)
-
-		path := filepath.Join(root, "public", filepath.FromSlash(name)+".jpeg")
-		require.NoError(t, os.MkdirAll(filepath.Dir(path), 0o750))
-		f, err := os.Create(path)
-		require.NoError(t, err)
-		require.NoError(t, jpeg.Encode(f, img, nil))
-		require.NoError(t, f.Close())
-	}
-
-	write("content/events/2024-13-13-gourmet.md", `---
-{
-  "title": "Gourmetaften",
-  "eventDate": "2024-10-01",
-  "publishedFrom": "2024-09-01",
-  "photo":
-    {
-      "path": "arrangementer/patrick",
-      "photographer":
-        { "name": "Lucky Thirteen", "website": "https://luckythirteen.no/" },
-      "description": "",
-    },
-}
----
-
-Aspargesgården inviterer til **gourmetaften**.
-`)
-	write("content/events/2026-10-31-takkebakstkurs.md", `---
-{
-  "title": "Takkebakstkurs med Anita Saga",
-  "eventDate": "2026-10-31",
-  "eventDates": ["2026-10-31", "2026-11-28", "2026-11-29"],
-  "eventTime": "10:00",
-  "eventEndDate": "2026-10-31",
-  "eventEndTime": "ca. 15:00",
-  "publishedFrom": "2026-10-10",
-  "photo": {
-    "path": "arrangementer/anita",
-    "photographer": { "name": "", "website": "" },
-    "description": "Anita Saga ved bakebordet"
-  }
-}
----
-
-Invitasjon til takkebakstkurs.
-`)
-	write("content/events/2026-11-14-julemarked.md", `---
-{
-  "title": "Julemarked på Aspargesgården",
-  "eventDate": "2026-11-14",
-  "eventTime": "12:00",
-  "eventEndDate": "2026-11-15",
-  "eventEndTime": "16:00",
-  "publishedFrom": "2026-10-10",
-  "photo": {
-    "path": "arrangementer/julemarked1",
-    "photographer": { "name": "", "website": "" },
-    "description": "Bålfat på gårdsplassen"
-  }
-}
----
-
-[Les mer om julemarkedet og praktisk informasjon her](/christmas/2026)
-`)
-	write("content/events/2027-01-01-utkast.md", `---
-{
-  "title": "Nyttårskonsert",
-  "eventDate": "2027-01-01",
-  "eventTime": "etter middag",
-  "photo": { "path": "arrangementer/patrick", "photographer": { "name": "", "website": "" }, "description": "" },
-}
----
-
-Kommer.
-`)
-	write("content/gallery.yaml", `---
-photographers:
-  lucky:
-    name: Lucky Thirteen
-    website: "https://luckythirteen.no/"
-  sophia:
-    name: Sophia Karlsen Edwards
-    website: ""
-
-photos:
-  - path: galleri/b
-    photographer: sophia
-    description: ""
-  - path: arrangementer/patrick
-    photographer: lucky
-    description: "Kokken"
-  - path: galleri/a
-    photographer: lucky
-    description: "Blomster fra @bondenshage"
-  - path: arrangementer/liten
-    photographer: lucky
-    description: ""
-`)
-	write("content/events/2026-05-19-varkonsert.md", `---
-{
-  "title": "Vårkonsert med Black & Lekker",
-  "eventDate": "2026-05-19",
-  "eventTime": "19:30",
-  "publishedFrom": "2026-01-01",
-  "photo": { "path": "arrangementer/liten", "photographer": { "name": "", "website": "" }, "description": "" }
-}
----
-
-Velkommen til en stemningsfull vårkveld.
-`)
-
-	for _, p := range []string{
-		"arrangementer/patrick", "arrangementer/anita", "arrangementer/julemarked1",
-		"arrangementer/2026-11-14-julemarked", "arrangementer/julemarked2", "arrangementer/julemarked3", "arrangementer/julemarked4",
-		"galleri/a",
-	} {
-		photo(p, 1300, 800)
-	}
-
-	// Too narrow for a banner or a share image; fine for the gallery.
-	photo("galleri/b", 600, 900)
-	// Too narrow for anything, as one old event photo is.
-	photo("arrangementer/liten", 393, 479)
-
-	return root
-}
+// oldSite is a small copy of the old site, shared with e2e/gallery: files
+// named as the real ones, with their quirks (trailing commas, a wrong date in
+// a name, "ca."), and synthetic photos from its gen.sh.
+const oldSite = "testdata/oldsite"
 
 func runImport(t *testing.T, root, data string) *site.Store {
 	t.Helper()
@@ -229,7 +80,7 @@ func summarize(t *testing.T, store *site.Store) []imported {
 }
 
 func TestImport(t *testing.T) {
-	store := runImport(t, oldCheckout(t), t.TempDir())
+	store := runImport(t, oldSite, t.TempDir())
 
 	want := []imported{
 		{
@@ -278,8 +129,10 @@ func TestImport(t *testing.T) {
 		alts[i] = p.Alt
 	}
 
-	// patrick was imported with the gourmet event first and keeps that alt.
-	require.Equal(t, []string{"", "Gourmetaften", "Blomster fra @bondenshage"}, alts)
+	// patrick was imported with the gourmet event first and keeps that alt;
+	// liten, too small, is left out.
+	require.Len(t, gallery, 12)
+	require.Equal(t, []string{"", "Gourmetaften", "Blomster fra @bondenshage", "Låven pyntet til bryllup"}, alts[:4])
 	require.Equal(t, "Sophia Karlsen Edwards", gallery[0].Photographer.Name)
 
 	// Centred crops of every kind the photo is large enough for; the narrow
@@ -299,7 +152,7 @@ func TestImport(t *testing.T) {
 // Running the import again changes nothing, and keeps what the admin has
 // changed since.
 func TestImportIsIdempotent(t *testing.T) {
-	root, data := oldCheckout(t), t.TempDir()
+	root, data := oldSite, t.TempDir()
 	store := runImport(t, root, data)
 	ctx := t.Context()
 

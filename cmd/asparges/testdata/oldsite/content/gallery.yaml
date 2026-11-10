@@ -1,0 +1,49 @@
+---
+photographers:
+  lucky:
+    name: Lucky Thirteen
+    website: "https://luckythirteen.no/"
+  sophia:
+    name: Sophia Karlsen Edwards
+    website: ""
+
+photos:
+  - path: galleri/b
+    photographer: sophia
+    description: ""
+  - path: arrangementer/patrick
+    photographer: lucky
+    description: "Kokken"
+  - path: galleri/a
+    photographer: lucky
+    description: "Blomster fra @bondenshage"
+  - path: arrangementer/liten
+    photographer: lucky
+    description: ""
+  - path: galleri/c
+    photographer: sophia
+    description: "Låven pyntet til bryllup"
+  - path: galleri/d
+    photographer: ""
+    description: ""
+  - path: galleri/e
+    photographer: lucky
+    description: "Langbord i Fjøset"
+  - path: galleri/f
+    photographer: ""
+    description: "Tunet om sommeren"
+  - path: galleri/g
+    photographer: sophia
+    description: ""
+  - path: galleri/h
+    photographer: lucky
+    description: "Kaker på buffeten"
+  - path: galleri/i
+    photographer: ""
+    description: "Lysthuset"
+  - path: galleri/j
+    photographer: sophia
+    description: ""
+  - path: galleri/k
+    photographer: lucky
+    description: "Skafferiet"
