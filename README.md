@@ -27,6 +27,10 @@ go run ./cmd/asparges serve --dev --listen-addr 127.0.0.1:8090 \
   photos, into `static/dist/photos/` with a `manifest.json`; pages ask for
   `static.Photo("<name>")`. A replaced master gets new variant names, and the
   old ones are removed on the next generate.
+- Events and gallery from the old site: `go run ./cmd/asparges import
+  --data-dir /tmp/asparges .` (this checkout; about a minute, mostly the
+  gallery photos). Run it before `serve`: a running server keeps its
+  rendered pages until the next change. Running it again changes nothing.
 - Changed markup on purpose: `UPDATE_GOLDEN=1 go test ./...`, then review
   the diff of the `testdata/*.html` golden files.
 - Avenir's 400 weight is Medium; switch to Roman by changing the one
