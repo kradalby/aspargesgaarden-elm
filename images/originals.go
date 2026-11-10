@@ -10,7 +10,6 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"time"
 )
 
 // MaxUpload is the largest original Intake accepts.
@@ -122,16 +121,18 @@ func (s *Store) Intake(ctx context.Context, r io.Reader) (Original, error) {
 }
 
 // storeOriginal moves a checked upload to its content address. created is
-// false when the same content was already there.
+// false when the same content was already there. Either way the photo is
+// fresh until the worker finds its row: the caller is about to write it,
+// and a forget queued by an earlier delete of the same bytes must not take
+// the original from under it.
 func (s *Store) storeOriginal(tmp string, o Original) (bool, error) {
+	s.files.Lock()
+	defer s.files.Unlock()
+
+	s.fresh[o.SHA256] = true
+
 	dst := s.originalPath(o.SHA256, o.MIME)
 	if exists(dst) {
-		// Restart the grace period: the caller is about to write a row for it.
-		now := time.Now()
-		if err := os.Chtimes(dst, now, now); err != nil {
-			return false, fmt.Errorf("touch original: %w", err)
-		}
-
 		return false, nil
 	}
 
@@ -176,12 +177,13 @@ func sniff(b []byte) string {
 	return ""
 }
 
-func extOf(mime string) string {
-	return map[string]string{
-		"image/jpeg": "jpg",
-		"image/png":  "png",
-		"image/webp": "webp",
-		"image/heic": "heic",
-		"image/avif": "avif",
-	}[mime]
+// exts names an original's file by its type.
+var exts = map[string]string{
+	"image/jpeg": "jpg",
+	"image/png":  "png",
+	"image/webp": "webp",
+	"image/heic": "heic",
+	"image/avif": "avif",
 }
+
+func extOf(mime string) string { return exts[mime] }

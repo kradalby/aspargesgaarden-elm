@@ -443,7 +443,7 @@ func (s *Server) deletePhoto(w http.ResponseWriter, r *http.Request, p site.Phot
 		return
 	}
 
-	s.Changed()
+	s.Changed(p.SHA256)
 	s.audit(r, "photo deleted", "photo", p.ID, "sha256", p.SHA256)
 	w.WriteHeader(http.StatusNoContent)
 }

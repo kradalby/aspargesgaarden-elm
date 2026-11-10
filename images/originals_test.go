@@ -9,7 +9,6 @@ import (
 	"os/exec"
 	"path/filepath"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/require"
 )
@@ -131,16 +130,9 @@ func TestIntakeDedup(t *testing.T) {
 
 	a := intake(t, s, "upright.jpg")
 	path := s.originalPath(a.SHA256, a.MIME)
-	old := time.Now().Add(-6 * 24 * time.Hour)
-	require.NoError(t, os.Chtimes(path, old, old))
 
 	b := intake(t, s, "upright.jpg")
 	require.Equal(t, a, b)
-
-	// The second upload marks the original fresh for the row to come.
-	st, err := os.Stat(path)
-	require.NoError(t, err)
-	require.WithinDuration(t, time.Now(), st.ModTime(), time.Minute)
 
 	entries, err := os.ReadDir(filepath.Dir(path))
 	require.NoError(t, err)

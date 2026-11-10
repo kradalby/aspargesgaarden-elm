@@ -442,6 +442,7 @@ func TestAdminDeletePhoto(t *testing.T) {
 	require.JSONEq(t, `{"errors":[{"code":"photo_in_use"}],"usedBy":[{"id":`+itoa(e.ID)+`,"title":"Julemarked 2026"}]}`, rec.Body.String())
 
 	require.Equal(t, http.StatusNoContent, a.do(t, "DELETE", "/admin/api/photos/"+itoa(inGallery.ID), req{}).Code)
+	require.Contains(t, a.images.enqueued, inGallery.SHA256, "the photo store removes its files")
 	require.Equal(t, http.StatusNotFound, a.do(t, "DELETE", "/admin/api/photos/"+itoa(inGallery.ID), req{}).Code)
 
 	g := decode[map[string][]photoJSON](t, a.do(t, "GET", "/admin/api/gallery", req{}))

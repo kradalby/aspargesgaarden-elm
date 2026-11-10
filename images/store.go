@@ -41,6 +41,10 @@ type Store struct {
 	runningAsked bool
 	failed       map[string]error // a photo's last failure, until a success or Enqueue
 	wake         chan struct{}
+
+	// files orders Intake's storing of an original against forget.
+	files sync.Mutex
+	fresh map[string]bool // stored by Intake, row not yet seen; see forget
 }
 
 // Option configures a Store.
@@ -62,6 +66,7 @@ func New(root string, cat Catalog, opts ...Option) (*Store, error) {
 		maxUpload: MaxUpload,
 		slots:     make(chan struct{}, jobs),
 		failed:    map[string]error{},
+		fresh:     map[string]bool{},
 		wake:      make(chan struct{}, 1),
 	}
 

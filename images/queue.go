@@ -4,7 +4,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io/fs"
 	"os"
+	"path/filepath"
 	"slices"
 	"time"
 )
@@ -150,16 +152,30 @@ func (s *Store) Run(ctx context.Context) error {
 	}
 }
 
-// prepare builds every missing variant of a photo, a group at a time in
-// groups order, so the crop tool's picture comes first.
+// prepare brings a photo's files in line with the catalogue: it removes the
+// variants the photo no longer has (an old crop), then builds the missing
+// ones a group at a time in groups order, so the crop tool's picture comes
+// first. A photo the catalogue does not have loses all its files.
 func (s *Store) prepare(ctx context.Context, sha string) error {
+	if !shaRE.MatchString(sha) {
+		return fmt.Errorf("prepare %q: not a sha256", sha)
+	}
+
 	p, err := s.cat.Photo(ctx, sha)
 	if errors.Is(err, ErrNotFound) {
-		return nil
+		return s.forget(sha)
 	}
 
 	if err != nil {
 		return fmt.Errorf("prepare %s: %w", sha, err)
+	}
+
+	s.files.Lock()
+	delete(s.fresh, sha)
+	s.files.Unlock()
+
+	if err := s.prune(p); err != nil {
+		return err
 	}
 
 	type work struct {
@@ -212,6 +228,69 @@ func (s *Store) prepare(ctx context.Context, sha string) error {
 	if len(errs) == 0 {
 		s.log.Info("images: photo prepared", "photo", sha, "variants", n, "took", time.Since(start))
 	}
+
+	return errors.Join(errs...)
+}
+
+// photoDir is the folder of a photo's variants.
+func (s *Store) photoDir(sha string) string {
+	return filepath.Join(s.root, "variants", fmt.Sprintf("v%d", PipelineVersion), sha[:2], sha)
+}
+
+// prune removes the variant files of p that its current crops do not
+// explain. Pages link only to current names, and Changed has dropped every
+// kept page before the worker gets here.
+func (s *Store) prune(p Photo) error {
+	keep := map[string]bool{}
+	for _, sp := range Expected(p) {
+		keep[sp.file()] = true
+	}
+
+	entries, err := os.ReadDir(s.photoDir(p.SHA256))
+	if errors.Is(err, fs.ErrNotExist) {
+		return nil
+	}
+
+	if err != nil {
+		return fmt.Errorf("prune %s: %w", p.SHA256, err)
+	}
+
+	var errs []error
+
+	for _, e := range entries {
+		if !keep[e.Name()] {
+			errs = append(errs, os.Remove(filepath.Join(s.photoDir(p.SHA256), e.Name())))
+		}
+	}
+
+	return errors.Join(errs...)
+}
+
+// forget removes every file of a photo the catalogue does not have: its
+// variants and its original. The photo is named only by a delete or the
+// unused-photo sweep, never found by looking at the folders, so a database
+// restored without its photos cannot set off a mass delete. An upload of the
+// same bytes since (see Intake) keeps everything: its row is on the way.
+func (s *Store) forget(sha string) error {
+	s.files.Lock()
+	defer s.files.Unlock()
+
+	if s.fresh[sha] {
+		return nil
+	}
+
+	dir := filepath.Join(s.root, "originals", sha[:2])
+
+	errs := []error{os.RemoveAll(s.photoDir(sha))}
+	for _, ext := range exts {
+		if err := os.Remove(filepath.Join(dir, sha+"."+ext)); !errors.Is(err, fs.ErrNotExist) {
+			errs = append(errs, err)
+		}
+	}
+
+	// Each only if empty.
+	_ = os.Remove(filepath.Dir(s.photoDir(sha)))
+	_ = os.Remove(dir)
 
 	return errors.Join(errs...)
 }

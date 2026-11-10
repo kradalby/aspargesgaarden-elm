@@ -293,11 +293,128 @@ func TestRun(t *testing.T) {
 	require.NoError(t, <-done)
 }
 
-func TestPrepareSkipsDeletedPhotos(t *testing.T) {
+// A crop change leaves the new crop's files and none of the old's.
+func TestPruneOldCrop(t *testing.T) {
+	t.Parallel()
+	cat := newFakeCatalog()
+	s := newTestStore(t, cat)
+	ctx := t.Context()
+
+	p := photoOf(intake(t, s, "upright.jpg"))
+	cat.put(p)
+	require.NoError(t, s.prepare(ctx, p.SHA256))
+
+	old := Expected(p)
+	p.Crops = map[Kind]Rect{Card: {X: 0, Y: 0, W: 480, H: 600}}
+	cat.put(p)
+	require.NoError(t, s.prepare(ctx, p.SHA256))
+
+	want := make([]string, 0, len(Expected(p)))
+	for _, sp := range Expected(p) {
+		want = append(want, sp.file())
+	}
+
+	entries, err := os.ReadDir(s.photoDir(p.SHA256))
+	require.NoError(t, err)
+
+	got := make([]string, 0, len(entries))
+	for _, e := range entries {
+		got = append(got, e.Name())
+	}
+
+	require.ElementsMatch(t, want, got)
+	require.NotEqual(t, Expected(p), old)
+}
+
+// A deleted photo loses every file: variants and original.
+func TestForgetDeletedPhoto(t *testing.T) {
+	t.Parallel()
+	cat := newFakeCatalog()
+	s := newTestStore(t, cat)
+	ctx := t.Context()
+
+	p := photoOf(intake(t, s, "upright.jpg"))
+	cat.put(p)
+	require.NoError(t, s.prepare(ctx, p.SHA256))
+
+	cat.remove(p.SHA256)
+	s.Enqueue(p.SHA256)
+
+	before := s.builds.Load()
+	require.True(t, s.step(ctx))
+	require.Equal(t, before, s.builds.Load(), "nothing built for it")
+
+	require.NoDirExists(t, s.photoDir(p.SHA256))
+	require.NoFileExists(t, s.originalPath(p.SHA256, p.MIME))
+
+	for _, d := range []string{"originals", "variants/v1"} {
+		entries, err := os.ReadDir(filepath.Join(s.root, d))
+		require.NoError(t, err)
+		require.Empty(t, entries, d)
+	}
+}
+
+// The same bytes uploaded again after a delete, before the worker got to
+// the delete: the upload's row is on the way, so nothing is removed.
+func TestForgetSparesReupload(t *testing.T) {
+	t.Parallel()
+	cat := newFakeCatalog()
+	s := newTestStore(t, cat)
+	ctx := t.Context()
+
+	p := photoOf(intake(t, s, "upright.jpg"))
+	cat.put(p)
+	require.NoError(t, s.prepare(ctx, p.SHA256))
+
+	cat.remove(p.SHA256)
+	s.Enqueue(p.SHA256)
+	intake(t, s, "upright.jpg")
+	require.True(t, s.step(ctx))
+	require.FileExists(t, s.originalPath(p.SHA256, p.MIME))
+	require.FileExists(t, s.path(Expected(p)[0]))
+
+	// Its row seen once, a later delete removes it as usual.
+	cat.put(p)
+	require.NoError(t, s.prepare(ctx, p.SHA256))
+	cat.remove(p.SHA256)
+	require.NoError(t, s.prepare(ctx, p.SHA256))
+	require.NoFileExists(t, s.originalPath(p.SHA256, p.MIME))
+}
+
+// A start with a database that does not know the originals on disk (a bad
+// restore) touches none of them.
+func TestRunLeavesUnknownOriginals(t *testing.T) {
+	t.Parallel()
+	cat := newFakeCatalog()
+	s := newTestStore(t, cat)
+
+	unknown := intake(t, s, "upright.jpg")
+	known := photoOf(intake(t, s, "p3.jpg"))
+	cat.put(known)
+
+	ctx, cancel := context.WithCancel(t.Context())
+	done := make(chan error, 1)
+
+	go func() { done <- s.Run(ctx) }()
+
+	require.EventuallyWithT(t, func(c *assert.CollectT) {
+		st, err := s.Status(ctx, known.SHA256)
+		require.NoError(c, err)
+		assert.Equal(c, StateReady, st.State)
+	}, time.Minute, 50*time.Millisecond)
+
+	cancel()
+	require.NoError(t, <-done)
+	require.FileExists(t, s.originalPath(unknown.SHA256, unknown.MIME))
+	pv, _ := previewSpec(photoOf(unknown))
+	require.FileExists(t, s.path(pv), "nor its variants")
+}
+
+func TestPrepareRejectsBadNames(t *testing.T) {
 	t.Parallel()
 	s := newTestStore(t, newFakeCatalog())
 
-	require.NoError(t, s.prepare(t.Context(), testSHA))
+	require.Error(t, s.prepare(t.Context(), "../../etc"))
 	require.Zero(t, s.builds.Load())
 }
 
