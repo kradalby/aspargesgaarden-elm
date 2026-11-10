@@ -58,3 +58,26 @@ INSERT INTO gallery_photos (photo_id, position, updated_at) VALUES (?, ?, ?);
 SELECT CAST(coalesce(max(max(gallery_photos.updated_at), max(photos.updated_at)), 0) AS INTEGER)
 FROM gallery_photos
 JOIN photos ON photos.id = gallery_photos.photo_id;
+
+-- name: GetPhotoBySha256 :one
+SELECT * FROM photos WHERE sha256 = ?;
+
+-- name: ListPhotoEvents :many
+-- The events that show a photo, which keep it from being deleted.
+SELECT events.id, events.title FROM events
+JOIN event_photos ON event_photos.event_id = events.id
+WHERE event_photos.photo_id = ?
+ORDER BY events.id;
+
+-- name: DeleteGalleryPhoto :exec
+DELETE FROM gallery_photos WHERE photo_id = ?;
+
+-- name: DeleteUnusedPhotos :many
+-- Uploads no event or gallery took up, untouched since the cutoff. The
+-- check and the delete are one statement, so a save that links one of them
+-- either lands first and keeps it, or fails on the foreign key.
+DELETE FROM photos
+WHERE photos.updated_at < ?
+    AND NOT EXISTS (SELECT 1 FROM event_photos WHERE event_photos.photo_id = photos.id)
+    AND NOT EXISTS (SELECT 1 FROM gallery_photos WHERE gallery_photos.photo_id = photos.id)
+RETURNING sha256;
