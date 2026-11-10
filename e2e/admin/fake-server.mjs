@@ -19,7 +19,15 @@ const arg = (name, def) => {
 const port = Number(arg("port", 18097));
 
 const MAX_UPLOAD = 40 * 1024 * 1024;
-const ASPECT = { card: 4 / 5, banner: 16 / 9, share: 1200 / 630 };
+// As images.Kind: shape as whole numbers, and the narrowest crop allowed.
+const KINDS = {
+  card: { an: 4, ad: 5, min: 480 },
+  banner: { an: 16, ad: 9, min: 800 },
+  share: { an: 40, ad: 21, min: 1200 },
+};
+const MAX_PIXELS = 100_000_000;
+// Variants a photo's sizes take; any count would do, the app shows it as is.
+const VARIANTS = 12;
 
 let db;
 let clock;
@@ -28,22 +36,30 @@ let clock;
 const now = () =>
   new Date(Date.UTC(2026, 10, 10, 9, 0, 0) + ++clock * 1000).toISOString();
 
+// images.CentredCrop: the largest centred rectangle of the kind's shape.
+function centredCrop(k, w, h) {
+  const { an, ad } = KINDS[k];
+  let cw = w;
+  let ch = Math.floor((w * ad) / an);
+  if (w * ad > h * an) {
+    cw = Math.floor((h * an) / ad);
+    ch = h;
+  }
+  return {
+    x: Math.floor((w - cw) / 2),
+    y: Math.floor((h - ch) / 2),
+    w: cw,
+    h: ch,
+  };
+}
+
+const usable = (k, w, h) => centredCrop(k, w, h).w >= KINDS[k].min;
+
+// The stored crops of a new photo: only the kinds it is large enough for.
 function defaultCrops(w, h) {
   const out = {};
-  for (const [k, a] of Object.entries(ASPECT)) {
-    let cw = w;
-    let ch = Math.round(w / a);
-    if (ch > h) {
-      ch = h;
-      cw = Math.round(h * a);
-    }
-    out[k] = {
-      x: Math.floor((w - cw) / 2),
-      y: Math.floor((h - ch) / 2),
-      w: cw,
-      h: ch,
-    };
-  }
+  for (const k of Object.keys(KINDS))
+    if (usable(k, w, h)) out[k] = centredCrop(k, w, h);
   return out;
 }
 
@@ -59,13 +75,20 @@ async function addPhoto(bytes, mime, alt = "", ready = false) {
     alt,
     photographerId: null,
     crops: defaultCrops(size.width, size.height),
+    // As the server: the preview is made before the upload answers.
     status: ready
-      ? { state: "ready", done: 46, total: 46, previewReady: true, reason: "" }
+      ? {
+          state: "ready",
+          done: VARIANTS,
+          total: VARIANTS,
+          previewReady: true,
+          reason: "",
+        }
       : {
           state: "preparing",
           done: 0,
-          total: 0,
-          previewReady: false,
+          total: VARIANTS,
+          previewReady: true,
           reason: "",
         },
   });
@@ -164,7 +187,13 @@ function photoJson(p) {
     photographer: photographerJson(p.photographerId),
     previewUrl: `/fake-img/${p.id}/preview`,
     thumbUrl: `/fake-img/${p.id}/thumb`,
-    crops: p.crops,
+    // Every kind, as the server: an unset one shows its centred rectangle.
+    crops: Object.fromEntries(
+      Object.keys(KINDS).map((k) => [
+        k,
+        p.crops[k] || centredCrop(k, p.width, p.height),
+      ]),
+    ),
     status: p.status,
   };
 }
@@ -214,7 +243,7 @@ const lastDay = (e) =>
 const isOver = (e) => !!e.start && lastDay(e) < today;
 
 function eventJson(e) {
-  const path = e.year ? `/arrangementer/${e.year}/${e.slug}` : "";
+  const path = e.year && e.slug ? `/arrangementer/${e.year}/${e.slug}` : "";
   const photo = (r) => {
     const p = db.photos.get(r.id);
     return p ? photoJson(p) : null;
@@ -380,8 +409,8 @@ const esc = (s) =>
   );
 
 // No inline styles: the frame inherits the admin's CSP, as the real one does.
-function previewHtml(view, input) {
-  const e = revise(null, input);
+function previewHtml(view, input, saved) {
+  const e = revise(saved || null, input);
   const main = e.mainPhoto && db.photos.get(e.mainPhoto.id);
   const img = main
     ? `<img src="/fake-img/${main.id}/preview" alt="${esc(input.mainPhoto.alt)}" width="100%">`
@@ -421,7 +450,15 @@ async function readBody(req, limit = 1 << 20) {
   return Buffer.concat(chunks);
 }
 
+// As readJSON: only application/json is read.
 async function json(req, res) {
+  if (
+    (req.headers["content-type"] || "").split(";")[0].trim() !==
+    "application/json"
+  ) {
+    fail(res, 400, [{ code: "bad_request" }]);
+    return undefined;
+  }
   try {
     return JSON.parse((await readBody(req)).toString("utf8") || "null");
   } catch {
@@ -459,7 +496,7 @@ async function api(req, res, path, url) {
 
   if (req.method === "GET" && path === "me")
     return send(res, 200, {
-      name: "Kristine",
+      name: "Utvikler",
       siteUrl: "https://aspargesgaarden.no",
     });
 
@@ -527,7 +564,7 @@ async function api(req, res, path, url) {
 
     const input = await json(req, res);
     if (input === undefined) return;
-    if (input?.updatedAt !== prev.updatedAt)
+    if (!input?.updatedAt || input.updatedAt !== prev.updatedAt)
       return fail(res, 409, [{ code: "conflict" }], {
         current: eventJson(prev),
       });
@@ -563,7 +600,7 @@ async function api(req, res, path, url) {
     return send(
       res,
       200,
-      previewHtml(body.view, body.event),
+      previewHtml(body.view, body.event, body.id && db.events.get(body.id)),
       "text/html; charset=utf-8",
     );
   }
@@ -582,6 +619,8 @@ async function api(req, res, path, url) {
       return fail(res, 415, [{ code: "unsupported_type" }]);
     const size = imageSize(part.bytes);
     if (!size) return fail(res, 422, [{ code: "damaged" }]);
+    if (size.width * size.height > MAX_PIXELS)
+      return fail(res, 422, [{ code: "too_many_pixels" }]);
     if (size.width < 480) return fail(res, 422, [{ code: "too_small" }]);
     const same = [...db.photos.values()].find((x) =>
       x.bytes.equals(part.bytes),
@@ -598,13 +637,11 @@ async function api(req, res, path, url) {
       .map(Number)) {
       const p = db.photos.get(id);
       if (!p) continue;
-      // Each poll moves a preparing photo along, so tests see every state.
+      // Each poll moves a preparing photo along.
       const s = p.status;
       if (s.state === "preparing") {
-        s.previewReady = true;
-        s.total = 46;
-        s.done = Math.min(46, s.done + 23);
-        if (s.done === 46) s.state = "ready";
+        s.done = Math.min(s.total, s.done + s.total / 2);
+        if (s.done === s.total) s.state = "ready";
       }
       statuses[id] = s;
     }
@@ -634,7 +671,7 @@ async function api(req, res, path, url) {
         p.status = {
           state: "preparing",
           done: 0,
-          total: 46,
+          total: VARIANTS,
           previewReady: p.status.previewReady,
           reason: "",
         };
@@ -657,8 +694,20 @@ async function api(req, res, path, url) {
     }
     if (req.method === "PUT" && r[2] === "crops") {
       const errs = [];
+      const keep = {};
       for (const [k, c] of Object.entries(body || {})) {
-        if (!ASPECT[k]) errs.push({ code: "crop_kind", field: k });
+        const kind = KINDS[k];
+        const centred = kind && centredCrop(k, p.width, p.height);
+        // The centred rectangle the photo shows for a kind it is too small
+        // for comes back with the rest: accepted, nothing stored.
+        if (
+          kind &&
+          !usable(k, p.width, p.height) &&
+          JSON.stringify(c) === JSON.stringify(centred)
+        )
+          continue;
+        const want = kind && (c.w * kind.ad) / kind.an;
+        if (!kind) errs.push({ code: "crop_kind", field: k });
         else if (
           c.x < 0 ||
           c.y < 0 ||
@@ -666,14 +715,15 @@ async function api(req, res, path, url) {
           c.y + c.h > p.height
         )
           errs.push({ code: "crop_outside", field: k });
-        else if (Math.abs(c.w / ASPECT[k] - c.h) > 1)
+        else if (Math.abs(c.h - want) > Math.max(2, want * 0.01))
           errs.push({ code: "crop_aspect", field: k });
-        else if (c.w < Math.min(480, p.width))
+        else if (c.w < kind.min)
           errs.push({ code: "crop_too_small", field: k });
+        else keep[k] = c;
       }
       if (errs.length) return fail(res, 422, errs);
-      Object.assign(p.crops, body);
-      p.status = { ...p.status, state: "preparing", done: 0, total: 46 };
+      Object.assign(p.crops, keep);
+      p.status = { ...p.status, state: "preparing", done: 0, total: VARIANTS };
       return send(res, 200, photoJson(p));
     }
   }
@@ -724,7 +774,9 @@ async function api(req, res, path, url) {
   if (path === "gallery" && req.method === "PUT") {
     const body = await json(req, res);
     if (body === undefined) return;
-    const ids = body.photoIds || [];
+    if (!Array.isArray(body?.photoIds))
+      return fail(res, 400, [{ code: "bad_request" }]);
+    const ids = body.photoIds;
     const missing = ids.find((id) => !db.photos.has(id));
     if (missing)
       return fail(res, 404, [{ code: "not_found", photoId: missing }]);
