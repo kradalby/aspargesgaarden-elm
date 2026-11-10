@@ -5,11 +5,9 @@ been, with the actions she needs on each.
 -}
 
 import Api exposing (Event, EventLists)
-import Browser.Dom as Dom
 import Html exposing (Html, a, article, div, h3, img, p, section, text)
 import Html.Attributes as A exposing (class)
 import Route
-import Task
 import Text
 import Ui
 
@@ -126,8 +124,8 @@ update msg model =
 
 
 focus : String -> Cmd Msg
-focus id =
-    Task.attempt (\_ -> Focused) (Dom.focus id)
+focus =
+    Ui.focus Focused
 
 
 

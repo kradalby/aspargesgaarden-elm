@@ -3,6 +3,7 @@ module Text exposing
     , atFloor
     , cropTooSmall
     , error
+    , movedTo
     , noAccess
     , noCrop
     , photoFailure
@@ -205,6 +206,13 @@ stretched, only shown smaller, so this is information, not a warning.
 shownSmaller : String
 shownSmaller =
     "Bildet er litt lite, så det vises mindre når man åpner det stort. Det går fint."
+
+
+{-| Said aloud after a move button, with the item's new place.
+-}
+movedTo : Int -> String
+movedTo place =
+    "Bildet er flyttet til plass " ++ String.fromInt place ++ "."
 
 
 {-| For someone the tailnet does not let into the admin.

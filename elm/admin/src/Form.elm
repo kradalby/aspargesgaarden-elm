@@ -10,7 +10,6 @@ module Form exposing
     , setAt
     , summaryLimit
     , toInput
-    , unplaced
     )
 
 {-| The event form's state and its rules: what is sent, which control a
@@ -195,13 +194,6 @@ fieldId p =
 errorsFor : String -> List Problem -> List String
 errorsFor id =
     List.filter (\p -> fieldId p == Just id) >> List.map Text.problem
-
-
-{-| Problems no control of the form owns; shown at the top only.
--}
-unplaced : List Problem -> List Problem
-unplaced =
-    List.filter (\p -> fieldId p == Nothing)
 
 
 {-| The form after a save answered with stored. If nothing was typed while

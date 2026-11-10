@@ -7,6 +7,7 @@ module Ui exposing
     , errorList
     , errorText
     , field
+    , focus
     , h1
     , h2
     , help
@@ -14,6 +15,7 @@ module Ui exposing
     , linkButton
     , liveRegion
     , modal
+    , moveId
     , notice
     , primaryButton
     , progress
@@ -30,10 +32,12 @@ strings are written out whole, because Tailwind finds them by scanning this
 file.
 -}
 
+import Browser.Dom as Dom
 import Html exposing (Attribute, Html, button, div, label, li, p, span, text, ul)
 import Html.Attributes as A exposing (class)
 import Html.Events exposing (onClick, preventDefaultOn)
 import Json.Decode as D
+import Task
 
 
 h1 : String -> Html msg
@@ -334,6 +338,32 @@ spinnerText s =
 liveRegion : String -> Html msg
 liveRegion s =
     div [ A.attribute "aria-live" "polite", A.attribute "role" "status", class "sr-only" ] [ text s ]
+
+
+
+-- FOCUS
+
+
+{-| Moves focus to the element with id; done is sent either way, since a
+control that is gone is no error.
+-}
+focus : msg -> String -> Cmd msg
+focus done id =
+    Task.attempt (\_ -> done) (Dom.focus id)
+
+
+{-| The id of the move button that moved item i by delta, so focus can
+follow the item to its new place.
+-}
+moveId : Int -> Int -> String
+moveId i delta =
+    (if delta < 0 then
+        "flytt-tidligere-"
+
+     else
+        "flytt-senere-"
+    )
+        ++ String.fromInt i
 
 
 

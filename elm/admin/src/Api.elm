@@ -13,6 +13,7 @@ module Api exposing
     , Qualities
     , Quality
     , Rect
+    , State(..)
     , UsedBy
     , copyEvent
     , createEvent
@@ -26,7 +27,6 @@ module Api exposing
     , getEvents
     , getGallery
     , getMe
-    , getPhoto
     , getPhotographers
     , getStatuses
     , photoDecoder
@@ -101,11 +101,18 @@ type alias Qualities =
     { card : Quality, banner : Quality, share : Quality, full : Quality }
 
 
-{-| How far the server is with the photo's sizes; state is "preparing",
-"ready" or "failed", reason a code when failed.
+{-| How far the server is with the photo's sizes.
 -}
 type alias PhotoStatus =
-    { state : String, done : Int, total : Int, previewReady : Bool, reason : String }
+    { state : State, done : Int, total : Int, previewReady : Bool }
+
+
+{-| Failed carries the server's reason code (docs/admin-api.md).
+-}
+type State
+    = Preparing
+    | Ready
+    | Failed String
 
 
 type alias Event =
@@ -228,12 +235,26 @@ qualitiesDecoder =
 
 statusDecoder : Decoder PhotoStatus
 statusDecoder =
-    D.map5 PhotoStatus
-        (D.field "state" D.string)
+    D.map4 PhotoStatus
+        (D.map2 toState (D.field "state" D.string) (D.field "reason" D.string))
         (D.field "done" D.int)
         (D.field "total" D.int)
         (D.field "previewReady" D.bool)
-        (D.field "reason" D.string)
+
+
+{-| A state this app does not know yet is followed like one in progress.
+-}
+toState : String -> String -> State
+toState state reason =
+    case state of
+        "ready" ->
+            Ready
+
+        "failed" ->
+            Failed reason
+
+        _ ->
+            Preparing
 
 
 eventDecoder : Decoder Event
@@ -521,11 +542,6 @@ upload tracker file toMsg =
         , timeout = Nothing
         , tracker = Just tracker
         }
-
-
-getPhoto : Int -> (Result Error Photo -> msg) -> Cmd msg
-getPhoto id toMsg =
-    get ("photos/" ++ String.fromInt id) toMsg photoDecoder
 
 
 {-| Statuses of the given photos, keyed by id; unknown ids are left out.

@@ -1,11 +1,11 @@
 module Photos exposing
     ( Model
-    , Msg
+    , Msg(..)
     , Out(..)
+    , Slot(..)
     , Upload
     , add
     , busySummary
-    , creditText
     , dialog
     , get
     , image
@@ -67,7 +67,7 @@ type alias Model =
 
 type alias Upload =
     { key : Int
-    , slot : String
+    , slot : Slot
     , file : File
     , sent : Int
     , size : Int
@@ -75,10 +75,19 @@ type alias Upload =
     }
 
 
+{-| Where an upload goes: the event's main photo, its other photos, or the
+gallery.
+-}
+type Slot
+    = Main
+    | Extra
+    | Gallery
+
+
 type UploadState
     = Sending
     | Checking
-    | Failed Api.Error
+    | UploadFailed Api.Error
 
 
 type alias Dialog =
@@ -94,7 +103,7 @@ type alias Dialog =
 {-| What the page has to act on.
 -}
 type Out
-    = Added String Photo
+    = Added Slot Photo
     | Credit Int (Maybe Int)
 
 
@@ -146,7 +155,15 @@ get id model =
 
 isPending : Photo -> Bool
 isPending p =
-    p.status.state == "preparing" || (not p.status.previewReady && p.status.state /= "failed")
+    case p.status.state of
+        Api.Preparing ->
+            True
+
+        Api.Ready ->
+            not p.status.previewReady
+
+        Api.Failed _ ->
+            False
 
 
 pendingIds : Model -> List Int
@@ -154,7 +171,7 @@ pendingIds model =
     Dict.values model.photos |> List.filter isPending |> List.map .id
 
 
-uploadsFor : String -> Model -> List Upload
+uploadsFor : Slot -> Model -> List Upload
 uploadsFor slot model =
     List.filter (\u -> u.slot == slot) model.uploads
 
@@ -164,8 +181,8 @@ uploadsFor slot model =
 
 
 type Msg
-    = Pick String Bool
-    | Picked String File (List File)
+    = Pick Slot Bool
+    | Picked Slot File (List File)
     | Progress Int Http.Progress
     | Uploaded Int (Result Api.Error Photo)
     | Cancel Int
@@ -186,9 +203,9 @@ type Msg
     | Focused
 
 
-{-| Opens the file chooser for slot ("main", "extra", "gallery").
+{-| Opens the file chooser for slot, for one file or many.
 -}
-pick : String -> Bool -> Msg
+pick : Slot -> Bool -> Msg
 pick =
     Pick
 
@@ -276,7 +293,7 @@ update msg model =
                             | uploads = List.filter (\x -> x.key /= key) model.uploads
                             , announce =
                                 File.name u.file
-                                    ++ (if photo.status.state == "ready" then
+                                    ++ (if photo.status.state == Api.Ready then
                                             " er lastet opp, og bildet er klart."
 
                                         else
@@ -288,7 +305,7 @@ update msg model =
                     )
 
                 ( [ u ], Err e ) ->
-                    ( mapUpload key (\x -> { x | state = Failed e }) { model | announce = File.name u.file ++ ": " ++ uploadError e }
+                    ( mapUpload key (\x -> { x | state = UploadFailed e }) { model | announce = File.name u.file ++ ": " ++ uploadError e }
                     , Cmd.none
                     , []
                     )
@@ -347,13 +364,13 @@ update msg model =
                         |> List.map
                             (\( p, s ) ->
                                 case s.state of
-                                    "ready" ->
+                                    Api.Ready ->
                                         name p ++ " er klart."
 
-                                    "failed" ->
-                                        name p ++ ": " ++ Text.photoFailure s.reason
+                                    Api.Failed reason ->
+                                        name p ++ ": " ++ Text.photoFailure reason
 
-                                    _ ->
+                                    Api.Preparing ->
                                         ""
                             )
                         |> String.join " "
@@ -377,7 +394,7 @@ update msg model =
             ( { model | polling = False }, Cmd.none, [] )
 
         Prepare id ->
-            ( setStatus id (\s -> { s | state = "preparing", reason = "" }) model
+            ( setStatus id (\s -> { s | state = Api.Preparing }) model
             , Api.prepare id (Prepared id)
             , []
             )
@@ -386,7 +403,7 @@ update msg model =
             ( setStatus id (always s) model, Cmd.none, [] )
 
         Prepared id (Err _) ->
-            ( setStatus id (\s -> { s | state = "failed", reason = "internal" }) model, Cmd.none, [] )
+            ( setStatus id (\s -> { s | state = Api.Failed "internal" }) model, Cmd.none, [] )
 
         GotPhotographers (Ok list) ->
             ( { model | photographers = merge list model.photographers, photographersFailed = False }, Cmd.none, [] )
@@ -612,7 +629,7 @@ uploadRow toMsg u =
             Checking ->
                 Ui.spinnerText "Sjekker bildet …"
 
-            Failed e ->
+            UploadFailed e ->
                 div [ class "flex flex-col gap-2" ]
                     [ Ui.errorText ("opplasting-" ++ String.fromInt u.key) [ uploadError e ]
                     , div [ class "flex flex-wrap gap-2" ]
@@ -636,23 +653,23 @@ statusView toMsg photo =
         s =
             photo.status
     in
-    div [ class "flex flex-col gap-1", A.attribute "data-photo-status" s.state ]
+    div [ class "flex flex-col gap-1", A.attribute "data-photo-status" (stateName s.state) ]
         (case s.state of
-            "ready" ->
+            Api.Ready ->
                 [ p [ class "flex items-center gap-2 text-mork-eukalyptus font-bold" ]
                     [ span [ A.attribute "aria-hidden" "true" ] [ text "✓" ], text "Bildet er klart" ]
                 ]
 
-            "failed" ->
-                [ Ui.errorText ("bildefeil-" ++ String.fromInt photo.id) [ Text.photoFailure s.reason ]
-                , if s.reason == "damaged" || s.reason == "too_small" then
+            Api.Failed reason ->
+                [ Ui.errorText ("bildefeil-" ++ String.fromInt photo.id) [ Text.photoFailure reason ]
+                , if reason == "damaged" || reason == "too_small" then
                     text ""
 
                   else
                     div [] [ Ui.secondaryButton [] (toMsg (Prepare photo.id)) "Prøv igjen" ]
                 ]
 
-            _ ->
+            Api.Preparing ->
                 [ if s.total > 0 then
                     Ui.progress ("Klargjør bildet … " ++ String.fromInt s.done ++ " av " ++ String.fromInt s.total) s.done s.total
 
@@ -661,6 +678,21 @@ statusView toMsg photo =
                 , Ui.help [] "Du kan fortsette å skrive mens bildet gjøres klart."
                 ]
         )
+
+
+{-| The state as the server names it, for tests to find.
+-}
+stateName : Api.State -> String
+stateName state =
+    case state of
+        Api.Preparing ->
+            "preparing"
+
+        Api.Ready ->
+            "ready"
+
+        Api.Failed _ ->
+            "failed"
 
 
 {-| For a gallery or extra photo narrower than the lightbox's largest frame.
@@ -685,7 +717,7 @@ image attrs photo =
     else
         div (class "flex items-center justify-center bg-kalk/40 text-center text-sm p-2" :: attrs)
             [ text
-                (if photo.status.state == "failed" then
+                (if isFailed photo then
                     "Ingen forhåndsvisning"
 
                  else
@@ -694,16 +726,14 @@ image attrs photo =
             ]
 
 
-{-| "Foto: name" for a photo's photographer, or "" for none.
--}
-creditText : Model -> Maybe Int -> String
-creditText model id =
-    case photographer model id of
-        Just ph ->
-            "Foto: " ++ ph.name
+isFailed : Photo -> Bool
+isFailed photo =
+    case photo.status.state of
+        Api.Failed _ ->
+            True
 
-        Nothing ->
-            ""
+        _ ->
+            False
 
 
 photographer : Model -> Maybe Int -> Maybe Photographer
@@ -870,7 +900,7 @@ busySummary photos model =
             count
                 (\u ->
                     case u.state of
-                        Failed _ ->
+                        UploadFailed _ ->
                             True
 
                         _ ->
@@ -881,7 +911,7 @@ busySummary photos model =
             List.length (List.filter isPending photos)
 
         failed =
-            List.length (List.filter (\ph -> ph.status.state == "failed") photos)
+            List.length (List.filter isFailed photos)
 
         part n one many =
             if n == 0 then

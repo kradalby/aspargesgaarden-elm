@@ -35,11 +35,8 @@ suite =
                 \_ -> Form.fieldId (problem "end_before_start" (Just "endTime") Nothing) |> Expect.equal (Just "slutter")
             , test "a missing photo goes to the photo button" <|
                 \_ -> Form.fieldId (problem "main_photo_required" (Just "mainPhoto") Nothing) |> Expect.equal (Just "hovedbilde")
-            , test "an unknown field stays at the top" <|
-                \_ ->
-                    Form.unplaced [ problem "x" (Just "nope") Nothing, problem "title_required" (Just "title") Nothing ]
-                        |> List.map .code
-                        |> Expect.equal [ "x" ]
+            , test "an unknown field has no control" <|
+                \_ -> Form.fieldId (problem "x" (Just "nope") Nothing) |> Expect.equal Nothing
             , test "a field gets all its messages, in words" <|
                 \_ ->
                     Form.errorsFor "tittel" [ problem "title_required" (Just "title") Nothing, problem "ticket_url" (Just "ticketUrl") Nothing ]

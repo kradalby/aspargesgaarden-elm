@@ -10,7 +10,7 @@ import Browser.Dom as Dom
 import Crop
 import Dict exposing (Dict)
 import Form exposing (Form)
-import Html exposing (Html, a, div, h3, iframe, img, label, li, node, p, span, text, ul)
+import Html exposing (Html, a, div, iframe, img, label, li, node, p, span, text, ul)
 import Html.Attributes as A exposing (attribute, class, style)
 import Html.Events exposing (on, onClick, onInput)
 import Html.Keyed as Keyed
@@ -256,8 +256,8 @@ update msg model =
                 ( m, cmd, out ) =
                     edit (\form -> { form | extraPhotos = Form.move i d form.extraPhotos }) model
             in
-            ( { m | announce = "Bildet er flyttet til plass " ++ String.fromInt (clamp 1 (List.length model.form.extraPhotos) (i + d + 1)) ++ "." }
-            , Cmd.batch [ cmd, focus (moveId (i + d) d) ]
+            ( { m | announce = Text.movedTo (clamp 1 (List.length model.form.extraPhotos) (i + d + 1)) }
+            , Cmd.batch [ cmd, focus (Ui.moveId (i + d) d) ]
             , out
             )
 
@@ -591,7 +591,7 @@ applyPhotosOut out ( model, cmd, o ) =
 
         ( m, c, _ ) =
             case out of
-                Photos.Added "main" p ->
+                Photos.Added Photos.Main p ->
                     edit (\f -> { f | mainPhoto = Just (ref p) }) model
 
                 Photos.Added _ p ->
@@ -682,19 +682,8 @@ mapCropRect f model =
 
 
 focus : String -> Cmd Msg
-focus id =
-    Task.attempt (\_ -> Ignored) (Dom.focus id)
-
-
-moveId : Int -> Int -> String
-moveId i d =
-    (if d < 0 then
-        "flytt-tidligere-"
-
-     else
-        "flytt-senere-"
-    )
-        ++ String.fromInt i
+focus =
+    Ui.focus Ignored
 
 
 photosPending : Model -> Bool
@@ -1103,7 +1092,7 @@ mainPhotoView model =
                     , div [ class "flex-1 min-w-60 flex flex-col gap-4" ]
                         [ Photos.statusView PhotosMsg photo
                         , div [ class "flex flex-wrap gap-2" ]
-                            [ Ui.secondaryButton [ A.id "hovedbilde" ] (PhotosMsg (Photos.pick "main" False)) "Bytt bilde"
+                            [ Ui.secondaryButton [ A.id "hovedbilde" ] (PhotosMsg (Photos.pick Photos.Main False)) "Bytt bilde"
                             , Ui.secondaryButton [ A.id "beskjaer", A.disabled (not photo.status.previewReady) ] OpenCrop "Beskjær"
                             , Ui.quietButton [] RemoveMain "Ta bort bildet"
                             ]
@@ -1120,7 +1109,7 @@ mainPhotoView model =
 
             Nothing ->
                 div [ class "flex flex-col gap-2" ]
-                    [ div [] [ Ui.primaryButton [ A.id "hovedbilde", attribute "aria-describedby" "hovedbilde-feil" ] (PhotosMsg (Photos.pick "main" False)) "Velg bilde" ]
+                    [ div [] [ Ui.primaryButton [ A.id "hovedbilde", attribute "aria-describedby" "hovedbilde-feil" ] (PhotosMsg (Photos.pick Photos.Main False)) "Velg bilde" ]
                     , Ui.errorText "hovedbilde-feil" (errs model "hovedbilde")
                     ]
         , Ui.errorText "hovedbilde-feil2"
@@ -1130,7 +1119,7 @@ mainPhotoView model =
              else
                 errs model "hovedbilde"
             )
-        , div [ class "flex flex-col gap-2" ] (List.map (Photos.uploadRow PhotosMsg) (Photos.uploadsFor "main" model.photos))
+        , div [ class "flex flex-col gap-2" ] (List.map (Photos.uploadRow PhotosMsg) (Photos.uploadsFor Photos.Main model.photos))
         ]
 
 
@@ -1225,8 +1214,8 @@ extraPhotosView model =
                                     , altField model ref
                                     , Photos.photographerField { photoId = ref.id, selected = ref.photographerId, onSelect = SetPhotographer ref.id, toMsg = PhotosMsg } model.photos
                                     , div [ class "flex flex-wrap gap-2" ]
-                                        [ Ui.secondaryButton [ A.id (moveId i -1), A.disabled (i == 0), attribute "aria-label" ("Flytt bilde " ++ String.fromInt (i + 1) ++ " tidligere") ] (MoveExtra i -1) "↑ Tidligere"
-                                        , Ui.secondaryButton [ A.id (moveId i 1), A.disabled (i == n - 1), attribute "aria-label" ("Flytt bilde " ++ String.fromInt (i + 1) ++ " senere") ] (MoveExtra i 1) "↓ Senere"
+                                        [ Ui.secondaryButton [ A.id (Ui.moveId i -1), A.disabled (i == 0), attribute "aria-label" ("Flytt bilde " ++ String.fromInt (i + 1) ++ " tidligere") ] (MoveExtra i -1) "↑ Tidligere"
+                                        , Ui.secondaryButton [ A.id (Ui.moveId i 1), A.disabled (i == n - 1), attribute "aria-label" ("Flytt bilde " ++ String.fromInt (i + 1) ++ " senere") ] (MoveExtra i 1) "↓ Senere"
                                         , Ui.quietButton [ attribute "aria-label" ("Ta bort bilde " ++ String.fromInt (i + 1)) ] (RemoveExtra i) "Ta bort"
                                         ]
                                     ]
@@ -1237,9 +1226,9 @@ extraPhotosView model =
                 )
                 model.form.extraPhotos
             )
-        , div [ class "flex flex-col gap-2" ] (List.map (Photos.uploadRow PhotosMsg) (Photos.uploadsFor "extra" model.photos))
+        , div [ class "flex flex-col gap-2" ] (List.map (Photos.uploadRow PhotosMsg) (Photos.uploadsFor Photos.Extra model.photos))
         , Ui.errorText "flere-bilder-feil" (errs model "flere-bilder")
-        , div [] [ Ui.secondaryButton [ A.id "flere-bilder" ] (PhotosMsg (Photos.pick "extra" True)) "+ Legg til bilder" ]
+        , div [] [ Ui.secondaryButton [ A.id "flere-bilder" ] (PhotosMsg (Photos.pick Photos.Extra True)) "+ Legg til bilder" ]
         ]
 
 

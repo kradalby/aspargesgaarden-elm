@@ -6,7 +6,6 @@ next to the photo, with a way to try again.
 -}
 
 import Api exposing (Photo, UsedBy)
-import Browser.Dom as Dom
 import Dict exposing (Dict)
 import Form
 import Html exposing (Html, div, li, p, span, text, ul)
@@ -14,7 +13,6 @@ import Html.Attributes as A exposing (attribute, class)
 import Html.Events exposing (on, onInput, targetValue)
 import Json.Decode as D
 import Photos
-import Task
 import Text
 import Ui
 
@@ -129,8 +127,8 @@ update msg model =
                     Form.move i d model.order
             in
             saveOrder order
-                ( { model | announce = "Bildet er flyttet til plass " ++ String.fromInt (clamp 1 (List.length order) (i + d + 1)) ++ "." }
-                , focus (moveId (i + d) d)
+                ( { model | announce = Text.movedTo (clamp 1 (List.length order) (i + d + 1)) }
+                , focus (Ui.moveId (i + d) d)
                 )
 
         OrderSaved (Ok photos) ->
@@ -257,20 +255,9 @@ savePhoto id ph model =
     )
 
 
-moveId : Int -> Int -> String
-moveId i d =
-    (if d < 0 then
-        "flytt-tidligere-"
-
-     else
-        "flytt-senere-"
-    )
-        ++ String.fromInt i
-
-
 focus : String -> Cmd Msg
-focus id =
-    Task.attempt (\_ -> Ignored) (Dom.focus id)
+focus =
+    Ui.focus Ignored
 
 
 subscriptions : Model -> Sub Msg
@@ -294,7 +281,7 @@ view model =
     div [ class "flex flex-col gap-8" ]
         [ div [ class "flex flex-wrap gap-4 items-center justify-between" ]
             [ Ui.h1 "Galleri"
-            , Ui.primaryButton [ A.id "legg-til-bilder" ] (PhotosMsg (Photos.pick "gallery" True)) "+ Legg til bilder"
+            , Ui.primaryButton [ A.id "legg-til-bilder" ] (PhotosMsg (Photos.pick Photos.Gallery True)) "+ Legg til bilder"
             ]
         , Ui.help [] "Bildene vises på galleri-siden i denne rekkefølgen. Alt du endrer her, lagres med en gang."
         , Ui.liveRegion model.announce
@@ -313,7 +300,7 @@ view model =
 
             Nothing ->
                 text ""
-        , div [ class "flex flex-col gap-2" ] (List.map (Photos.uploadRow PhotosMsg) (Photos.uploadsFor "gallery" model.photos))
+        , div [ class "flex flex-col gap-2" ] (List.map (Photos.uploadRow PhotosMsg) (Photos.uploadsFor Photos.Gallery model.photos))
         , case model.loading of
             Loading ->
                 Ui.spinnerText "Henter bildene …"
@@ -385,8 +372,8 @@ photoCard model n i photo =
             }
             model.photos
         , div [ class "flex flex-wrap gap-2 mt-auto pt-2" ]
-            [ Ui.secondaryButton [ A.id (moveId i -1), A.disabled (i == 0), attribute "aria-label" ("Flytt bilde " ++ String.fromInt (i + 1) ++ " tidligere") ] (Move i -1) "← Tidligere"
-            , Ui.secondaryButton [ A.id (moveId i 1), A.disabled (i == n - 1), attribute "aria-label" ("Flytt bilde " ++ String.fromInt (i + 1) ++ " senere") ] (Move i 1) "Senere →"
+            [ Ui.secondaryButton [ A.id (Ui.moveId i -1), A.disabled (i == 0), attribute "aria-label" ("Flytt bilde " ++ String.fromInt (i + 1) ++ " tidligere") ] (Move i -1) "← Tidligere"
+            , Ui.secondaryButton [ A.id (Ui.moveId i 1), A.disabled (i == n - 1), attribute "aria-label" ("Flytt bilde " ++ String.fromInt (i + 1) ++ " senere") ] (Move i 1) "Senere →"
             , Ui.dangerButton [ A.id ("slett-" ++ String.fromInt photo.id), attribute "aria-label" ("Slett bilde " ++ String.fromInt (i + 1)) ] (AskDelete photo.id) "Slett"
             ]
         ]
