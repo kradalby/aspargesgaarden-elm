@@ -35,9 +35,13 @@ const (
 	adminHost = "asparges.tail1234.ts.net"
 )
 
-// fakeTailnet answers WhoIs and the node's own names as tsnet would.
+// fakeTailnet answers WhoIs and the node's own names as tsnet would. A nil
+// entry in who is the local API's JSON null; statusErr and noSelf are a
+// node that cannot say who it is.
 type fakeTailnet struct {
-	who map[string]*apitype.WhoIsResponse
+	who       map[string]*apitype.WhoIsResponse
+	statusErr error
+	noSelf    bool
 }
 
 func (f *fakeTailnet) WhoIs(_ context.Context, addr string) (*apitype.WhoIsResponse, error) {
@@ -49,7 +53,15 @@ func (f *fakeTailnet) WhoIs(_ context.Context, addr string) (*apitype.WhoIsRespo
 	return w, nil
 }
 
-func (*fakeTailnet) StatusWithoutPeers(context.Context) (*ipnstate.Status, error) {
+func (f *fakeTailnet) StatusWithoutPeers(context.Context) (*ipnstate.Status, error) {
+	if f.statusErr != nil {
+		return nil, f.statusErr
+	}
+
+	if f.noSelf {
+		return &ipnstate.Status{}, nil
+	}
+
 	return &ipnstate.Status{
 		Self:         &ipnstate.PeerStatus{DNSName: adminHost + "."},
 		TailscaleIPs: []netip.Addr{netip.MustParseAddr("100.64.0.100"), netip.MustParseAddr("fd7a:115c:a1e0::100")},
@@ -288,6 +300,34 @@ func TestAdminAccess(t *testing.T) {
 				}
 			})
 		}
+	}
+}
+
+// Whatever the tailnet cannot tell, the answer is no, never a crash or a way
+// in: the node's own names unknown, a caller WhoIs knows nothing of, or no
+// tailnet at all outside --dev.
+func TestAdminAccessWhenTheTailnetCannotTell(t *testing.T) {
+	tests := []struct {
+		name    string
+		breakIt func(*adminFixture, *fakeTailnet)
+	}{
+		{"status fails", func(_ *adminFixture, tn *fakeTailnet) { tn.statusErr = errors.New("tailscaled is not running") }},
+		{"no self", func(_ *adminFixture, tn *fakeTailnet) { tn.noSelf = true }},
+		{"WhoIs answers null", func(_ *adminFixture, tn *fakeTailnet) { tn.who[kristine] = nil }},
+		{"no user profile", func(_ *adminFixture, tn *fakeTailnet) { tn.who[kristine].UserProfile = nil }},
+		{"no tailnet", func(a *adminFixture, _ *fakeTailnet) { a.srv.cfg.Admin.Tailnet = nil }},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			a := newAdmin(t, false)
+			tn := newFakeTailnet()
+			a.srv.cfg.Admin.Tailnet = tn
+			tt.breakIt(a, tn)
+
+			rec := a.do(t, "GET", "/admin/api/me", req{})
+			require.Equal(t, http.StatusForbidden, rec.Code)
+			require.Equal(t, []problem{{Code: "forbidden"}}, errorsOf(t, rec))
+		})
 	}
 }
 
