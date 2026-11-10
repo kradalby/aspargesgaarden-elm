@@ -112,16 +112,25 @@ func TestIntakeLimits(t *testing.T) {
 	_, err = s.Intake(context.Background(), bytes.NewReader(b))
 	require.NoError(t, err)
 
-	small := filepath.Join(t.TempDir(), "small.png")
-	out, err := exec.Command("vips", "black", small, "479", "800").CombinedOutput()
-	require.NoError(t, err, string(out))
+	for _, tt := range []struct {
+		w, h string
+		want error
+	}{
+		{"479", "800", ErrTooSmall},
+		// 480 wide is the narrowest size, and WebP and AVIF stop at 16383.
+		{"480", "16384", ErrUnsupported},
+	} {
+		path := filepath.Join(t.TempDir(), "black.png")
+		out, err := exec.Command("vips", "black", path, tt.w, tt.h).CombinedOutput()
+		require.NoError(t, err, string(out))
 
-	f, err := os.Open(small)
-	require.NoError(t, err)
-	defer f.Close()
+		f, err := os.Open(path)
+		require.NoError(t, err)
 
-	_, err = s.Intake(context.Background(), f)
-	require.ErrorIs(t, err, ErrTooSmall)
+		_, err = s.Intake(context.Background(), f)
+		require.ErrorIs(t, err, tt.want, "%sx%s", tt.w, tt.h)
+		require.NoError(t, f.Close())
+	}
 }
 
 func TestIntakeDedup(t *testing.T) {

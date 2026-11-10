@@ -85,6 +85,13 @@ func (s *Store) Intake(ctx context.Context, r io.Reader) (Original, error) {
 	}
 
 	o := Original{SHA256: hex.EncodeToString(h.Sum(nil)), MIME: mime, Width: hdr.width, Height: hdr.height}
+	p := Photo{SHA256: o.SHA256, MIME: o.MIME, Width: o.Width, Height: o.Height}
+
+	// Even its narrowest size would be too tall for WebP and AVIF.
+	pv, ok := previewSpec(p)
+	if !ok {
+		return Original{}, fmt.Errorf("%w: %dx%d is too tall and narrow", ErrUnsupported, o.Width, o.Height)
+	}
 
 	if err := f.Sync(); err != nil {
 		return Original{}, fmt.Errorf("sync upload: %w", err)
@@ -98,8 +105,6 @@ func (s *Store) Intake(ctx context.Context, r io.Reader) (Original, error) {
 	// The preview is the full decode that proves the file is sound, and what
 	// the admin shows next, with the thumb its lists show. The row does not
 	// exist yet, so they are built here, not by the worker.
-	p := Photo{SHA256: o.SHA256, MIME: o.MIME, Width: o.Width, Height: o.Height}
-	pv, _ := previewSpec(p)
 	specs := []VariantSpec{pv}
 	if th, ok := thumbSpec(p); ok && th != pv {
 		specs = append(specs, th)

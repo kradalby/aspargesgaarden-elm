@@ -70,6 +70,29 @@ func (c *fakeCatalog) Photos(context.Context) ([]Photo, error) {
 	return slices.Collect(maps.Values(c.photos)), nil
 }
 
+// A poster or a long screenshot: no width whose height WebP or AVIF refuse,
+// in any format, so every <source> a page lists can be built.
+func TestGroupsTallPhoto(t *testing.T) {
+	p := Photo{SHA256: testSHA, MIME: "image/png", Width: 1100, Height: 17000}
+
+	gs := groups(p)
+	require.Len(t, gs, 1)
+	require.Equal(t, ladder(480, 800), func() []string {
+		out := make([]string, 0, len(gs[0].specs))
+		for _, s := range gs[0].specs {
+			out = append(out, fmt.Sprintf("%s/%d", s.Format, s.Width))
+		}
+
+		return out
+	}())
+
+	for _, s := range Expected(p) {
+		require.LessOrEqual(t, s.Kind.height(Rect{W: p.Width, H: p.Height}, s.Width), maxSide, s.Name())
+	}
+
+	require.Empty(t, groups(Photo{SHA256: testSHA, Width: 480, Height: 16384}))
+}
+
 func TestGroupsLadder(t *testing.T) {
 	card := Rect{X: 0, Y: 0, W: 1000, H: 1250}
 	banner := Rect{X: 0, Y: 0, W: 3000, H: 1687}

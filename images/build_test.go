@@ -7,6 +7,7 @@ import (
 	"image"
 	"image/color"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"testing"
 
@@ -203,6 +204,23 @@ func TestBuildSizes(t *testing.T) {
 
 		require.InDelta(t, s.Kind.height(r, s.Width), h, 1, s.Name())
 	}
+}
+
+// A photo taller than WebP and AVIF allow at its own width still gets every
+// size it lists, in every format.
+func TestBuildTall(t *testing.T) {
+	t.Parallel()
+	v := newTestVips(t)
+
+	orig := filepath.Join(t.TempDir(), "tall.png")
+	out, err := exec.Command("vips", "black", orig, "1000", "17000").CombinedOutput()
+	require.NoError(t, err, string(out))
+
+	hdr, err := v.preflight(t.Context(), orig, "image/png")
+	require.NoError(t, err)
+
+	p := Photo{SHA256: testSHA, MIME: "image/png", Width: hdr.width, Height: hdr.height}
+	require.Len(t, buildAll(t, v, p, orig, t.TempDir()), 6)
 }
 
 func TestBuildLeavesNothingOnFailure(t *testing.T) {

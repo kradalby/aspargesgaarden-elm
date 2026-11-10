@@ -5,9 +5,14 @@ import (
 	"fmt"
 	"math"
 	"regexp"
+	"slices"
 )
 
 var shaRE = regexp.MustCompile(`^[0-9a-f]{64}$`)
+
+// maxSide is the most pixels a WebP or AVIF file may have on a side; JPEG
+// allows 65535.
+const maxSide = 16383
 
 // Photo is what this package needs to know about one photo row.
 type Photo struct {
@@ -83,13 +88,18 @@ func groups(p Photo) []group {
 			ws, fs = []int{shareWidth}, []Format{JPEG}
 		}
 
+		// Every format must exist at every width a page offers.
+		ws = slices.DeleteFunc(ws, func(w int) bool { return k.height(r, w) > maxSide })
+
 		for _, f := range fs {
 			for _, w := range ws {
 				g.specs = append(g.specs, VariantSpec{Photo: p.SHA256, Kind: k, Crop: r.ID(), Width: w, Format: f})
 			}
 		}
 
-		out = append(out, g)
+		if len(g.specs) > 0 {
+			out = append(out, g)
+		}
 	}
 
 	return out
