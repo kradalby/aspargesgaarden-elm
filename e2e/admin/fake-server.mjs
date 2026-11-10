@@ -3,7 +3,7 @@
 // test only: no auth, no persistence, and a fake preview. The admin document
 // and its files come from Go (server/main.go), which passes the rest here.
 //
-//   node e2e/admin/fake-server.mjs --port 8097
+//   node e2e/admin/fake-server.mjs --port 18097
 //
 // Test hooks (not part of the contract): POST /__reset, POST /__touch/<id>.
 import { createServer } from "node:http";
@@ -16,7 +16,7 @@ const arg = (name, def) => {
   const i = process.argv.indexOf(`--${name}`);
   return i > 0 ? process.argv[i + 1] : def;
 };
-const port = Number(arg("port", 8097));
+const port = Number(arg("port", 18097));
 
 const MAX_UPLOAD = 40 * 1024 * 1024;
 const ASPECT = { card: 4 / 5, banner: 16 / 9, share: 1200 / 630 };

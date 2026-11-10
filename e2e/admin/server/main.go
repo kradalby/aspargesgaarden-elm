@@ -25,8 +25,8 @@ import (
 )
 
 func main() {
-	addr := flag.String("addr", "127.0.0.1:8096", "listen address")
-	fake := flag.String("fake", "http://127.0.0.1:8097", "the fake admin API")
+	addr := flag.String("addr", "127.0.0.1:18096", "listen address")
+	fake := flag.String("fake", "http://127.0.0.1:18097", "the fake admin API")
 	flag.Parse()
 
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)

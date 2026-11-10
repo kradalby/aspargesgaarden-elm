@@ -14,7 +14,7 @@ set -euo pipefail
 root=$(cd "$(dirname "$0")/../.." && pwd)
 here=$root/e2e/admin
 out=${OUT:-$here/out}
-port=${PORT:-8096}
+port=${PORT:-18096}
 cd "$root"
 
 tools=$(nix build --impure --no-link --print-out-paths -f "$here/tools.nix" playwright node)
