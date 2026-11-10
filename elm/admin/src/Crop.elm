@@ -4,12 +4,11 @@ module Crop exposing
     , Thumb
     , aspectString
     , kinds
-    , minWidth
     , nudge
     , rectString
     , resize
     , thumb
-    , tooSmallForShare
+    , usable
     )
 
 {-| The three crops every main photo carries, and the rectangle arithmetic
@@ -28,14 +27,21 @@ type alias Kind =
     , usedFor : String
     , ratioW : Int
     , ratioH : Int
+
+    -- The narrowest crop the server takes for the kind, in source pixels.
+    , minWidth : Int
     }
 
 
+{-| The minimum widths are the server's (images.Kind.MinWidth): a card needs
+the smallest size the site makes, a banner is soft under 800, and a share
+image is always 1200 wide and never upscaled.
+-}
 kinds : List Kind
 kinds =
-    [ Kind "card" "Listen" "I listen over arrangementer" 4 5
-    , Kind "banner" "Toppen" "Øverst på siden til arrangementet" 16 9
-    , Kind "share" "Deling" "Når noen deler lenken, for eksempel på Facebook" 1200 630
+    [ Kind "card" "Listen" "I listen over arrangementer" 4 5 480
+    , Kind "banner" "Toppen" "Øverst på siden til arrangementet" 16 9 800
+    , Kind "share" "Deling" "Når noen deler lenken, for eksempel på Facebook" 1200 630 1200
     ]
 
 
@@ -58,11 +64,21 @@ rectString r =
     String.join "," (List.map String.fromInt [ r.x, r.y, r.w, r.h ])
 
 
-{-| The smallest width the server accepts for a crop (its smallest output).
+{-| Whether the photo is large enough for the kind at all. The server keeps
+no crop of a kind a photo is too small for (the page then uses another
+picture), so the dialog offers none.
 -}
-minWidth : Int
-minWidth =
-    480
+usable : Kind -> Size -> Bool
+usable kind photo =
+    let
+        centredWidth =
+            if photo.width * kind.ratioH > photo.height * kind.ratioW then
+                photo.height * kind.ratioW // kind.ratioH
+
+            else
+                photo.width
+    in
+    centredWidth >= kind.minWidth
 
 
 {-| Moves the frame by dx, dy steps of a twentieth of its own size, kept
@@ -81,7 +97,8 @@ nudge photo dx dy r =
 
 
 {-| Scales the frame around its centre by factor, keeping the kind's shape,
-at least minWidth wide (or the whole photo, if smaller) and inside the photo.
+at least the kind's minimum width (or the whole photo, if smaller) and
+inside the photo.
 -}
 resize : Kind -> Size -> Float -> Rect -> Rect
 resize kind photo factor r =
@@ -91,7 +108,7 @@ resize kind photo factor r =
 
         wanted =
             round (toFloat r.w * factor)
-                |> max (min minWidth photo.width)
+                |> max (min kind.minWidth photo.width)
                 |> min photo.width
 
         ( w, h ) =
@@ -133,11 +150,3 @@ thumb photo boxWidth r =
     , left = -(toFloat r.x * s)
     , top = -(toFloat r.y * s)
     }
-
-
-{-| Facebook shows the share image at 1200 px wide; a smaller crop still
-works but looks soft there.
--}
-tooSmallForShare : Rect -> Bool
-tooSmallForShare r =
-    r.w < 1200

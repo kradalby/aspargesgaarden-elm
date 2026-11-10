@@ -449,15 +449,23 @@ deleteEvent id toMsg =
 
 
 {-| The page as the server renders it from the unsaved input; view is "page"
-or "list".
+or "list", id the saved event being edited (its frozen address, and its
+place in the list).
 -}
-preview : String -> EventInput -> (Result Error String -> msg) -> Cmd msg
-preview view input toMsg =
+preview : String -> Maybe Int -> EventInput -> (Result Error String -> msg) -> Cmd msg
+preview view id input toMsg =
     Http.request
         { method = "POST"
         , headers = []
         , url = base ++ "preview"
-        , body = Http.jsonBody (E.object [ ( "view", E.string view ), ( "event", encodeEventInput input ) ])
+        , body =
+            Http.jsonBody
+                (E.object
+                    (( "view", E.string view )
+                        :: ( "event", encodeEventInput input )
+                        :: (id |> Maybe.map (\i -> [ ( "id", E.int i ) ]) |> Maybe.withDefault [])
+                    )
+                )
         , expect =
             Http.expectStringResponse toMsg <|
                 \response ->

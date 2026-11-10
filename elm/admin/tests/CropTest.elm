@@ -13,7 +13,12 @@ photo =
 
 banner : Crop.Kind
 banner =
-    { key = "banner", name = "", usedFor = "", ratioW = 16, ratioH = 9 }
+    { key = "banner", name = "", usedFor = "", ratioW = 16, ratioH = 9, minWidth = 800 }
+
+
+share : Crop.Kind
+share =
+    { key = "share", name = "", usedFor = "", ratioW = 1200, ratioH = 630, minWidth = 1200 }
 
 
 inside : Crop.Size -> { x : Int, y : Int, w : Int, h : Int } -> Bool
@@ -38,11 +43,11 @@ suite =
             \_ ->
                 Crop.resize banner photo 0.5 { x = 0, y = 375, w = 4000, h = 2250 }
                     |> Expect.equal { x = 1000, y = 938, w = 2000, h = 1125 }
-        , test "resize never goes below the smallest output" <|
+        , test "resize never goes below the kind's minimum" <|
             \_ ->
                 Crop.resize banner photo 0.01 { x = 0, y = 375, w = 4000, h = 2250 }
                     |> .w
-                    |> Expect.equal Crop.minWidth
+                    |> Expect.equal 800
         , fuzz2 (Fuzz.floatRange 0.2 3) (Fuzz.intRange 0 2000) "resize always stays inside the photo with the right shape" <|
             \factor x ->
                 let
@@ -58,8 +63,15 @@ suite =
             \_ ->
                 Crop.thumb photo 200 { x = 1000, y = 500, w = 2000, h = 1000 }
                     |> Expect.equal { boxHeight = 100, imgWidth = 400, imgHeight = 300, left = -100, top = -50 }
-        , test "share warning below Facebook's width" <|
+        , test "a photo under 1200 wide has no share crop, as the server says" <|
             \_ ->
-                ( Crop.tooSmallForShare { x = 0, y = 0, w = 1199, h = 630 }, Crop.tooSmallForShare { x = 0, y = 0, w = 1200, h = 630 } )
-                    |> Expect.equal ( True, False )
+                [ { width = 1199, height = 2000 }, { width = 1200, height = 630 }, { width = 3000, height = 629 } ]
+                    |> List.map (Crop.usable share)
+                    |> Expect.equal [ False, True, False ]
+        , test "a banner needs 800 across its centred crop" <|
+            \_ ->
+                -- 1000x400: the 16:9 crop is 711 wide, cut by the height.
+                [ { width = 1000, height = 600 }, { width = 1000, height = 400 } ]
+                    |> List.map (Crop.usable banner)
+                    |> Expect.equal [ True, False ]
         ]

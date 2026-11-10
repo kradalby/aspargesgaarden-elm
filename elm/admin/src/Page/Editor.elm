@@ -449,7 +449,7 @@ schedulePreview ( model, cmd ) =
 
 requestPreview : Model -> Cmd Msg
 requestPreview model =
-    Api.preview model.preview.view (Form.toInput "" model.form) (GotPreview model.preview.seq)
+    Api.preview model.preview.view model.id (Form.toInput "" model.form) (GotPreview model.preview.seq)
 
 
 load : Event -> Model -> Model
@@ -1112,11 +1112,7 @@ mainPhotoView model =
 
                           else
                             text ""
-                        , if Dict.get "share" photo.crops |> Maybe.map Crop.tooSmallForShare |> Maybe.withDefault False then
-                            Ui.help [] "Bildet er litt lite til deling på Facebook og kan se uskarpt ut der. Det går fint å bruke det likevel."
-
-                          else
-                            text ""
+                        , smallPhotoNote photo
                         , altField model ref
                         , Photos.photographerField { photoId = ref.id, selected = ref.photographerId, onSelect = SetPhotographer ref.id, toMsg = PhotosMsg } model.photos
                         ]
@@ -1136,6 +1132,38 @@ mainPhotoView model =
             )
         , div [ class "flex flex-col gap-2" ] (List.map (Photos.uploadRow PhotosMsg) (Photos.uploadsFor "main" model.photos))
         ]
+
+
+{-| What a photo too small for a crop kind gets instead, said once beside
+the photo; the crop dialog says it again where she would look for it.
+-}
+smallPhotoNote : Photo -> Html Msg
+smallPhotoNote photo =
+    let
+        size =
+            { width = photo.width, height = photo.height }
+
+        missing =
+            List.filter (\k -> not (Crop.usable k size)) Crop.kinds
+    in
+    if List.isEmpty missing then
+        text ""
+
+    else
+        div [ class "flex flex-col gap-1" ] (List.map (\k -> Ui.help [] (fallbackText k)) missing)
+
+
+fallbackText : Crop.Kind -> String
+fallbackText kind =
+    case kind.key of
+        "share" ->
+            "Bildet er under 1200 punkter bredt, så det får ikke eget bilde for deling på Facebook. Da brukes bildet fra toppen av siden. Det går fint."
+
+        "banner" ->
+            "Bildet er for lite til toppen av siden (under 800 punkter bredt), så der vises det uten beskjæring."
+
+        _ ->
+            "Bildet er for lite til listen (under 480 punkter bredt), så der vises det uten beskjæring."
 
 
 altField : Model -> PhotoRef -> Html Msg
@@ -1301,7 +1329,7 @@ cropDialog model =
                     { width = photo.width, height = photo.height }
 
                 current =
-                    List.filter (\k -> k.key == c.kind) Crop.kinds |> List.head |> Maybe.withDefault { key = "card", name = "", usedFor = "", ratioW = 4, ratioH = 5 }
+                    List.filter (\k -> k.key == c.kind) Crop.kinds |> List.head |> Maybe.withDefault { key = "card", name = "", usedFor = "", ratioW = 4, ratioH = 5, minWidth = 480 }
 
                 cropErrors =
                     case c.error of
@@ -1391,48 +1419,53 @@ cropChoice photo c kind =
 
         px v =
             String.fromFloat v ++ "px"
-    in
-    Html.button
-        [ A.type_ "button"
-        , onClick (CropKind kind.key)
-        , attribute "aria-pressed"
-            (if c.kind == kind.key then
-                "true"
 
-             else
-                "false"
-            )
-        , class "flex flex-col gap-2 items-start text-left p-2 rounded-lg border-2 border-transparent aria-pressed:border-sort aria-pressed:bg-brown/20 hover:bg-brown/10 focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-sort"
-        ]
-        [ div [ class "relative overflow-hidden rounded bg-kalk/40 shrink-0", style "width" (px boxWidth), style "height" (px t.boxHeight) ]
-            [ img
-                [ A.src photo.previewUrl
-                , A.alt ""
-                , class "absolute max-w-none"
-                , style "width" (px t.imgWidth)
-                , style "height" (px t.imgHeight)
-                , style "left" (px t.left)
-                , style "top" (px t.top)
+        picture =
+            div [ class "relative overflow-hidden rounded bg-kalk/40 shrink-0", style "width" (px boxWidth), style "height" (px t.boxHeight) ]
+                [ img
+                    [ A.src photo.previewUrl
+                    , A.alt ""
+                    , class "absolute max-w-none"
+                    , style "width" (px t.imgWidth)
+                    , style "height" (px t.imgHeight)
+                    , style "left" (px t.left)
+                    , style "top" (px t.top)
+                    ]
+                    []
                 ]
-                []
-            ]
-        , span [ class "font-bold" ]
-            [ text
-                (kind.usedFor
-                    ++ (if c.kind == kind.key then
-                            " (endres nå)"
+    in
+    if Crop.usable kind { width = photo.width, height = photo.height } then
+        Html.button
+            [ A.type_ "button"
+            , onClick (CropKind kind.key)
+            , attribute "aria-pressed"
+                (if c.kind == kind.key then
+                    "true"
 
-                        else
-                            ""
-                       )
+                 else
+                    "false"
                 )
+            , class "flex flex-col gap-2 items-start text-left p-2 rounded-lg border-2 border-transparent aria-pressed:border-sort aria-pressed:bg-brown/20 hover:bg-brown/10 focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-sort"
             ]
-        , if kind.key == "share" && Crop.tooSmallForShare r then
-            span [ class "text-sm" ] [ text "Litt lite for Facebook – kan se uskarpt ut der." ]
+            [ picture
+            , span [ class "font-bold" ]
+                [ text
+                    (kind.usedFor
+                        ++ (if c.kind == kind.key then
+                                " (endres nå)"
 
-          else
-            text ""
-        ]
+                            else
+                                ""
+                           )
+                    )
+                ]
+            ]
+
+    else
+        div [ class "flex flex-col gap-2 items-start p-2", attribute "data-crop-unusable" kind.key ]
+            [ span [ class "font-bold" ] [ text kind.usedFor ]
+            , Ui.help [] (fallbackText kind)
+            ]
 
 
 rectDecoder : D.Decoder Rect

@@ -16,6 +16,7 @@ import Page.Gallery as Gallery
 import Page.Overview as Overview
 import Route exposing (Route)
 import Task
+import Text
 import Ui
 import Url exposing (Url)
 import Venue
@@ -35,6 +36,10 @@ type alias Model =
     , leave : Maybe Url
     , leaving : Bool
     , dirty : Bool
+
+    -- Why the server will not let this person in, in words; the screens
+    -- give way to it, since every request would fail the same way.
+    , denied : Maybe String
     }
 
 
@@ -74,7 +79,7 @@ init _ url key =
         ( page, cmd ) =
             pageFor (Route.fromUrl url)
     in
-    ( { key = key, url = url, me = Nothing, page = page, leave = Nothing, leaving = False, dirty = False }
+    ( { key = key, url = url, me = Nothing, page = page, leave = Nothing, leaving = False, dirty = False, denied = Nothing }
     , Cmd.batch [ cmd, Api.getMe GotMe ]
     )
 
@@ -181,6 +186,14 @@ update msg model =
         ( GotMe (Ok me), _ ) ->
             ( { model | me = Just me }, Cmd.none )
 
+        ( GotMe (Err (Api.Problems ps)), _ ) ->
+            case List.filter (\p -> p.code == "forbidden" || p.code == "wrong_host") ps of
+                p :: _ ->
+                    ( { model | denied = Just (Text.problem p) }, Cmd.none )
+
+                [] ->
+                    ( model, Cmd.none )
+
         ( GotMe (Err _), _ ) ->
             ( model, Cmd.none )
 
@@ -270,20 +283,27 @@ view model =
             [ a [ A.href "#innhold", class "sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-50 focus:bg-white focus:p-3 focus:rounded-lg" ] [ text "Hopp til innholdet" ]
             , siteHeader model
             , main_ [ A.id "innhold", A.tabindex -1, class "max-w-7xl mx-auto px-4 md:px-8 py-6 md:py-10 focus:outline-none" ]
-                [ case model.page of
-                    NotFound ->
+                [ case ( model.denied, model.page ) of
+                    ( Just why, _ ) ->
+                        div [ class "flex flex-col gap-4 max-w-2xl" ]
+                            [ Ui.h1 "Ingen tilgang"
+                            , p [ A.attribute "role" "alert", class "text-xl" ] [ text why ]
+                            , p [] [ text "Du kan fortsatt se nettsiden som vanlig." ]
+                            ]
+
+                    ( Nothing, NotFound ) ->
                         div [ class "flex flex-col gap-4" ]
                             [ Ui.h1 "Fant ikke siden"
                             , a [ Route.href Route.Overview, class "underline font-bold" ] [ text "Til arrangementene" ]
                             ]
 
-                    Overview m ->
+                    ( Nothing, Overview m ) ->
                         Html.map OverviewMsg (Overview.view m)
 
-                    Editor m ->
+                    ( Nothing, Editor m ) ->
                         Html.map EditorMsg (Editor.view m)
 
-                    Gallery m ->
+                    ( Nothing, Gallery m ) ->
                         Html.map GalleryMsg (Gallery.view m)
                 ]
             , leaveDialog model

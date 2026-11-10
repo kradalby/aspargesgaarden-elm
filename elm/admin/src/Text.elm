@@ -1,4 +1,4 @@
-module Text exposing (error, photoFailure, problem, uploadFailure)
+module Text exposing (error, noAccess, photoFailure, problem, uploadFailure)
 
 {-| Every message the user reads about something that went wrong, in plain
 bokmål. The server sends codes only (docs/admin-api.md), so this is the one
@@ -77,6 +77,18 @@ problem p =
         ( "crop_aspect", _ ) ->
             "Rammen har feil form. Trykk «Avbryt» og prøv igjen."
 
+        ( "conflict", _ ) ->
+            "Noen andre har lagret endringer her mens du jobbet."
+
+        ( "forbidden", _ ) ->
+            noAccess
+
+        ( "wrong_host", _ ) ->
+            "Administrasjonen må åpnes fra sin egen adresse. Bruk lenken du har fått, ikke en kopi av siden."
+
+        ( "cross_origin", _ ) ->
+            "Endringen kom ikke fra administrasjonen selv, så den ble stoppet. Last inn siden på nytt og prøv igjen."
+
         _ ->
             uploadFailure p.code
 
@@ -98,8 +110,18 @@ uploadFailure code =
         "too_small" ->
             "Bildet er for lite (under 480 punkter bredt). Velg et større bilde."
 
+        "too_many_pixels" ->
+            "Bildet har for mange punkter til at nettsiden kan behandle det (over 100 millioner). Lagre det i mindre størrelse, og prøv igjen."
+
         _ ->
             "Noe gikk galt på serveren. Prøv igjen om litt."
+
+
+{-| For someone the tailnet does not let into the admin.
+-}
+noAccess : String
+noAccess =
+    "Du har ikke tilgang til administrasjonen. Be Kristoffer om å gi deg tilgang."
 
 
 {-| Why the server gave up preparing a photo's sizes.

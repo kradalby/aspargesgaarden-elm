@@ -268,7 +268,20 @@ update msg model =
         Uploaded key result ->
             case ( List.filter (\u -> u.key == key) model.uploads, result ) of
                 ( [ u ], Ok photo ) ->
-                    ( add [ photo ] { model | uploads = List.filter (\x -> x.key /= key) model.uploads, announce = File.name u.file ++ " er lastet opp. Bildet klargjøres nå." }
+                    -- A photo the server has seen before can be ready at once,
+                    -- so the words follow its state, not the steps it skipped.
+                    ( add [ photo ]
+                        { model
+                            | uploads = List.filter (\x -> x.key /= key) model.uploads
+                            , announce =
+                                File.name u.file
+                                    ++ (if photo.status.state == "ready" then
+                                            " er lastet opp, og bildet er klart."
+
+                                        else
+                                            " er lastet opp. Bildet klargjøres nå."
+                                       )
+                        }
                     , Cmd.none
                     , [ Added u.slot photo ]
                     )
