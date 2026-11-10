@@ -64,6 +64,9 @@
           vendorHash = hashes.vendor.sri;
           goPkg = pkgs.go_latest;
           subPackages = [ "cmd/asparges" ];
+          # db/db.go embeds schema.sql; flake-checks' source filter keeps only
+          # .go files, so the schema has to be added by hand.
+          extraSrc = [ ./db/schema.sql ];
 
           prettier = true;
           # Pulls .elm into the formatting check's source, so elm-format sees
@@ -131,6 +134,19 @@
           gotest = fc.goTest (common // { goRace = true; });
           golangci-lint = fc.goLint common;
           formatting = fc.goFormat common;
+          # db/dbsqlc is sqlc output with no //go:generate directive, so the
+          # drift check runs sqlc itself over the config, schema and queries.
+          generate = fc.goGenerate (
+            common
+            // {
+              extraSrc = common.extraSrc ++ [
+                ./sqlc.yaml
+                ./db/queries
+              ];
+              nativeCheckInputs = [ pkgs.sqlc ];
+              generateCommand = "sqlc generate";
+            }
+          );
         }
         # NixOS module evaluation needs a Linux system.
         // lib.optionalAttrs pkgs.stdenv.hostPlatform.isLinux {
