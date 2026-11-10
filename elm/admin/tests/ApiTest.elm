@@ -1,0 +1,119 @@
+module ApiTest exposing (suite)
+
+import Api
+import Dict
+import Expect
+import Json.Decode as D
+import Json.Encode as E
+import Test exposing (Test, describe, test)
+
+
+photoJson : String
+photoJson =
+    """
+    { "id": 12, "width": 4032, "height": 3024, "alt": "Låven",
+      "photographer": { "id": 3, "name": "Ola", "url": "" },
+      "previewUrl": "/img/p.jpg", "thumbUrl": "/img/t.jpg",
+      "crops": { "card": { "x": 1012, "y": 0, "w": 2419, "h": 3024 } },
+      "status": { "state": "preparing", "done": 12, "total": 46, "previewReady": true, "reason": "" } }
+    """
+
+
+eventJson : String
+eventJson =
+    """
+    { "id": 7, "status": "draft", "slug": "julemarked", "slugFrozen": false, "year": 2026,
+      "path": "/arrangementer/2026/julemarked", "url": "https://aspargesgaarden.no/arrangementer/2026/julemarked",
+      "dateText": "14. november 2026 på Aspargesgården", "isOver": false,
+      "title": "Julemarked", "summary": "", "body": "## Hei", "start": "2026-11-14", "startTime": "12:00",
+      "end": "", "endTime": "", "extraDates": ["2026-11-21"], "priceText": "", "ticketUrl": "",
+      "showInMenu": true, "menuLabel": "", "cancelled": false,
+      "mainPhoto": """ ++ photoJson ++ """, "extraPhotos": [],
+      "publishedAt": null, "createdAt": "2026-11-01T10:00:00Z", "updatedAt": "2026-11-10T09:12:44Z" }
+    """
+
+
+suite : Test
+suite =
+    describe "Api"
+        [ test "decodes a photo with its status and crops" <|
+            \_ ->
+                D.decodeString Api.photoDecoder photoJson
+                    |> Result.map (\p -> ( p.status.done, p.status.previewReady, Dict.get "card" p.crops |> Maybe.map .w ))
+                    |> Expect.equal (Ok ( 12, True, Just 2419 ))
+        , test "decodes an event as documented" <|
+            \_ ->
+                D.decodeString Api.eventDecoder eventJson
+                    |> Result.map (\e -> ( e.updatedAt, e.extraDates, Maybe.map .id e.mainPhoto ))
+                    |> Expect.equal (Ok ( "2026-11-10T09:12:44Z", [ "2026-11-21" ], Just 12 ))
+        , describe "errors"
+            [ test "several rule errors at once, with field and photo" <|
+                \_ ->
+                    D.decodeString (Api.errorDecoder 422)
+                        """{"errors":[{"code":"title_required","field":"title"},{"code":"alt_required","field":"mainPhoto","photoId":12}]}"""
+                        |> Expect.equal
+                            (Ok
+                                (Api.Problems
+                                    [ { code = "title_required", field = Just "title", photoId = Nothing }
+                                    , { code = "alt_required", field = Just "mainPhoto", photoId = Just 12 }
+                                    ]
+                                )
+                            )
+            , test "a conflict carries the stored event" <|
+                \_ ->
+                    case D.decodeString (Api.errorDecoder 409) ("""{"errors":[{"code":"conflict"}],"current":""" ++ eventJson ++ "}") of
+                        Ok (Api.Conflict e) ->
+                            Expect.equal e.id 7
+
+                        other ->
+                            Expect.fail (Debug.toString other)
+            , test "a photo in use lists its events" <|
+                \_ ->
+                    D.decodeString (Api.errorDecoder 409) """{"errors":[{"code":"photo_in_use"}],"usedBy":[{"id":7,"title":"Julemarked"}]}"""
+                        |> Expect.equal (Ok (Api.PhotoInUse [ { id = 7, title = "Julemarked" } ]))
+            , test "a taken name offers the existing photographer" <|
+                \_ ->
+                    D.decodeString (Api.errorDecoder 409) """{"errors":[{"code":"photographer_name_taken","field":"name"}],"existing":{"id":3,"name":"Ola","url":""}}"""
+                        |> Expect.equal (Ok (Api.NameTaken { id = 3, name = "Ola", url = "" }))
+            , test "an empty list is not an error the app understands" <|
+                \_ ->
+                    D.decodeString (Api.errorDecoder 500) """{"errors":[]}""" |> Expect.err
+            ]
+        , test "encodes the input with every documented key" <|
+            \_ ->
+                Api.encodeEventInput
+                    { updatedAt = "t"
+                    , slug = ""
+                    , title = "T"
+                    , summary = ""
+                    , body = ""
+                    , start = "2026-11-14"
+                    , startTime = ""
+                    , end = ""
+                    , endTime = ""
+                    , extraDates = []
+                    , priceText = ""
+                    , ticketUrl = ""
+                    , showInMenu = False
+                    , menuLabel = ""
+                    , cancelled = False
+                    , mainPhoto = Just { id = 12, alt = "Låven", photographerId = Nothing }
+                    , extraPhotos = []
+                    }
+                    |> E.encode 0
+                    |> D.decodeString (D.keyValuePairs D.value)
+                    |> Result.map (List.map Tuple.first >> List.sort)
+                    |> Expect.equal
+                        (Ok
+                            (List.sort
+                                [ "updatedAt", "slug", "title", "summary", "body", "start", "startTime", "end", "endTime", "extraDates", "priceText", "ticketUrl", "showInMenu", "menuLabel", "cancelled", "mainPhoto", "extraPhotos" ]
+                            )
+                        )
+        , test "a photo reference without a photographer sends null" <|
+            \_ ->
+                Api.encodeEventInput
+                    { updatedAt = "", slug = "", title = "", summary = "", body = "", start = "", startTime = "", end = "", endTime = "", extraDates = [], priceText = "", ticketUrl = "", showInMenu = False, menuLabel = "", cancelled = False, mainPhoto = Just { id = 12, alt = "", photographerId = Nothing }, extraPhotos = [] }
+                    |> E.encode 0
+                    |> D.decodeString (D.at [ "mainPhoto", "photographerId" ] (D.null "none"))
+                    |> Expect.equal (Ok "none")
+        ]
