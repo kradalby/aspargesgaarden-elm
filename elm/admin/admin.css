@@ -1,0 +1,76 @@
+/* Stand-in for the site's Tailwind build until the admin is wired into it:
+   the same theme as the site's input.css, scanning only the admin's Elm. */
+@import "tailwindcss" source(none);
+
+@source "./src/**/*.elm";
+
+@custom-variant hover (&:hover);
+
+@theme {
+  --color-*: initial;
+  --color-black: #000;
+  --color-white: #fff;
+  --color-gray-200: #e5e7eb;
+  --color-gray-500: #6b7280;
+  --color-gray-600: #4b5563;
+
+  --color-brown: #b7a8a2;
+  --color-brown-border: #b6a7a1;
+  --color-brown-link: #9c8d87;
+  --color-brown-link-active: #e0c3bc;
+  --color-brown-text: #757471;
+  --color-sort: #211f1e;
+  --color-lys-eukalyptus: #b4c0bd;
+  --color-mork-eukalyptus: #4a5348;
+  --color-mose: #647048;
+  --color-asparges: #8f9873;
+  --color-kalk: #cac3b5;
+  --color-tre: #9f856b;
+  --color-rust: #835f40;
+
+  --font-sans: "Avenir", sans-serif;
+  --font-display: "Cardillac", cursive;
+}
+
+@font-face {
+  font-family: "Avenir";
+  src: url("/static/fonts/AvenirLTStd-Medium.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Avenir";
+  src: url("/static/fonts/AvenirLTStd-Heavy.woff2") format("woff2");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Avenir";
+  src: url("/static/fonts/AvenirLTStd-MediumOblique.woff2") format("woff2");
+  font-weight: 400;
+  font-style: italic;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Cardillac";
+  src: url("/static/fonts/Hoftype-Cardillac.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@layer base {
+  *,
+  ::after,
+  ::before,
+  ::backdrop,
+  ::file-selector-button {
+    border-color: var(--color-gray-200, currentColor);
+  }
+  button:not(:disabled),
+  [role="button"]:not(:disabled) {
+    cursor: pointer;
+  }
+}
