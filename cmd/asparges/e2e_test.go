@@ -2,12 +2,15 @@ package main
 
 import (
 	"context"
+	"encoding/json"
+	"io"
 	"log/slog"
 	"net"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -44,34 +47,39 @@ func TestE2EHooks(t *testing.T) {
 	srv := server.New(server.Config{BaseURL: "http://127.0.0.1:8090", Dev: true, Store: store, Images: imgs, Now: clock.now})
 	hooks := e2eHooks(store, imgs, srv, fixtures, clock)
 
-	post := func(path string) int {
+	post := func(path string, body io.Reader) *httptest.ResponseRecorder {
 		rec := httptest.NewRecorder()
-		req := httptest.NewRequestWithContext(t.Context(), http.MethodPost, path, nil)
+		req := httptest.NewRequestWithContext(t.Context(), http.MethodPost, path, body)
 		req.Host = "127.0.0.1:8090"
 		hooks.ServeHTTP(rec, req)
 
-		return rec.Code
+		return rec
 	}
 
 	// Twice: the second reset starts from the first one's leftovers and an
-	// extra event, and lands on the same ids.
+	// extra event, and names the rows it made.
+	var seed e2eSeed
+
 	for range 2 {
 		_, err := store.CreateEvent(t.Context(), site.Event{Title: "Rester"})
 		require.NoError(t, err)
-		require.Equal(t, http.StatusNoContent, post("/__reset"))
+
+		rec := post("/__reset", nil)
+		require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+		require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &seed))
 
 		events, err := store.Events(t.Context())
 		require.NoError(t, err)
 		require.Len(t, events, 1)
-		require.EqualValues(t, 4, events[0].ID)
+		require.Equal(t, seed.Course, events[0].ID)
 		require.Equal(t, site.Published, events[0].Status)
-		require.EqualValues(t, 2, events[0].MainPhoto.ID)
+		require.Equal(t, seed.Portrett, events[0].MainPhoto.ID)
 
 		gallery, err := store.Gallery(t.Context())
 		require.NoError(t, err)
 		require.Len(t, gallery, 2)
-		require.EqualValues(t, 1, gallery[0].ID)
-		require.EqualValues(t, 3, gallery[0].Photographer.ID)
+		require.Equal(t, seed.Landskap, gallery[0].ID)
+		require.Equal(t, seed.Photographer, gallery[0].Photographer.ID)
 		require.Equal(t, "Ola Nordmann", gallery[0].Photographer.Name)
 
 		photographers, err := store.Photographers(t.Context())
@@ -79,24 +87,23 @@ func TestE2EHooks(t *testing.T) {
 		require.Len(t, photographers, 1)
 	}
 
-	before, err := store.Event(t.Context(), 4)
+	course := strconv.FormatInt(seed.Course, 10)
+
+	before, err := store.Event(t.Context(), seed.Course)
 	require.NoError(t, err)
 
-	require.Equal(t, http.StatusNoContent, post("/__touch/4"))
+	require.Equal(t, http.StatusNoContent, post("/__touch/"+course, nil).Code)
 
-	after, err := store.Event(t.Context(), 4)
+	after, err := store.Event(t.Context(), seed.Course)
 	require.NoError(t, err)
 	require.GreaterOrEqual(t, after.UpdatedAt.Sub(before.UpdatedAt), time.Second, "a second editor is always seen")
 	require.Equal(t, before.PriceText, after.PriceText)
 
 	// An old import's banner, under today's floor of 800.
-	rec := httptest.NewRecorder()
-	req := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/__crop/2", strings.NewReader(`{"banner":{"x":0,"y":0,"w":700,"h":394}}`))
-	req.Host = "127.0.0.1:8090"
-	hooks.ServeHTTP(rec, req)
+	rec := post("/__crop/"+strconv.FormatInt(seed.Portrett, 10), strings.NewReader(`{"banner":{"x":0,"y":0,"w":700,"h":394}}`))
 	require.Equal(t, http.StatusNoContent, rec.Code, rec.Body.String())
 
-	p, err := store.Photo(t.Context(), 2)
+	p, err := store.Photo(t.Context(), seed.Portrett)
 	require.NoError(t, err)
 	require.Equal(t, images.Rect{X: 0, Y: 0, W: 700, H: 394}, p.Crops[images.Banner])
 
@@ -115,7 +122,7 @@ func TestE2EHooks(t *testing.T) {
 		require.Equal(t, http.StatusForbidden, rec.Code, name)
 	}
 
-	kept, err := store.Event(t.Context(), 4)
+	kept, err := store.Event(t.Context(), seed.Course)
 	require.NoError(t, err)
 	require.Equal(t, after.CreatedAt, kept.CreatedAt, "a refused reset changed nothing")
 }

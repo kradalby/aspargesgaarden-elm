@@ -53,23 +53,25 @@ func (c *e2eClock) advance(d time.Duration) {
 
 // e2eHooks answers the admin browser tests' hooks (the front end's e2e/),
 // so they run against the real server: POST /__reset replaces everything
-// with their seed data, POST /__touch/{id} saves an event as a second
-// editor would, POST /__crop/{id} stores crops unchecked. Only
-// `serve --dev --e2e-fixtures` mounts them, and like the admin they answer
-// only to a loopback Host and never to a write from another origin, so no
-// page open in the developer's browser can wipe the data.
+// with their seed data and answers its ids (e2eSeed), POST /__touch/{id}
+// saves an event as a second editor would, POST /__crop/{id} stores crops
+// unchecked. Only `serve --dev --e2e-fixtures` mounts them, and like the
+// admin they answer only to a loopback Host and never to a write from
+// another origin, so no page open in the developer's browser can wipe the
+// data.
 func e2eHooks(store *site.Store, imgs *images.Store, srv *server.Server, fixtures string, clock *e2eClock) http.Handler {
 	mux := http.NewServeMux()
 
 	mux.HandleFunc("POST /__reset", func(w http.ResponseWriter, r *http.Request) {
-		shas, err := e2eReset(r.Context(), store, imgs, fixtures)
+		seed, shas, err := e2eReset(r.Context(), store, imgs, fixtures)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
 
 		srv.Changed(shas...)
-		w.WriteHeader(http.StatusNoContent)
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(seed)
 	})
 
 	mux.HandleFunc("POST /__touch/{id}", func(w http.ResponseWriter, r *http.Request) {
@@ -135,67 +137,45 @@ func e2eHooks(store *site.Store, imgs *images.Store, srv *server.Server, fixture
 	}))
 }
 
+// e2eSeed names the rows a reset makes, so the tests need not guess ids.
+type e2eSeed struct {
+	Landskap     int64 `json:"landskap"`
+	Portrett     int64 `json:"portrett"`
+	Photographer int64 `json:"photographer"`
+	Course       int64 `json:"course"`
+}
+
 // e2eReset deletes every event, photo and photographer and puts in the
-// fake server's seed: photos 1 and 2 (both in the gallery), photographer 3
-// on photo 1, and event 4, a published course over on 31 October with
-// photo 2. The tests address them by those ids, which the fake hands out
-// from one counter; SQLite counts per table from the highest id in use, so
-// placeholders hold the lower ids while the seed rows are made.
-func e2eReset(ctx context.Context, store *site.Store, imgs *images.Store, fixtures string) ([]string, error) {
+// browser tests' seed: landskap and portrett (both in the gallery),
+// photographer Ola Nordmann on landskap, and a published course over on
+// 31 October with portrett.
+func e2eReset(ctx context.Context, store *site.Store, imgs *images.Store, fixtures string) (e2eSeed, []string, error) {
 	if err := e2eWipe(ctx, store); err != nil {
-		return nil, fmt.Errorf("wipe: %w", err)
+		return e2eSeed{}, nil, fmt.Errorf("wipe: %w", err)
 	}
 
 	landskap, err := e2ePhoto(ctx, store, imgs, filepath.Join(fixtures, "landskap.jpg"), "Boder med julepynt i låven")
 	if err != nil {
-		return nil, err
+		return e2eSeed{}, nil, err
 	}
 
 	portrett, err := e2ePhoto(ctx, store, imgs, filepath.Join(fixtures, "portrett.jpg"), "Kursholder ved kjøkkenbenken")
 	if err != nil {
-		return nil, err
-	}
-
-	var placeholders []site.Photographer
-
-	for i := range 2 {
-		p, err := store.CreatePhotographer(ctx, site.Photographer{Name: fmt.Sprintf("e2e plassholder %d", i)})
-		if err != nil {
-			return nil, err
-		}
-
-		placeholders = append(placeholders, p)
+		return e2eSeed{}, nil, err
 	}
 
 	ola, err := store.CreatePhotographer(ctx, site.Photographer{Name: "Ola Nordmann", URL: "https://example.no"})
 	if err != nil {
-		return nil, err
-	}
-
-	for _, p := range placeholders {
-		if err := store.DeletePhotographer(ctx, p.ID); err != nil {
-			return nil, err
-		}
+		return e2eSeed{}, nil, err
 	}
 
 	landskap.Photographer = &ola
 	if _, err := store.UpdatePhoto(ctx, landskap); err != nil {
-		return nil, err
+		return e2eSeed{}, nil, err
 	}
 
 	if err := store.SetGallery(ctx, []int64{landskap.ID, portrett.ID}); err != nil {
-		return nil, err
-	}
-
-	var drafts []site.Event
-
-	for range 3 {
-		e, err := store.CreateEvent(ctx, site.Event{})
-		if err != nil {
-			return nil, err
-		}
-
-		drafts = append(drafts, e)
+		return e2eSeed{}, nil, err
 	}
 
 	course, err := store.CreateEvent(ctx, site.Event{
@@ -204,20 +184,16 @@ func e2eReset(ctx context.Context, store *site.Store, imgs *images.Store, fixtur
 		MainPhoto: &portrett,
 	})
 	if err != nil {
-		return nil, err
+		return e2eSeed{}, nil, err
 	}
 
 	if _, err := store.Publish(ctx, course.ID, course.UpdatedAt); err != nil {
-		return nil, err
+		return e2eSeed{}, nil, err
 	}
 
-	for _, e := range drafts {
-		if err := store.DeleteEvent(ctx, e.ID); err != nil {
-			return nil, err
-		}
-	}
+	seed := e2eSeed{Landskap: landskap.ID, Portrett: portrett.ID, Photographer: ola.ID, Course: course.ID}
 
-	return []string{landskap.SHA256, portrett.SHA256}, nil
+	return seed, []string{landskap.SHA256, portrett.SHA256}, nil
 }
 
 func e2eWipe(ctx context.Context, store *site.Store) error {

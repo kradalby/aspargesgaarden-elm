@@ -159,9 +159,8 @@ Two Playwright suites, from the pinned nixpkgs, against a local server.
 Neither touches the network once its tools are built.
 
 ```bash
-nix develop -c e2e/admin/run.sh         # admin in Chromium at 1280 and 390 px, against serve --dev
-FAKE=1 nix develop -c e2e/admin/run.sh  # the same specs against an in-memory fake API, faster
-nix develop -c e2e/gallery/run.sh       # gallery and lightbox in Chromium, Firefox and WebKit
+nix develop -c e2e/admin/run.sh    # admin in Chromium at 1280 and 390 px, against serve --dev
+nix develop -c e2e/gallery/run.sh  # gallery and lightbox in Chromium, Firefox and WebKit
 ```
 
 The admin suite starts `serve --dev --e2e-fixtures e2e/admin/fixtures` on a

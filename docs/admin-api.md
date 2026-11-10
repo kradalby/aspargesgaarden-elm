@@ -2,9 +2,8 @@
 
 The JSON API the admin app (`elm/admin`) uses. It lives on the tsnet listener
 only, behind the `kradalby.no/cap/asparges` capability (or loopback in
-`--dev`). The app is the only client; it is written against this file, and
-`e2e/admin/fake-server.mjs` implements the same contract for the browser tests, so a
-change here means a change in all three places.
+`--dev`). The app is the only client; it is written against this file, so a
+change here means a change in both places.
 
 ## Conventions
 

@@ -41,7 +41,7 @@ conventions (Go, Nix, Elm, git, services, secrets) are in
   `go.mod`, `elm2nix` after an `elm.json`, the `yarn.<app>` hash in
   `flakehashes.json` after a `yarn.lock`.
 - **The admin API is a contract.** `docs/admin-api.md` describes it; change
-  both together. The fake in `e2e/admin/fake-server.mjs` follows it too.
+  both together.
 
 ## Elm apps
 

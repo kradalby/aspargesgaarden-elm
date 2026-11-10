@@ -1,18 +1,21 @@
-// The admin app in Chromium, at desktop and phone size, against the contract
-// in docs/admin-api.md: the real `asparges serve --dev` by default, or the
-// fake (run.sh). ASP_REAL marks the real server; only it has a public site
-// to check the admin's effect on.
+// The admin app at desktop and phone size against `asparges serve --dev
+// --e2e-fixtures` (run.sh), and the public pages the admin changes.
 import { test as base, expect } from "@playwright/test";
 import { join } from "node:path";
 
 const fixture = (name) => join(import.meta.dirname, "fixtures", name);
-const real = !!process.env.ASP_REAL;
 
-// Every test starts from the seeded data and fails on any console error:
-// a CSP violation, a script error, or a file that did not load.
+// Every test starts from the seeded data (seed: the ids of its rows) and
+// fails on any console error: a CSP violation, a script error, or a file
+// that did not load.
 const test = base.extend({
-  page: async ({ page, request }, use) => {
-    expect((await request.post("/__reset")).ok()).toBe(true);
+  seed: async ({ request }, use) => {
+    const res = await request.post("/__reset");
+    expect(res.ok()).toBe(true);
+    await use(await res.json());
+  },
+  page: async ({ page, seed }, use) => {
+    expect(seed.course).toBeGreaterThan(0);
     const problems = [];
     page.on("console", (m) => {
       if (m.type() !== "error") return;
@@ -69,6 +72,7 @@ const live = (page) => page.getByRole("status").filter({ hasNotText: /^$/ });
 
 test("new event, from first word to published, copied and deleted", async ({
   page,
+  seed,
   request,
 }) => {
   await page.goto("/admin/");
@@ -150,7 +154,7 @@ test("new event, from first word to published, copied and deleted", async ({
   await expect(page.getByRole("button", { name: "Beskjær" })).toBeFocused();
 
   // The preview is the server's page for the unsaved form, with its photo
-  // (and, from the real server, its stylesheet) loaded inside the frame.
+  // and its stylesheet loaded inside the frame.
   const frame = page.frameLocator("#forhandsvisning iframe");
   await expect(
     frame.getByRole("heading", { name: "Julemarked 2026" }),
@@ -163,20 +167,18 @@ test("new event, from first word to published, copied and deleted", async ({
         .evaluate((i) => i.complete && i.naturalWidth),
     )
     .toBeGreaterThan(0);
-  if (real) {
-    await expect
-      .poll(() =>
-        frame
-          .locator("body")
-          .evaluate(() =>
-            [...document.styleSheets].reduce(
-              (n, sh) => n + sh.cssRules.length,
-              0,
-            ),
+  await expect
+    .poll(() =>
+      frame
+        .locator("body")
+        .evaluate(() =>
+          [...document.styleSheets].reduce(
+            (n, sh) => n + sh.cssRules.length,
+            0,
           ),
-      )
-      .toBeGreaterThan(0);
-  }
+        ),
+    )
+    .toBeGreaterThan(0);
   await page.getByLabel("Tittel").fill("Julemarked på gården");
   await expect(
     frame.getByRole("heading", { name: "Julemarked på gården" }),
@@ -213,28 +215,26 @@ test("new event, from first word to published, copied and deleted", async ({
   ).pathname;
   expect(path).toBe("/arrangementer/2026/julemarked-pa-garden");
 
-  if (real) {
-    // Published: on the list, the sitemap and its own page, with the crop.
-    expect((await publicText(request, "/arrangementer")).text).toContain(
-      "Julemarked på gården",
-    );
-    expect((await publicText(request, "/sitemap.xml")).text).toContain(path);
-    const before = await publicText(request, path);
-    expect(before.status).toBe(200);
-    const banner = cropOf(before.text, "banner");
-    expect(banner).toBeTruthy();
+  // Published: on the list, the sitemap and its own page, with the crop.
+  expect((await publicText(request, "/arrangementer")).text).toContain(
+    "Julemarked på gården",
+  );
+  expect((await publicText(request, "/sitemap.xml")).text).toContain(path);
+  const before = await publicText(request, path);
+  expect(before.status).toBe(200);
+  const banner = cropOf(before.text, "banner");
+  expect(banner).toBeTruthy();
 
-    // A new crop shows on the live page at once, under a new file name.
-    await page.getByRole("button", { name: "Beskjær" }).click();
-    await crop.getByRole("button", { name: /Øverst på siden/ }).click();
-    await crop.getByRole("button", { name: "Flytt rammen opp" }).click();
-    const recropped = page.waitForResponse((r) => r.url().endsWith("/crops"));
-    await crop.getByRole("button", { name: "Bruk" }).click();
-    expect((await recropped).status()).toBe(200);
-    const after = cropOf((await publicText(request, path)).text, "banner");
-    expect(after).toBeTruthy();
-    expect(after).not.toBe(banner);
-  }
+  // A new crop shows on the live page at once, under a new file name.
+  await page.getByRole("button", { name: "Beskjær" }).click();
+  await crop.getByRole("button", { name: /Øverst på siden/ }).click();
+  await crop.getByRole("button", { name: "Flytt rammen opp" }).click();
+  const recropped = page.waitForResponse((r) => r.url().endsWith("/crops"));
+  await crop.getByRole("button", { name: "Bruk" }).click();
+  expect((await recropped).status()).toBe(200);
+  const after = cropOf((await publicText(request, path)).text, "banner");
+  expect(after).toBeTruthy();
+  expect(after).not.toBe(banner);
 
   await page
     .getByRole("link", { name: "Arrangementer", exact: true })
@@ -280,15 +280,11 @@ test("new event, from first word to published, copied and deleted", async ({
   await page.goto(editorUrl);
   await page.getByRole("button", { name: "Gjør om til kladd" }).click();
   await expect(page.getByText("Kladd – vises ikke på nettsiden")).toBeVisible();
-  if (real) {
-    expect((await publicText(request, "/arrangementer")).text).not.toContain(
-      "Julemarked på gården",
-    );
-    expect((await publicText(request, "/sitemap.xml")).text).not.toContain(
-      path,
-    );
-    expect((await publicText(request, path)).status).toBe(404);
-  }
+  expect((await publicText(request, "/arrangementer")).text).not.toContain(
+    "Julemarked på gården",
+  );
+  expect((await publicText(request, "/sitemap.xml")).text).not.toContain(path);
+  expect((await publicText(request, path)).status).toBe(404);
 
   // Deleted: gone from the admin too.
   await page
@@ -305,7 +301,7 @@ test("new event, from first word to published, copied and deleted", async ({
   ).toHaveCount(0);
 });
 
-test("warns before leaving with unsaved changes", async ({ page }) => {
+test("warns before leaving with unsaved changes", async ({ page, seed }) => {
   await page.goto("/admin/");
   await page.getByRole("link", { name: "Endre Takkebakstkurs" }).click();
   await expect(page.getByLabel("Tittel")).toHaveValue("Takkebakstkurs");
@@ -319,7 +315,7 @@ test("warns before leaving with unsaved changes", async ({ page }) => {
   await expect(leave).toBeVisible();
   await leave.getByRole("button", { name: "Bli her og lagre" }).click();
   await expect(leave).toBeHidden();
-  await expect(page).toHaveURL(/\/arrangementer\/4$/);
+  await expect(page).toHaveURL(new RegExp(`/arrangementer/${seed.course}$`));
   await expect(page.getByLabel("Tittel")).toHaveValue(
     "Takkebakstkurs med Anita",
   );
@@ -377,10 +373,11 @@ test("a server error lands next to its field, in words", async ({ page }) => {
 
 test("a lost connection keeps what she typed, and a retry saves it", async ({
   page,
+  seed,
 }) => {
-  await page.goto("/admin/arrangementer/4");
+  await page.goto(`/admin/arrangementer/${seed.course}`);
   await page.getByLabel("Kort tekst").fill("Ny tekst skrevet på mobilen");
-  await page.route("**/admin/api/events/4", (route) =>
+  await page.route(`**/admin/api/events/${seed.course}`, (route) =>
     route.request().method() === "PUT" ? route.abort() : route.continue(),
   );
   await page.getByRole("button", { name: "Lagre endringene" }).click();
@@ -392,7 +389,7 @@ test("a lost connection keeps what she typed, and a retry saves it", async ({
   await expect(page.getByLabel("Kort tekst")).toHaveValue(
     "Ny tekst skrevet på mobilen",
   );
-  await page.unroute("**/admin/api/events/4");
+  await page.unroute(`**/admin/api/events/${seed.course}`);
   await page.getByRole("button", { name: "Prøv igjen" }).click();
   await expect(
     page.getByText("Endringene er lagret og vises på nettsiden.").first(),
@@ -401,11 +398,12 @@ test("a lost connection keeps what she typed, and a retry saves it", async ({
 
 test("two editors: hers is not lost and she chooses", async ({
   page,
+  seed,
   request,
 }) => {
-  await page.goto("/admin/arrangementer/4");
+  await page.goto(`/admin/arrangementer/${seed.course}`);
   await page.getByLabel("Pris").fill("Kr 1700,-");
-  await request.post("/__touch/4");
+  await request.post(`/__touch/${seed.course}`);
   await page.getByRole("button", { name: "Lagre endringene" }).click();
   const conflict = page.getByRole("dialog", {
     name: "Noen andre har endret arrangementet",
@@ -416,12 +414,10 @@ test("two editors: hers is not lost and she chooses", async ({
   await conflict.getByRole("button", { name: "Lagre min versjon" }).click();
   await expect(page.getByText("Endringene er lagret").first()).toBeVisible();
   await expect(page.getByLabel("Pris")).toHaveValue("Kr 1700,-");
-  if (real) {
-    const course = (
-      await publicText(request, "/arrangementer/2026/takkebakstkurs")
-    ).text;
-    expect(course).toContain("Kr 1700,-");
-  }
+  const course = (
+    await publicText(request, "/arrangementer/2026/takkebakstkurs")
+  ).text;
+  expect(course).toContain("Kr 1700,-");
 });
 
 test("someone without the grant is told so, plainly", async ({ page }) => {
@@ -443,6 +439,7 @@ test("someone without the grant is told so, plainly", async ({ page }) => {
 
 test("uploads that fail say why and can be retried or removed", async ({
   page,
+  seed,
 }) => {
   await page.goto("/admin/arrangementer/ny");
   await choose(
@@ -473,6 +470,7 @@ test("uploads that fail say why and can be retried or removed", async ({
 
 test("photographer: add in place, correct once, shown on every photo", async ({
   page,
+  seed,
 }) => {
   await page.goto("/admin/galleri");
   await expect(page.getByText("Bilde 2 av 2")).toBeVisible();
@@ -515,6 +513,7 @@ test("photographer: add in place, correct once, shown on every photo", async ({
 
 test("gallery: several uploads, order, alt text, and a photo in use", async ({
   page,
+  seed,
   request,
 }) => {
   await page.goto("/admin/galleri");
@@ -538,16 +537,19 @@ test("gallery: several uploads, order, alt text, and a photo in use", async ({
   await third.getByLabel("Beskriv bildet").fill("Hagen i juni");
   await third.getByLabel("Beskriv bildet").press("Tab");
   await expect(third.getByText("Lagret")).toBeVisible();
-  if (real)
-    expect((await publicText(request, "/galleri")).text).toContain(
-      "Hagen i juni",
-    );
+  expect((await publicText(request, "/galleri")).text).toContain(
+    "Hagen i juni",
+  );
 
   const saved = page.waitForRequest(
     (r) => r.url().endsWith("/admin/api/gallery") && r.method() === "PUT",
   );
   await page.getByRole("button", { name: "Flytt bilde 3 tidligere" }).click();
-  expect((await saved).postDataJSON().photoIds).toEqual([1, newId, 2]);
+  expect((await saved).postDataJSON().photoIds).toEqual([
+    seed.landskap,
+    newId,
+    seed.portrett,
+  ]);
   await expect(
     page.getByRole("button", { name: "Flytt bilde 2 tidligere" }),
   ).toBeFocused();
@@ -563,19 +565,18 @@ test("gallery: several uploads, order, alt text, and a photo in use", async ({
   ).toBeVisible();
   await dlg.getByRole("button", { name: "Ta ut av galleriet" }).click();
   await expect(page.getByText("Bilde 2 av 2")).toBeVisible();
-  if (real) {
-    const galleri = (await publicText(request, "/galleri")).text;
-    expect(galleri).not.toContain("Kursholder ved kjøkkenbenken");
-    expect(galleri.indexOf("Boder med julepynt")).toBeLessThan(
-      galleri.indexOf("Hagen i juni"),
-    );
-  }
+  const galleri = (await publicText(request, "/galleri")).text;
+  expect(galleri).not.toContain("Kursholder ved kjøkkenbenken");
+  expect(galleri.indexOf("Boder med julepynt")).toBeLessThan(
+    galleri.indexOf("Hagen i juni"),
+  );
 });
 
 test("the crop dialog works from the keyboard and gives focus back", async ({
   page,
+  seed,
 }) => {
-  await page.goto("/admin/arrangementer/4");
+  await page.goto(`/admin/arrangementer/${seed.course}`);
   const open = page.getByRole("button", { name: "Beskjær" });
   await open.focus();
   await page.keyboard.press("Enter");
@@ -601,11 +602,12 @@ test("the crop dialog works from the keyboard and gives focus back", async ({
 // is 896), one step smaller is not, and the floor of 800 stops Mindre.
 test("the crop dialog says, as she goes, when a crop will look soft", async ({
   page,
+  seed,
 }, testInfo) => {
   // A short laptop screen: the line must be in sight without scrolling.
   const { width, height } = page.viewportSize();
   await page.setViewportSize({ width, height: Math.min(height, 720) });
-  await page.goto("/admin/arrangementer/4");
+  await page.goto(`/admin/arrangementer/${seed.course}`);
   await expect(page.locator("#bilde-uskarpt")).toHaveCount(0);
   await page.getByRole("button", { name: "Beskjær" }).click();
   const crop = page.getByRole("dialog", { name: "Beskjær bildet" });
@@ -649,13 +651,16 @@ test("the crop dialog says, as she goes, when a crop will look soft", async ({
 // and her text edits never touch them.
 test("an old crop under the minimum survives the dialog and a save", async ({
   page,
+  seed,
   request,
 }) => {
   const old = { x: 98, y: 300, w: 704, h: 396 };
   expect(
-    (await request.post("/__crop/2", { data: { banner: old } })).ok(),
+    (
+      await request.post(`/__crop/${seed.portrett}`, { data: { banner: old } })
+    ).ok(),
   ).toBe(true);
-  await page.goto("/admin/arrangementer/4");
+  await page.goto(`/admin/arrangementer/${seed.course}`);
   await page.getByRole("button", { name: "Beskjær" }).click();
   const crop = page.getByRole("dialog", { name: "Beskjær bildet" });
   await crop.getByRole("button", { name: /Øverst på siden/ }).click();
@@ -678,27 +683,30 @@ test("an old crop under the minimum survives the dialog and a save", async ({
   await page.getByRole("button", { name: "Lagre endringene" }).click();
   await expect(page.getByText("Endringene er lagret").first()).toBeVisible();
 
-  const photo = await (await request.get("/admin/api/photos/2")).json();
+  const photo = await (
+    await request.get(`/admin/api/photos/${seed.portrett}`)
+  ).json();
   expect(photo.crops.banner).toEqual(old);
-  if (real) {
-    const course = await publicText(
-      request,
-      "/arrangementer/2026/takkebakstkurs",
-    );
-    expect(course.status).toBe(200);
-    expect(course.text).toContain("Kr 1700,-");
-  }
+  const course = await publicText(
+    request,
+    "/arrangementer/2026/takkebakstkurs",
+  );
+  expect(course.status).toBe(200);
+  expect(course.text).toContain("Kr 1700,-");
 });
 
 test("a small gallery photo is said to be shown smaller, calmly", async ({
   page,
+  seed,
 }) => {
   await page.goto("/admin/galleri");
   // portrett.jpg is 900 px wide, under the lightbox's 992; landskap is 1300.
   await expect(
-    page.locator('[data-photo="2"] [data-verdict="info"] p'),
+    page.locator(`[data-photo="${seed.portrett}"] [data-verdict="info"] p`),
   ).toHaveText(
     "Bildet er litt lite, så det vises mindre når man åpner det stort. Det går fint.",
   );
-  await expect(page.locator('[data-photo="1"] [data-verdict]')).toHaveCount(0);
+  await expect(
+    page.locator(`[data-photo="${seed.landskap}"] [data-verdict]`),
+  ).toHaveCount(0);
 });
