@@ -185,6 +185,19 @@ func TestChangedPingsIndexNow(t *testing.T) {
 	}, 5*time.Second, 10*time.Millisecond)
 }
 
+// Crawlers and arrivals from assistants show up in /metrics with bounded
+// labels.
+func TestVisitMetrics(t *testing.T) {
+	f := newFixture(t, true)
+
+	f.get(t, "/lokaler", "User-Agent", "Mozilla/5.0 (compatible; ClaudeBot/1.0; +claudebot@anthropic.com)")
+	f.get(t, "/lokaler?utm_source=chatgpt.com")
+
+	body := f.get(t, "/metrics").Body.String()
+	require.Contains(t, body, `asparges_bot_requests_total{agent="claudebot",purpose="ai_training"}`)
+	require.Contains(t, body, `asparges_referrals_total{source="chatgpt"}`)
+}
+
 func TestLLMsTxt(t *testing.T) {
 	rec := withMarkets(t).get(t, "/llms.txt")
 

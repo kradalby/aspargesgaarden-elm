@@ -133,6 +133,7 @@ func (s *Server) Public() http.Handler {
 		if s.cfg.NoIndex {
 			w.Header().Set("X-Robots-Tag", "noindex")
 		}
+		seo.CountVisit(r)
 		mux.ServeHTTP(w, r)
 	})
 }
