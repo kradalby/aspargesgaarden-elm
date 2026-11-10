@@ -166,7 +166,7 @@ func TestEventNodes(t *testing.T) {
 	// One graph across pages: the event's place and organiser are the venue.
 	venue := VenueNode(testBase).ID
 	require.Equal(t, venue, ev.Location.ID)
-	require.Equal(t, venue, ev.Organizer.ID)
+	require.Equal(t, Organization{Type: "Organization", ID: venue, Name: "Aspargesgården", URL: "https://aspargesgaarden.no/"}, ev.Organizer)
 }
 
 // The offset is the one in force on the day: summer time in May, winter
