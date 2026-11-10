@@ -29,6 +29,11 @@ withMain width height =
         |> step (Loaded (Ok (Fixture.eventWith (Just { spec | width = width, height = height }) { id = 4, updatedAt = "1", summary = "" })))
 
 
+published : Api.Event -> Api.Event
+published e =
+    { e | status = "published" }
+
+
 theirs : Api.Event
 theirs =
     Fixture.event { id = 4, updatedAt = "2", summary = "Deres" }
@@ -79,6 +84,20 @@ suite =
                 \_ -> loaded |> step (Set Editor.Title "Nytt") |> Editor.nextRequest Publish |> Expect.equal (Update 4)
             , test "a new one is created" <|
                 \_ -> Editor.init Nothing |> Tuple.first |> Editor.nextRequest SaveDraft |> Expect.equal Create
+            ]
+        , describe "a hidden tab"
+            [ test "saves a draft with changes" <|
+                \_ -> loaded |> step (Set Editor.Summary "Ny") |> step Hidden |> .busy |> Expect.equal (Just SaveDraft)
+            , test "leaves a draft without changes alone" <|
+                \_ -> loaded |> step Hidden |> .busy |> Expect.equal Nothing
+            , test "never saves a published event by itself" <|
+                \_ ->
+                    loaded
+                        |> step (Done Publish (Ok (published (Fixture.event { id = 4, updatedAt = "2", summary = "" }))))
+                        |> step (Set Editor.Summary "Ny")
+                        |> step Hidden
+                        |> .busy
+                        |> Expect.equal Nothing
             ]
         , describe "the crop dialog"
             [ test "opens on the list crop when the photo is large enough" <|

@@ -19,3 +19,6 @@ const app = window.Elm.Admin.init({ flags: null });
 app.ports.setDirty.subscribe((d) => {
   dirty = d;
 });
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "hidden") app.ports.pageHidden.send(null);
+});

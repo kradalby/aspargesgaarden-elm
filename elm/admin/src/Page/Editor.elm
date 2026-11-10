@@ -194,6 +194,7 @@ type Msg
     | SetView String
     | RetryPreview
     | ShowPreview
+    | Hidden
     | Ignored
 
 
@@ -414,6 +415,15 @@ update msg model =
                 |> Task.attempt (\_ -> Ignored)
             , Nothing
             )
+
+        Hidden ->
+            -- Only a draft: saving a published event would put half-done
+            -- changes on the live page.
+            if model.form /= model.saved && model.busy == Nothing && model.conflict == Nothing && status model /= "published" then
+                run SaveDraft { model | result = Nothing, failure = Nothing }
+
+            else
+                ( model, Cmd.none, Nothing )
 
         Ignored ->
             ( model, Cmd.none, Nothing )

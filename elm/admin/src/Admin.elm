@@ -28,6 +28,13 @@ the tab is closed or reloaded.
 port setDirty : Bool -> Cmd msg
 
 
+{-| The tab was hidden: she switched app or tab, or is closing it. Safari on
+an iPad or iPhone never asks before a tab is closed, and may drop a hidden
+one, so the editor saves a draft then.
+-}
+port pageHidden : (() -> msg) -> Sub msg
+
+
 type alias Model =
     { key : Nav.Key
     , url : Url
@@ -292,7 +299,10 @@ subscriptions : Model -> Sub Msg
 subscriptions model =
     case model.page of
         Editor m ->
-            Sub.map (EditorMsg model.gen) (Editor.subscriptions m)
+            Sub.batch
+                [ Sub.map (EditorMsg model.gen) (Editor.subscriptions m)
+                , pageHidden (\_ -> EditorMsg model.gen Editor.Hidden)
+                ]
 
         Gallery m ->
             Sub.map (GalleryMsg model.gen) (Gallery.subscriptions m)
