@@ -305,7 +305,7 @@ func (s *Store) ensure(ctx context.Context, p Photo, g group, specs []VariantSpe
 	s.mu.Unlock()
 
 	if len(mine) > 0 {
-		land := func(sp VariantSpec, err error) { s.land(sp, flights[s.path(sp)], err) }
+		land := func(sp VariantSpec, err error) { s.land(sp, flights[s.path(sp)], err, ctx.Err() != nil) }
 		err := s.buildGroup(ctx, p, g, mine, land)
 
 		// Files the build never reached: it failed before encoding.
@@ -340,8 +340,9 @@ func (s *Store) ensure(ctx context.Context, p Photo, g group, specs []VariantSpe
 }
 
 // land ends f, the flight of sp, once: it records a failure for a file
-// that is not there and wakes whoever waits for it.
-func (s *Store) land(sp VariantSpec, f *flight, err error) {
+// that is not there and wakes whoever waits for it. A build stopped by its
+// context is no failure: the next caller builds the file.
+func (s *Store) land(sp VariantSpec, f *flight, err error, stopped bool) {
 	path := s.path(sp)
 
 	s.mu.Lock()
@@ -363,7 +364,9 @@ func (s *Store) land(sp VariantSpec, f *flight, err error) {
 	}
 
 	f.err = err
-	s.failed[path] = failure{err: err, until: s.now().Add(failTTL)}
+	if !stopped {
+		s.failed[path] = failure{err: err, until: s.now().Add(failTTL)}
+	}
 }
 
 // buildGroup runs one build in a job slot.
@@ -393,6 +396,13 @@ func (s *Store) buildGroup(ctx context.Context, p Photo, g group, specs []Varian
 		if exists(s.path(sp)) {
 			metricBuilt.WithLabelValues(string(sp.Kind), string(sp.Format)).Inc()
 		}
+	}
+
+	// A shutdown or an interrupted warm kills vips mid-build; that says
+	// nothing about the photo, whatever vips's last words were.
+	if err != nil && ctx.Err() != nil {
+		log.Debug("image build stopped", "err", err)
+		return ctx.Err()
 	}
 
 	if err != nil {

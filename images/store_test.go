@@ -1,15 +1,18 @@
 package images
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
 	"image"
 	"image/color"
 	"image/png"
+	"log/slog"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
@@ -265,6 +268,27 @@ func TestEnsureRemembersFailures(t *testing.T) {
 	_, err = s.Ensure(context.Background(), spec)
 	require.ErrorIs(t, err, ErrBroken)
 	require.Equal(t, int64(2), s.builds.Load())
+}
+
+// A build stopped by shutdown is no failure: not logged as one, and not
+// remembered against the photo.
+func TestEnsureStoppedIsNoFailure(t *testing.T) {
+	logs := &bytes.Buffer{}
+	cat := newFakeCatalog()
+	s := newTestStore(t, cat, WithLogger(slog.New(slog.NewTextHandler(logs, nil))))
+	p := photoOf(intake(t, s, "upright.jpg"))
+	cat.put(p)
+
+	spec := VariantSpec{Photo: p.SHA256, Kind: Card, Crop: exampleCrop.ID(), Width: 480, Format: JPEG}
+	g := groups(p)[slices.IndexFunc(groups(p), func(g group) bool { return g.kind == Card })]
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	require.ErrorIs(t, s.ensure(ctx, p, g, []VariantSpec{spec}), context.Canceled)
+
+	_, err := s.Ensure(context.Background(), spec)
+	require.NoError(t, err)
+	require.NotContains(t, logs.String(), "level=ERROR")
 }
 
 func TestEnsureRejectsReplacedOriginal(t *testing.T) {
