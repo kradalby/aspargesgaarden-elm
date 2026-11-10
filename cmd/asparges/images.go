@@ -2,20 +2,24 @@ package main
 
 import (
 	"context"
-	"errors"
 	"fmt"
+	"time"
 
 	"github.com/peterbourgon/ff/v4"
 
 	"github.com/kradalby/asparges/images"
+	"github.com/kradalby/asparges/site"
 )
-
-var errCatalogNotWired = errors.New("the images commands need the database, which is not wired in yet")
 
 // openImageCatalog opens the database's view of photos for the images
 // commands. Replaced in tests.
-var openImageCatalog = func(_ context.Context, _ string) (images.Catalog, func() error, error) {
-	return nil, nil, errCatalogNotWired
+var openImageCatalog = func(ctx context.Context, dataDir string) (images.Catalog, func() error, error) {
+	d, err := openData(ctx, dataDir)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return site.NewStore(d, time.Now).Catalog(), d.Close, nil
 }
 
 func newImagesCmd(a *app, parent *ff.FlagSet) *ff.Command {

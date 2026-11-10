@@ -18,13 +18,17 @@ import (
 	"os/signal"
 	"path/filepath"
 	"syscall"
+	"time"
 
 	"github.com/kradalby/kra/web"
 	"github.com/peterbourgon/ff/v4"
 	"github.com/peterbourgon/ff/v4/ffhelp"
 	"golang.org/x/sync/errgroup"
 
+	"github.com/kradalby/asparges/db"
+	"github.com/kradalby/asparges/images"
 	"github.com/kradalby/asparges/server"
+	"github.com/kradalby/asparges/site"
 )
 
 const envPrefix = "ASPARGES"
@@ -166,10 +170,47 @@ func serve(ctx context.Context, log *slog.Logger, cfg serveConfig) error {
 		return fmt.Errorf("build server: %w", err)
 	}
 
-	srv.Handle("/", server.Public(cfg.baseURL, cfg.dev))
+	d, err := openData(ctx, cfg.dataDir)
+	if err != nil {
+		return err
+	}
+	defer d.Close()
+
+	store := site.NewStore(d, time.Now)
+
+	imgs, err := images.New(cfg.dataDir, store.Catalog(), images.WithLogger(log))
+	if err != nil {
+		return fmt.Errorf("photo store: %w", err)
+	}
+
+	public := server.New(server.Config{
+		BaseURL: cfg.baseURL,
+		Dev:     cfg.dev,
+		Store:   store,
+		Images:  imgs,
+		Now:     time.Now,
+		Log:     log,
+	})
+	srv.Handle("/", public.Public())
 
 	g, ctx := errgroup.WithContext(ctx)
 	g.Go(func() error { return srv.ListenAndServe(ctx) })
+	g.Go(func() error { return imgs.Run(ctx) })
 
 	return g.Wait()
+}
+
+// openData opens the database in the state directory, creating both.
+func openData(ctx context.Context, dataDir string) (*db.DB, error) {
+	// The unit's StateDirectoryMode; group access is for litestream.
+	if err := os.MkdirAll(dataDir, 0o770); err != nil { //nolint:gosec // see above
+		return nil, fmt.Errorf("creating %s: %w", dataDir, err)
+	}
+
+	d, err := db.Open(ctx, filepath.Join(dataDir, "asparges.db"))
+	if err != nil {
+		return nil, fmt.Errorf("opening database: %w", err)
+	}
+
+	return d, nil
 }

@@ -33,17 +33,16 @@ func TestImagesCmd(t *testing.T) {
 		return newRootCmd(a).ParseAndRun(context.Background(), args)
 	}
 
-	dir := t.TempDir()
-	require.ErrorIs(t, run("images", "check", "--data-dir", dir), errCatalogNotWired)
+	// The real catalogue is the database: a fresh one has nothing to check.
+	require.NoError(t, run("images", "check", "--data-dir", t.TempDir()))
+	require.NoError(t, run("images", "gc", "--data-dir", t.TempDir()))
 
+	dir := t.TempDir()
+	wired := openImageCatalog
 	openImageCatalog = func(context.Context, string) (images.Catalog, func() error, error) {
 		return oneMissingPhoto{}, func() error { return nil }, nil
 	}
-	t.Cleanup(func() {
-		openImageCatalog = func(context.Context, string) (images.Catalog, func() error, error) {
-			return nil, nil, errCatalogNotWired
-		}
-	})
+	t.Cleanup(func() { openImageCatalog = wired })
 
 	orphan := filepath.Join(dir, "tmp", "build-old")
 	require.NoError(t, os.MkdirAll(filepath.Dir(orphan), 0o750))
