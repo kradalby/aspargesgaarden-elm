@@ -85,7 +85,7 @@ func (s *Store) RemovePhoto(ctx context.Context, id int64) ([]Event, error) {
 			return fmt.Errorf("photo %d: %w", id, ErrPhotoInUse)
 		}
 
-		if err := q.DeleteGalleryPhoto(ctx, id); err != nil {
+		if _, err := q.DeleteGalleryPhoto(ctx, id); err != nil {
 			return fmt.Errorf("taking photo %d out of the gallery: %w", id, err)
 		}
 

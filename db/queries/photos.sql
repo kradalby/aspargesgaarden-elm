@@ -61,12 +61,12 @@ JOIN photos ON photos.id = gallery_photos.photo_id;
 
 -- name: ListPhotoEvents :many
 -- The events that show a photo, which keep it from being deleted.
-SELECT events.id, events.title FROM events
+SELECT events.id, events.title, events.status FROM events
 JOIN event_photos ON event_photos.event_id = events.id
 WHERE event_photos.photo_id = ?
 ORDER BY events.id;
 
--- name: DeleteGalleryPhoto :exec
+-- name: DeleteGalleryPhoto :execrows
 DELETE FROM gallery_photos WHERE photo_id = ?;
 
 -- name: DeleteUnusedPhotos :many
@@ -87,3 +87,7 @@ UPDATE photos SET updated_at = ?
 WHERE id IN (sqlc.slice('ids'))
     AND NOT EXISTS (SELECT 1 FROM event_photos WHERE event_photos.photo_id = photos.id)
     AND NOT EXISTS (SELECT 1 FROM gallery_photos WHERE gallery_photos.photo_id = photos.id);
+
+-- name: TouchGallery :exec
+-- A photo gone from the gallery changes its page, though no row left says so.
+UPDATE gallery_photos SET updated_at = ?;

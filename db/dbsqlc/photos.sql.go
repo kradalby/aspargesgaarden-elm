@@ -58,13 +58,16 @@ func (q *Queries) DeleteGallery(ctx context.Context) error {
 	return err
 }
 
-const deleteGalleryPhoto = `-- name: DeleteGalleryPhoto :exec
+const deleteGalleryPhoto = `-- name: DeleteGalleryPhoto :execrows
 DELETE FROM gallery_photos WHERE photo_id = ?
 `
 
-func (q *Queries) DeleteGalleryPhoto(ctx context.Context, photoID int64) error {
-	_, err := q.db.ExecContext(ctx, deleteGalleryPhoto, photoID)
-	return err
+func (q *Queries) DeleteGalleryPhoto(ctx context.Context, photoID int64) (int64, error) {
+	result, err := q.db.ExecContext(ctx, deleteGalleryPhoto, photoID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
 }
 
 const deletePhoto = `-- name: DeletePhoto :execrows
@@ -272,15 +275,16 @@ func (q *Queries) ListPhotoCrops(ctx context.Context, photoID int64) ([]PhotoCro
 }
 
 const listPhotoEvents = `-- name: ListPhotoEvents :many
-SELECT events.id, events.title FROM events
+SELECT events.id, events.title, events.status FROM events
 JOIN event_photos ON event_photos.event_id = events.id
 WHERE event_photos.photo_id = ?
 ORDER BY events.id
 `
 
 type ListPhotoEventsRow struct {
-	ID    int64  `db:"id"`
-	Title string `db:"title"`
+	ID     int64  `db:"id"`
+	Title  string `db:"title"`
+	Status string `db:"status"`
 }
 
 // The events that show a photo, which keep it from being deleted.
@@ -293,7 +297,7 @@ func (q *Queries) ListPhotoEvents(ctx context.Context, photoID int64) ([]ListPho
 	var items []ListPhotoEventsRow
 	for rows.Next() {
 		var i ListPhotoEventsRow
-		if err := rows.Scan(&i.ID, &i.Title); err != nil {
+		if err := rows.Scan(&i.ID, &i.Title, &i.Status); err != nil {
 			return nil, err
 		}
 		items = append(items, i)
@@ -371,6 +375,16 @@ func (q *Queries) ReleasePhotos(ctx context.Context, arg ReleasePhotosParams) er
 		query = strings.Replace(query, "/*SLICE:ids*/?", "NULL", 1)
 	}
 	_, err := q.db.ExecContext(ctx, query, queryParams...)
+	return err
+}
+
+const touchGallery = `-- name: TouchGallery :exec
+UPDATE gallery_photos SET updated_at = ?
+`
+
+// A photo gone from the gallery changes its page, though no row left says so.
+func (q *Queries) TouchGallery(ctx context.Context, updatedAt int64) error {
+	_, err := q.db.ExecContext(ctx, touchGallery, updatedAt)
 	return err
 }
 

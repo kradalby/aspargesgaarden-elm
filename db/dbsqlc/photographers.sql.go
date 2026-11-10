@@ -76,6 +76,22 @@ func (q *Queries) GetPhotographer(ctx context.Context, id int64) (Photographer, 
 	return i, err
 }
 
+const getPhotographerByNameKey = `-- name: GetPhotographerByNameKey :one
+SELECT id, name, name_key, url FROM photographers WHERE name_key = ?
+`
+
+func (q *Queries) GetPhotographerByNameKey(ctx context.Context, nameKey string) (Photographer, error) {
+	row := q.db.QueryRowContext(ctx, getPhotographerByNameKey, nameKey)
+	var i Photographer
+	err := row.Scan(
+		&i.ID,
+		&i.Name,
+		&i.NameKey,
+		&i.Url,
+	)
+	return i, err
+}
+
 const listPhotographers = `-- name: ListPhotographers :many
 SELECT id, name, name_key, url FROM photographers ORDER BY name_key
 `

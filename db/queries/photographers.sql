@@ -20,3 +20,6 @@ UPDATE photographers SET name = ?, name_key = ?, url = ? WHERE id = ?;
 
 -- name: DeletePhotographer :execrows
 DELETE FROM photographers WHERE id = ?;
+
+-- name: GetPhotographerByNameKey :one
+SELECT * FROM photographers WHERE name_key = ?;
