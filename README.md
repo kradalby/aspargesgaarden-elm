@@ -145,13 +145,13 @@ gets `403` on `/admin/`. The API contract is
 
 - `go test ./...` runs the unit, golden and HTTP tests, and the image tests
   against the real vips.
-- `nix flake check` runs every check: `build`, `gotest` (race),
+- `nix flake check` runs every check: `build`, `gotest` (race, shuffled),
   `golangci-lint`, `formatting`, `generate` (sqlc drift), `photo-variants`,
   `elm-test-admin`, `elm-test-gallery`, `module-eval`, and on x86_64-linux
   the VM tests `vm-basic` (the unit, import, restore) and `vm-tsnet` (the
-  grant against headscale). CI runs each as its own job, the list read from
-  the flake; on aarch64 it runs `build`, `gotest` and the unit's sandbox on a
-  real kernel (`nix build .#hardening-smoke`, run as root).
+  grant against headscale). CI runs each as its own job on x86_64 and
+  aarch64, the lists read from the flake, and on aarch64 also the unit's
+  sandbox on a real kernel (`nix build .#hardening-smoke`, run as root).
 - `cd elm/<app> && elm-test-rs` runs one Elm app's tests.
 
 ### Browser suites

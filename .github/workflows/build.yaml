@@ -20,12 +20,13 @@ permissions:
   contents: read
 
 jobs:
-  # The matrix below is every x86_64-linux check the flake defines, read from
+  # The matrices below are every Linux check the flake defines, read from
   # the flake itself, so a new check cannot be left out of CI.
   checks:
     runs-on: ubuntu-latest
     outputs:
       x86: ${{ steps.list.outputs.x86 }}
+      arm: ${{ steps.list.outputs.arm }}
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -35,7 +36,16 @@ jobs:
 
       - name: List checks
         id: list
-        run: echo "x86=$(nix flake show --json | jq -c '.checks["x86_64-linux"] | keys')" >>"$GITHUB_OUTPUT"
+        # Each command on its own line: inside echo's argument a failed eval
+        # would pass as an empty list.
+        shell: bash
+        run: |
+          set -euo pipefail
+          checks=$(nix flake show --json)
+          x86=$(jq -ce '.checks["x86_64-linux"] | keys' <<<"$checks")
+          arm=$(jq -ce '.checks["aarch64-linux"] | keys' <<<"$checks")
+          echo "x86=$x86" >>"$GITHUB_OUTPUT"
+          echo "arm=$arm" >>"$GITHUB_OUTPUT"
 
   check:
     needs: checks
@@ -57,19 +67,16 @@ jobs:
       - name: ${{ matrix.check }}
         run: nix build -L .#checks.x86_64-linux.${{ matrix.check }}
 
-  # The beta host is aarch64. Only what can differ by architecture: the
-  # builds (photo-variants among them), the real vips on the fixtures, and the
-  # unit's sandbox on a real kernel. No /dev/kvm on these runners, so the VM
-  # tests stay x86-only.
+  # The beta host is aarch64: every check again there (no /dev/kvm on these
+  # runners, so the flake keeps the VM tests x86-only), and the unit's
+  # sandbox on a real kernel.
   check-aarch64:
+    needs: checks
     runs-on: ubuntu-24.04-arm
     strategy:
       fail-fast: false
       matrix:
-        check:
-          - build
-          - gotest
-          - hardening-smoke
+        check: ${{ fromJSON(needs.checks.outputs.arm) }}
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -81,10 +88,20 @@ jobs:
         uses: Mic92/hestia@dfed9ced335d28978ba74e513939a10db1f71025 # v3.1.0
 
       - name: ${{ matrix.check }}
-        if: matrix.check != 'hardening-smoke'
         run: nix build -L .#checks.aarch64-linux.${{ matrix.check }}
+
+  hardening-smoke-aarch64:
+    runs-on: ubuntu-24.04-arm
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Install Nix
+        uses: NixOS/nix-installer-action@62c1943b776c509394b550f3f983adc14e9212d6 # v1.0.0
+
+      - name: Setup Nix cache (hestia)
+        uses: Mic92/hestia@dfed9ced335d28978ba74e513939a10db1f71025 # v3.1.0
 
       # Root and the runner's systemd, so it runs outside the nix sandbox.
       - name: hardening-smoke
-        if: matrix.check == 'hardening-smoke'
         run: sudo "$(nix build -L --no-link --print-out-paths .#packages.aarch64-linux.hardening-smoke)/bin/asparges-hardening-smoke"
