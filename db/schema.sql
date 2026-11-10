@@ -91,7 +91,7 @@ CREATE TABLE photos (
 CREATE INDEX photos_photographer ON photos (photographer_id);
 
 -- photo_crops holds one rectangle per crop kind, in source pixels. A photo
--- without a crop of a kind falls back to a centred one computed by images/.
+-- without a crop of a kind is shown whole where that kind would be.
 CREATE TABLE photo_crops (
     photo_id INTEGER NOT NULL REFERENCES photos (id) ON DELETE CASCADE,
     kind     TEXT    NOT NULL CHECK (kind IN ('card', 'banner', 'share')),

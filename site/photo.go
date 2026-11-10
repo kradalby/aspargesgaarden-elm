@@ -55,8 +55,8 @@ type Photo struct {
 	Alt           string
 	// Photographer is the credit, nil for none; only its ID is read on writes.
 	Photographer *Photographer
-	// Crops holds the rectangles set so far; a missing kind means images/
-	// falls back to a centred crop.
+	// Crops holds the rectangles set so far; a missing kind has no variants
+	// of its own, and pages show the whole photo there.
 	Crops     map[images.Kind]images.Rect
 	CreatedAt time.Time
 	// UpdatedAt is the last change. In an event being saved it is the

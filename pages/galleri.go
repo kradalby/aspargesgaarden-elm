@@ -27,7 +27,8 @@ func Galleri(s Site, photos []site.Photo) *elem.Element {
 }
 
 // fallbackAlt names a photo stored without alt text, so its link still says
-// where it leads. The admin requires alt text; imported photos may lack it.
+// where it leads. The admin requires alt text only on photos a published
+// event shows; gallery photos may lack it.
 const fallbackAlt = "Bilde fra Aspargesgården"
 
 // galleryPhotos is what ui.Gallery shows of stored photos, in their order:

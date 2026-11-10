@@ -197,7 +197,7 @@
 
           prettier = true;
           # Pulls .elm into the formatting check's source, so elm-format sees
-          # the Elm apps once they exist instead of silently checking nothing.
+          # the Elm apps instead of silently checking nothing.
           fmtExts = [ "elm" ];
           treefmtExtra = {
             programs.elm-format.enable = true;
@@ -211,9 +211,8 @@
         };
 
         asparges = (withStatic goBuild).overrideAttrs (old: {
-          # Every subcommand that touches photos shells out to vips; the
-          # wrapper carries the slim one, so serve, import and images work
-          # wherever the binary runs.
+          # serve and import shell out to vips; the wrapper carries the slim
+          # one, so both work wherever the binary runs.
           nativeBuildInputs = (old.nativeBuildInputs or [ ]) ++ [ pkgs.makeWrapper ];
           postFixup = (old.postFixup or "") + ''
             wrapProgram $out/bin/asparges --prefix PATH : ${lib.getBin vips}/bin
@@ -340,7 +339,8 @@
               ;
           };
         }
-        # VM tests run on x86_64-linux only, as the server will.
+        # VM tests run on x86_64-linux only; on aarch64, where the server
+        # runs, hardening-smoke checks the unit's sandbox instead.
         // lib.optionalAttrs (system == "x86_64-linux") {
           vm-basic = pkgs.testers.nixosTest (
             import ./nix/tests/basic.nix {

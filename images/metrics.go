@@ -22,8 +22,8 @@ var (
 	}))
 )
 
-// register adds c to the default registry, which the skeleton serves on
-// /metrics. Not promauto: that package is not in the vendor tree yet.
+// register adds c to the default registry, which the service serves on
+// /metrics.
 func register[C prometheus.Collector](c C) C {
 	prometheus.MustRegister(c)
 	return c

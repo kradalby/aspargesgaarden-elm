@@ -395,7 +395,7 @@ const (
 )
 
 // Status is what the admin polls while a photo is prepared. It shows
-// "Bildene klargjøres …" until State is StateReady, and on StateFailed turns
+// "Klargjør bildet …" until State is StateReady, and on StateFailed turns
 // Reason into a sentence and offers Retry. Publishing need not wait: a size
 // not built yet is missing on the page until the worker gets to it.
 type Status struct {
