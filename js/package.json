@@ -1,0 +1,9 @@
+{
+  "name": "asparges-admin-js",
+  "private": true,
+  "license": "UNLICENSED",
+  "dependencies": {
+    "@github/markdown-toolbar-element": "2.2.3",
+    "cropperjs": "1.6.2"
+  }
+}
