@@ -60,6 +60,25 @@ func (s *Store) Enqueue(sha string) {
 	s.enqueue(sha, true)
 }
 
+// Retry forgets the photo's recent build failures and queues it again: the
+// admin's answer to StateFailed, for a cause that has gone away since.
+func (s *Store) Retry(ctx context.Context, sha string) error {
+	p, err := s.photo(ctx, sha)
+	if err != nil {
+		return fmt.Errorf("retry: %w", err)
+	}
+
+	s.mu.Lock()
+	for _, sp := range Expected(p) {
+		delete(s.failed, s.path(sp))
+	}
+	s.mu.Unlock()
+
+	s.Enqueue(sha)
+
+	return nil
+}
+
 func (s *Store) enqueue(sha string, first bool) {
 	s.qmu.Lock()
 	if first {
@@ -136,6 +155,14 @@ func (s *Store) Run(ctx context.Context) error {
 }
 
 func (s *Store) reconcileAndLog(ctx context.Context) {
+	if s.sweep != nil {
+		if err := s.sweep(ctx); err != nil {
+			s.log.Error("images: sweep before reconcile", "err", err)
+		}
+
+		s.Changed()
+	}
+
 	rep, err := s.Reconcile(ctx, false)
 	if err != nil {
 		s.log.Error("images: reconcile", "err", err)
@@ -191,6 +218,35 @@ func previewSpec(p Photo) (VariantSpec, bool) {
 	}
 
 	return best, best.Width > 0
+}
+
+// PreviewURL is the address of the crop tool's picture of p, and ThumbURL
+// of p whole at the smallest width, for the admin's lists. Both are "" for
+// a photo with no variants. Status tells when the preview is built; the
+// thumb is built on its first request if the queue has not got to it.
+func PreviewURL(p Photo) string {
+	pv, ok := previewSpec(p)
+	if !ok {
+		return ""
+	}
+
+	return pv.URL()
+}
+
+// ThumbURL: see PreviewURL.
+func ThumbURL(p Photo) string {
+	gs := groups(p)
+	if len(gs) == 0 || gs[0].kind != Full {
+		return ""
+	}
+
+	for _, s := range gs[0].specs {
+		if s.Format == JPEG && s.Width == widths[0] {
+			return s.URL()
+		}
+	}
+
+	return ""
 }
 
 // warm builds the missing variants pick chooses from each group of a photo.

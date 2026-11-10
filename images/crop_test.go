@@ -84,3 +84,13 @@ func TestDefaultCrop(t *testing.T) {
 		})
 	}
 }
+
+func TestCentredCrop(t *testing.T) {
+	// Where DefaultCrop refuses, the admin still gets a rectangle to start from.
+	require.Equal(t, Rect{0, 87, 1000, 525}, CentredCrop(Share, 1000, 700))
+	require.Equal(t, Rect{0, 0, 479, 800}, CentredCrop(Full, 479, 800))
+
+	got, err := DefaultCrop(Card, 1200, 800)
+	require.NoError(t, err)
+	require.Equal(t, got, CentredCrop(Card, 1200, 800))
+}

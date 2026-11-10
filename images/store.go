@@ -40,6 +40,7 @@ type Store struct {
 	vips      *vips
 	now       func() time.Time
 	maxUpload int64
+	sweep     func(context.Context) error
 	jobs      chan struct{}
 	builds    atomic.Int64 // group builds started; tests read it
 
@@ -78,6 +79,12 @@ func WithLogger(l *slog.Logger) Option {
 // WithClock replaces time.Now for the negative cache and the grace periods.
 func WithClock(now func() time.Time) Option {
 	return func(s *Store) error { s.now = now; return nil }
+}
+
+// WithSweep runs sweep before each scheduled reconcile, so photo rows it
+// deletes from the catalogue lose their files in the same pass.
+func WithSweep(sweep func(context.Context) error) Option {
+	return func(s *Store) error { s.sweep = sweep; return nil }
 }
 
 // WithJobs sets how many variant groups may build at once.

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -179,6 +180,75 @@ func TestQueueSkipsDeletedPhotos(t *testing.T) {
 
 	require.NoError(t, s.warm(context.Background(), testSHA, allSpecs))
 	require.Zero(t, s.builds.Load())
+}
+
+func TestRetry(t *testing.T) {
+	t.Parallel()
+	cat := newFakeCatalog()
+	s := newTestStore(t, cat)
+	ctx := context.Background()
+
+	b, err := os.ReadFile(fixture(t, "truncated.jpg"))
+	require.NoError(t, err)
+
+	p := Photo{SHA256: testSHA, MIME: "image/jpeg", Width: 1200, Height: 800}
+	orig := s.originalPath(p.SHA256, p.MIME)
+	require.NoError(t, os.MkdirAll(filepath.Dir(orig), dirPerm))
+	require.NoError(t, os.WriteFile(orig, b, 0o600))
+	cat.put(p)
+
+	require.ErrorIs(t, s.warm(ctx, p.SHA256, allSpecs), ErrBroken)
+	require.NotEmpty(t, s.failed)
+
+	require.NoError(t, s.Retry(ctx, p.SHA256))
+	require.Empty(t, s.failed, "the failures are forgotten")
+
+	st, err := s.Status(ctx, p.SHA256)
+	require.NoError(t, err)
+	require.Equal(t, StateQueued, st.State)
+
+	sha, first, ok := s.next()
+	require.True(t, ok)
+	require.True(t, first)
+	require.Equal(t, p.SHA256, sha)
+
+	require.ErrorIs(t, s.Retry(ctx, strings.Repeat("f", 64)), ErrNotFound)
+}
+
+func TestAdminURLs(t *testing.T) {
+	p := Photo{SHA256: testSHA, MIME: "image/jpeg", Width: 3000, Height: 2000}
+	require.Equal(t, "/img/v1/"+testSHA+"/full-"+(Rect{W: 3000, H: 2000}).ID()+"-1200.jpg", PreviewURL(p))
+	require.Equal(t, "/img/v1/"+testSHA+"/full-"+(Rect{W: 3000, H: 2000}).ID()+"-480.jpg", ThumbURL(p))
+
+	bad := Photo{SHA256: "nope", Width: 3000, Height: 2000}
+	require.Empty(t, PreviewURL(bad))
+	require.Empty(t, ThumbURL(bad))
+}
+
+func TestSweepBeforeReconcile(t *testing.T) {
+	t.Parallel()
+	clock := newFakeClock()
+	cat := newFakeCatalog()
+
+	unused := strings.Repeat("d", 64)
+	cat.put(Photo{SHA256: unused, MIME: "image/jpeg", Width: 1200, Height: 800})
+	// An empty catalogue holds every original back; see reconcileOriginals.
+	cat.put(Photo{SHA256: testSHA, MIME: "image/jpeg", Width: 1200, Height: 800})
+
+	swept := 0
+	s := newTestStore(t, cat, WithClock(clock.now), WithSweep(func(context.Context) error {
+		swept++
+		cat.remove(unused)
+
+		return nil
+	}))
+
+	orig := s.originalPath(unused, "image/jpeg")
+	plant(t, orig, clock.now().Add(-8*24*time.Hour))
+
+	s.reconcileAndLog(context.Background())
+	require.Equal(t, 1, swept)
+	require.NoFileExists(t, orig, "the swept photo's original goes in the same pass")
 }
 
 func TestWarmAll(t *testing.T) {

@@ -75,12 +75,26 @@ func ValidateCrop(k Kind, w, h int, r Rect) error {
 // starting point in the admin and the crop the import uses. ErrTooSmall
 // means the photo cannot be used for that kind at all.
 func DefaultCrop(k Kind, w, h int) (Rect, error) {
+	if an, _ := k.aspect(); an == 0 && k != Full {
+		return Rect{}, fmt.Errorf("%w: %q", ErrKind, k)
+	}
+
+	r := CentredCrop(k, w, h)
+	if r.W < k.MinWidth() {
+		return Rect{}, fmt.Errorf("%w: %s needs at least %d pixels across, the photo gives %d", ErrTooSmall, k, k.MinWidth(), r.W)
+	}
+
+	return r, nil
+}
+
+// CentredCrop is the largest centred rectangle of kind k's shape on a w×h
+// photo, however small: where the admin's crop tool starts for a kind the
+// photo has no crop of. Full, and a kind without a shape, is the whole photo.
+func CentredCrop(k Kind, w, h int) Rect {
 	r := Rect{W: w, H: h}
 
 	an, ad := k.aspect()
 	switch {
-	case an == 0 && k != Full:
-		return Rect{}, fmt.Errorf("%w: %q", ErrKind, k)
 	case an == 0:
 	case w*ad > h*an:
 		r.W, r.H = h*an/ad, h
@@ -88,11 +102,7 @@ func DefaultCrop(k Kind, w, h int) (Rect, error) {
 		r.W, r.H = w, w*ad/an
 	}
 
-	if r.W < k.MinWidth() {
-		return Rect{}, fmt.Errorf("%w: %s needs at least %d pixels across, the photo gives %d", ErrTooSmall, k, k.MinWidth(), r.W)
-	}
-
 	r.X, r.Y = (w-r.W)/2, (h-r.H)/2
 
-	return r, nil
+	return r
 }
