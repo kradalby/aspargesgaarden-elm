@@ -2,6 +2,33 @@
 
 Elm/elm-pages 2 static site for [aspargesgaarden.no](https://aspargesgaarden.no).
 
+## asparges (the Go rewrite on this branch)
+
+The new site is one Go binary. Its stylesheet, fonts and fixed-page photos
+are built by `static/build.sh` into `static/dist/` (git-ignored) and embedded
+with `go:embed`. The Nix build runs the same script, so nothing here differs
+from what ships.
+
+```bash
+nix develop
+go generate ./static        # CSS, WOFF2 fonts, photo variants into static/dist
+go test ./...               # needs static/dist; the first generate takes ~40 s
+go run ./cmd/asparges serve --dev --listen-addr 127.0.0.1:8090 \
+  --base-url http://127.0.0.1:8090 --data-dir /tmp/asparges
+```
+
+- Changed Go markup or classes: rerun `go generate ./static` (Tailwind only
+  emits classes it finds in `ui/`, `pages/`, `markdown/`; fonts and photos
+  are skipped unless their source is newer), then restart `go run`.
+- Changed markup on purpose: `UPDATE_GOLDEN=1 go test ./...`, then review
+  the diff of the `testdata/*.html` golden files.
+- Avenir's 400 weight is Medium; switch to Roman by changing the one
+  `@font-face` line in `static/input.css`.
+- Pages may load nothing from outside the binary except the origins in
+  `ui/external.go` (Umami, the Google calendar frame). Tests check the
+  rendered pages and the stylesheet; every public response carries the
+  matching Content-Security-Policy.
+
 ## elm-pages version (pinned to v2)
 
 This site is intentionally pinned to **elm-pages 2** (`elm-pages@2.1.12` on npm,
