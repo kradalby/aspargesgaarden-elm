@@ -372,7 +372,17 @@ func openData(ctx context.Context, dataDir string) (*db.DB, error) {
 		return nil, fmt.Errorf("creating %s: %w", dataDir, err)
 	}
 
-	d, err := db.Open(ctx, filepath.Join(dataDir, "asparges.db"))
+	// SQLite would create the database 0644, and gives -wal and -shm the
+	// database's mode; litestream, in the group, writes all three.
+	path := filepath.Join(dataDir, "asparges.db")
+
+	f, err := os.OpenFile(path, os.O_RDONLY|os.O_CREATE, 0o660) //nolint:gosec // see above
+	if err != nil {
+		return nil, fmt.Errorf("creating database: %w", err)
+	}
+	_ = f.Close()
+
+	d, err := db.Open(ctx, path)
 	if err != nil {
 		return nil, fmt.Errorf("opening database: %w", err)
 	}

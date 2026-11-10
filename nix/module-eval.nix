@@ -34,6 +34,7 @@ let
     cfg: map (a: a.message) (lib.filter (a: !a.assertion) (configFor cfg).assertions);
 
   default = unitFor { enable = true; };
+  tmpfiles = (configFor { enable = true; }).systemd.tmpfiles.rules;
 
   custom = unitFor {
     enable = true;
@@ -95,6 +96,11 @@ assert check (
   custom.EnvironmentFile == "/run/agenix/asparges-env"
 ) "custom EnvironmentFile not set";
 assert check (default.MemoryMax == "2G") "default MemoryMax is ${default.MemoryMax}";
+assert check (lib.all (f: lib.elem "z /var/lib/asparges/${f} 0660 asparges asparges -" tmpfiles) [
+  "asparges.db"
+  "asparges.db-wal"
+  "asparges.db-shm"
+]) "litestream needs the database files group-writable: ${toString tmpfiles}";
 assert check (
   failedAssertions {
     enable = true;

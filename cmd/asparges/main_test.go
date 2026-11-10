@@ -12,6 +12,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"syscall"
 	"testing"
 	"time"
 
@@ -300,4 +301,22 @@ func TestSweepUnusedPhotos(t *testing.T) {
 
 	cancel()
 	require.NoError(t, <-done)
+}
+
+// Under the unit's UMask=0007 litestream, in the group, can write the
+// database and the -wal and -shm SQLite makes beside it.
+func TestOpenDataGroupWritable(t *testing.T) {
+	old := syscall.Umask(0o007)
+	t.Cleanup(func() { syscall.Umask(old) })
+
+	dir := t.TempDir()
+	d, err := openData(t.Context(), dir)
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = d.Close() })
+
+	for _, name := range []string{"asparges.db", "asparges.db-wal", "asparges.db-shm"} {
+		fi, err := os.Stat(filepath.Join(dir, name))
+		require.NoError(t, err)
+		assert.Equal(t, os.FileMode(0o660), fi.Mode().Perm(), name)
+	}
 }

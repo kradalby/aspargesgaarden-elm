@@ -133,6 +133,14 @@ in
     # sudo -u asparges asparges import --data-dir /var/lib/asparges <checkout>.
     environment.systemPackages = [ cfg.package ];
 
+    # The service creates the database 0660 and SQLite gives -wal and -shm
+    # its mode; these put back what a restore or a seed copied in otherwise.
+    systemd.tmpfiles.rules = map (f: "z ${cfg.dataDir}/${f} 0660 ${cfg.user} ${cfg.group} -") [
+      "asparges.db"
+      "asparges.db-wal"
+      "asparges.db-shm"
+    ];
+
     systemd.services.asparges = {
       description = "asparges, the aspargesgaarden.no web server";
       wantedBy = [ "multi-user.target" ];
@@ -170,7 +178,8 @@ in
         Group = cfg.group;
         StateDirectory = lib.removePrefix stateRoot cfg.dataDir;
         # setgid so litestream-created -wal/-shm inherit the asparges group
-        # (litestream joins it to replicate the db); group-writable via UMask.
+        # (litestream joins it to replicate the db); UMask keeps the
+        # database's 0660 on the files SQLite creates beside it.
         StateDirectoryMode = "2770";
         UMask = "0007";
         Restart = "always";

@@ -22,8 +22,11 @@ state: /var/lib/asparges/{asparges.db, originals/, variants/, tmp/, tsnet/}
 
 - One systemd unit, `asparges.service`, from `services.asparges`
   (`nixosModules.default` of this flake). Static user and group `asparges`,
-  `StateDirectory` with mode `2770` and `UMask=0007` so litestream (in the
-  group) can replicate the database. `MemoryMax=2G` covers the server and two
+  `StateDirectory` with mode `2770`. The service creates `asparges.db`
+  `0660` and SQLite gives `-wal` and `-shm` its mode (`UMask=0007` keeps
+  it), so litestream (in the group) can replicate the database; the
+  module's `z` tmpfiles rules put `0660 asparges:asparges` back on all
+  three at boot and on every deploy. `MemoryMax=2G` covers the server and two
   vips children.
 - The public listener is plain HTTP on loopback; nginx terminates TLS.
   Uploads go over the tailnet, never through nginx, so the vhost needs no
@@ -181,9 +184,9 @@ Follow `hvor` and `ghdl`, which run the same way on the same host:
     hourly `sqlite-backup` snapshot (`VACUUM INTO`, integrity check, xz into
     `/var/backup/sqlite`) and the weekly litestream restore test.
   - `"asparges"` in the litestream user's `extraGroups`.
-  - `z` tmpfiles rules `0660 asparges asparges` on `asparges.db`, `-wal` and
-    `-shm`, and `asparges.service` in litestream's `after`/`wants`, as for
-    ghdl (the wal/shm permission race at boot).
+  - `asparges.service` in litestream's `after`/`wants`, as for ghdl (the
+    wal/shm permission race at boot). The module brings the `z` tmpfiles
+    rules itself.
 - `machines/core.oracldn/restic.nix`: `config.services.asparges.dataDir` in
   `paths`. The live `asparges.db`, `-wal` and `-shm` are excluded
   automatically (every litestream database is); restic takes the snapshot
