@@ -3,7 +3,6 @@ package server
 import (
 	"context"
 	"io"
-	"io/fs"
 	"log/slog"
 	"net"
 	"net/http"
@@ -56,10 +55,11 @@ type AdminConfig struct {
 	// --dev; in --dev the loopback listener stands in and every caller is
 	// DevName.
 	Tailnet Tailnet
-	// App is the built admin front end: index.html, the shell served for
-	// every page address under /admin/, and static/, served at
-	// /admin/static/. Nil serves a placeholder page.
-	App    fs.FS
+	// App answers every address under /admin/ but the API: the document
+	// the admin app runs in (pages.AdminHandler). Its files come from
+	// /static/, which the listener serves beside it. Nil serves a
+	// placeholder page.
+	App    http.Handler
 	Photos Photos
 }
 
@@ -90,8 +90,13 @@ func (s *Server) Admin() http.Handler {
 	mux.HandleFunc("/admin/api/", func(w http.ResponseWriter, r *http.Request) {
 		s.writeProblems(w, r, http.StatusNotFound, []problem{{Code: "not_found"}}, nil)
 	})
-	mux.Handle("GET /admin/static/", s.appStatic())
-	mux.HandleFunc("/admin/", s.appShell)
+	// No method in the pattern: "GET /admin/" would conflict with the
+	// method-less "/admin/api/".
+	if s.cfg.Admin.App != nil {
+		mux.Handle("/admin/", s.cfg.Admin.App)
+	} else {
+		mux.HandleFunc("/admin/", placeholderApp)
+	}
 
 	csrf := http.NewCrossOriginProtection()
 	csrf.SetDenyHandler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -241,15 +246,8 @@ func logPath(p string) string {
 	return p
 }
 
-// placeholderShell stands in until the admin app is built into the binary.
-const placeholderShell = `<!doctype html>
-<html lang="nb"><head><meta charset="utf-8"><title>Aspargesgården admin</title></head>
-<body><p>Admin-appen er ikke bygget inn ennå.</p></body></html>
-`
-
-// appShell answers every page address of the app with the same shell; the
-// app reads the address itself.
-func (s *Server) appShell(w http.ResponseWriter, r *http.Request) {
+// placeholderApp stands in for the admin app until it is built in.
+func placeholderApp(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet && r.Method != http.MethodHead {
 		w.Header().Set("Allow", "GET, HEAD")
 		http.Error(w, http.StatusText(http.StatusMethodNotAllowed), http.StatusMethodNotAllowed)
@@ -257,33 +255,9 @@ func (s *Server) appShell(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	body := []byte(placeholderShell)
-
-	if s.cfg.Admin.App != nil {
-		b, err := fs.ReadFile(s.cfg.Admin.App, "index.html")
-		if err != nil {
-			s.cfg.Log.ErrorContext(r.Context(), "admin: app shell", "err", err)
-			http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
-
-			return
-		}
-
-		body = b
-	}
-
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	_, _ = w.Write(body)
-}
-
-func (s *Server) appStatic() http.Handler {
-	if s.cfg.Admin.App == nil {
-		return http.NotFoundHandler()
-	}
-
-	sub, err := fs.Sub(s.cfg.Admin.App, "static")
-	if err != nil {
-		return http.NotFoundHandler()
-	}
-
-	return http.StripPrefix("/admin/static/", http.FileServerFS(sub))
+	_, _ = w.Write([]byte(`<!doctype html>
+<html lang="nb"><head><meta charset="utf-8"><title>Aspargesgården admin</title></head>
+<body><p>Admin-appen er ikke bygget inn ennå.</p></body></html>
+`))
 }

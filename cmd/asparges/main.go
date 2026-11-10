@@ -78,7 +78,6 @@ type serveConfig struct {
 	authKeyPath string
 	dev         bool
 	noindex     bool
-	adminDir    string
 	e2eFixtures string
 }
 
@@ -104,7 +103,6 @@ func newServeCmd(a *app, parent *ff.FlagSet) *ff.Command {
 	fs.StringVar(&cfg.authKeyPath, 0, "tailscale-auth-key-path", "", "file holding the Tailscale auth key (TS_AUTHKEY takes precedence)")
 	fs.BoolVar(&cfg.dev, 0, "dev", "local development: no Tailscale, metrics and admin on the loopback-only local listener")
 	fs.BoolVar(&cfg.noindex, 0, "noindex", "keep the site out of search engines (beta): noindex on every response, robots.txt disallows all, no IndexNow")
-	fs.StringVar(&cfg.adminDir, 0, "admin-dir", "", "with --dev: serve the admin app from this folder (index.html, static/) instead of the built-in one")
 	fs.StringVar(&cfg.e2eFixtures, 0, "e2e-fixtures", "", "with --dev: the admin browser tests' photo folder; mounts their hooks POST /__reset (deletes everything) and /__touch/{id}")
 
 	return &ff.Command{
@@ -126,7 +124,7 @@ func newServeCmd(a *app, parent *ff.FlagSet) *ff.Command {
 var (
 	errBaseURL     = errors.New("--base-url must be an http(s) origin without path, query or trailing slash")
 	errDevLoopback = errors.New("--dev serves metrics on the local listener, so --listen-addr must be a loopback address")
-	errDevOnly     = errors.New("--admin-dir and --e2e-fixtures need --dev")
+	errDevOnly     = errors.New("--e2e-fixtures needs --dev: its hooks delete everything")
 )
 
 func (c serveConfig) validate() error {
@@ -140,7 +138,7 @@ func (c serveConfig) validate() error {
 		return fmt.Errorf("%w: %q", errDevLoopback, c.listenAddr)
 	}
 
-	if !c.dev && (c.adminDir != "" || c.e2eFixtures != "") {
+	if !c.dev && c.e2eFixtures != "" {
 		return errDevOnly
 	}
 
@@ -220,9 +218,6 @@ func serve(ctx context.Context, log *slog.Logger, cfg serveConfig) error {
 	}
 
 	admin := server.AdminConfig{Photos: imgs}
-	if cfg.adminDir != "" {
-		admin.App = os.DirFS(cfg.adminDir)
-	}
 
 	if !cfg.dev {
 		lc := srv.TailscaleLocalClient()

@@ -15,7 +15,6 @@ import (
 	"strings"
 	"sync"
 	"testing"
-	"testing/fstest"
 
 	"github.com/stretchr/testify/require"
 	"tailscale.com/client/tailscale/apitype"
@@ -398,24 +397,22 @@ func TestAdminApp(t *testing.T) {
 	require.Equal(t, http.StatusOK, rec.Code)
 	require.Contains(t, rec.Body.String(), "ikke bygget inn")
 
-	a.srv.cfg.Admin.App = fstest.MapFS{
-		"index.html":       {Data: []byte("<!doctype html><title>shell</title>")},
-		"static/app.js":    {Data: []byte("elm()")},
-		"static/admin.css": {Data: []byte("body{}")},
-	}
+	require.Equal(t, http.StatusMethodNotAllowed, a.do(t, "POST", "/admin/", req{}).Code)
+
+	a.srv.cfg.Admin.App = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte("shell for " + r.URL.Path))
+	})
 	a.admin = a.srv.Admin()
 
 	for _, path := range []string{"/admin/", "/admin/arrangementer/4", "/admin/galleri"} {
 		rec := a.do(t, "GET", path, req{})
 		require.Equal(t, http.StatusOK, rec.Code, path)
-		require.Equal(t, "<!doctype html><title>shell</title>", rec.Body.String(), path)
+		require.Equal(t, "shell for "+path, rec.Body.String(), path)
 	}
 
-	rec = a.do(t, "GET", "/admin/static/app.js", req{})
-	require.Equal(t, http.StatusOK, rec.Code)
-	require.Equal(t, "elm()", rec.Body.String())
-	require.Equal(t, http.StatusNotFound, a.do(t, "GET", "/admin/static/nope.js", req{}).Code)
-	require.Equal(t, http.StatusMethodNotAllowed, a.do(t, "POST", "/admin/", req{}).Code)
+	// The API stays the API, and the app is as closed as the rest.
+	require.Equal(t, http.StatusOK, a.do(t, "GET", "/admin/api/me", req{}).Code)
+	require.Equal(t, http.StatusForbidden, a.do(t, "GET", "/admin/", req{from: anders}).Code)
 }
 
 // Every write says who did what.
