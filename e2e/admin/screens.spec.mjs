@@ -33,11 +33,14 @@ test("screens", async ({ page }, testInfo) => {
   const chooser = page.waitForEvent("filechooser");
   await page.getByRole("button", { name: "Velg bilde" }).click();
   await (await chooser).setFiles(fixture("konsert.jpg"));
-  await expect(page.getByText("Klargjør bildet … 23 av 46")).toBeVisible();
+  // Whatever state the photo has reached when it first shows.
+  await expect(page.locator("[data-photo-status]")).toBeVisible();
   await page
     .locator("#bilde")
     .screenshot({ path: file(testInfo, "2a-klargjor") });
-  await expect(page.locator('[data-photo-status="ready"]')).toBeVisible();
+  await expect(page.locator('[data-photo-status="ready"]')).toBeVisible({
+    timeout: 60_000,
+  });
   await page.getByLabel("Beskriv bildet").fill("Boder i låven");
   await expect(page.locator("#forhandsvisning iframe")).toBeVisible();
   await shot(page, testInfo, "2-endre");
