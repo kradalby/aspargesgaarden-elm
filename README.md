@@ -110,7 +110,8 @@ In `--dev` the loopback listener carries the admin and everyone is
 "Utvikler": `go run ./cmd/asparges serve --dev …` as above gives a working
 admin at `/admin/`. `--e2e-fixtures e2e/admin/fixtures` adds the browser
 tests' hooks (`POST /__reset` deletes everything and seeds their data;
-`POST /__touch/{id}`); it is refused without `--dev`.
+`POST /__touch/{id}`; `POST /__crop/{id}` stores crops unchecked); it is
+refused without `--dev`.
 
 ```bash
 cd elm/admin && elm-test-rs              # decoders, form rules, crop arithmetic
