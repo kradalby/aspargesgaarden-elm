@@ -24,6 +24,11 @@ var dbSchema string
 
 // schema is the squibble migration target. Schema changes append
 // {Source, Target, Apply} rules whose digests chain to the hash of schema.sql.
+// Squibble's digest sees columns only: a rule must also make every changed
+// CHECK, key and index, or production silently keeps the old ones. Each
+// change keeps the schema it replaces as testdata/schema-<digest>.sql, and
+// TestMigratedEqualsFresh fails until a database made from every one of them
+// migrates to exactly what a fresh one holds.
 //
 // IgnoreTables keeps litestream's bookkeeping tables out of the digest:
 // litestream replicates this database and creates them at runtime, and

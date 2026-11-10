@@ -1,7 +1,9 @@
--- asparges schema. Source of truth for squibble: the live database is
--- migrated to match this file exactly (see db.go). Rules that need more than
--- one row live in site/; the checks here are the ones a bad write must never
--- get past, whatever code path it comes from.
+-- asparges schema: what a fresh database is made from. An existing one is
+-- changed only by the update rules in db.go, and squibble checks the result
+-- against this file by its tables' columns alone; a changed CHECK, key or
+-- index needs a rule of its own, which TestMigratedEqualsFresh holds to.
+-- Rules that need more than one row live in site/; the checks here are the
+-- ones a bad write must never get past, whatever code path it comes from.
 --
 -- Dates are TEXT 'YYYY-MM-DD' (civil dates in Europe/Oslo, '' for none) and
 -- times TEXT 'HH:MM' ('' for none). Instants are INTEGER unix seconds, set by

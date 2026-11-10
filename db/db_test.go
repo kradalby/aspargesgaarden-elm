@@ -3,11 +3,16 @@ package db
 import (
 	"database/sql"
 	"errors"
+	"os"
 	"path/filepath"
+	"regexp"
+	"slices"
 	"strings"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/require"
+	"github.com/tailscale/squibble"
 
 	"github.com/kradalby/asparges/db/dbsqlc"
 )
@@ -326,4 +331,100 @@ func TestInTxRollsBack(t *testing.T) {
 	events, err := d.Queries().ListEvents(t.Context())
 	require.NoError(t, err)
 	require.Empty(t, events)
+}
+
+// Squibble compares column lists only, so a constraint changed in
+// schema.sql without an update rule would never reach a production database.
+// A database made with each schema the service has run in production
+// (testdata/schema-<digest>.sql), once opened, must hold exactly what a fresh
+// one does: tables, columns, checks, keys and indexes.
+func TestMigratedEqualsFresh(t *testing.T) {
+	fresh := schemaOf(t, openTest(t).sql)
+
+	olds, err := filepath.Glob("testdata/schema-*.sql")
+	require.NoError(t, err)
+	require.NotEmpty(t, olds)
+
+	for _, file := range olds {
+		t.Run(filepath.Base(file), func(t *testing.T) {
+			src, err := os.ReadFile(file)
+			require.NoError(t, err)
+
+			path := filepath.Join(t.TempDir(), "old.db")
+			raw, err := sql.Open("sqlite", path)
+			require.NoError(t, err)
+			require.NoError(t, (&squibble.Schema{Current: string(src)}).Apply(t.Context(), raw))
+			require.NoError(t, raw.Close())
+
+			d, err := Open(t.Context(), path)
+			require.NoError(t, err)
+			t.Cleanup(func() { _ = d.Close() })
+
+			if diff := cmp.Diff(fresh, schemaOf(t, d.sql)); diff != "" {
+				t.Errorf("migrated schema differs from a fresh one (-fresh +migrated):\n%s", diff)
+			}
+		})
+	}
+}
+
+// schemaOf is every table and index in sqlite_schema with its statement in
+// a canonical form; see canonical.
+func schemaOf(t *testing.T, db *sql.DB) map[string]string {
+	t.Helper()
+
+	// The schema catalog is outside sqlc; raw SQL in a test is the exception.
+	rows, err := db.QueryContext(t.Context(),
+		"SELECT type || ' ' || name, coalesce(sql, '') FROM sqlite_schema WHERE name NOT LIKE '\\_%' ESCAPE '\\'")
+	require.NoError(t, err)
+	defer rows.Close()
+
+	out := map[string]string{}
+	for rows.Next() {
+		var name, stmt string
+		require.NoError(t, rows.Scan(&name, &stmt))
+		out[name] = canonical(stmt)
+	}
+	require.NoError(t, rows.Err())
+
+	return out
+}
+
+var sqlComment = regexp.MustCompile(`--[^\n]*`)
+
+// canonical makes two statements that define the same thing equal. SQLite
+// keeps each as it was typed, and ALTER TABLE ADD COLUMN appends the column
+// after any table constraint, where CREATE TABLE cannot have it, so a
+// table's columns and constraints are compared as a set.
+func canonical(stmt string) string {
+	s := strings.Join(strings.Fields(sqlComment.ReplaceAllString(stmt, "")), " ")
+
+	open, end := strings.IndexByte(s, '('), strings.LastIndexByte(s, ')')
+	if !strings.HasPrefix(s, "CREATE TABLE") || open < 0 || end < open {
+		return s
+	}
+
+	var (
+		items []string
+		depth int
+		start = open + 1
+	)
+
+	for i := open + 1; i < end; i++ {
+		switch s[i] {
+		case '(':
+			depth++
+		case ')':
+			depth--
+		case ',':
+			if depth == 0 {
+				items = append(items, strings.TrimSpace(s[start:i]))
+				start = i + 1
+			}
+		}
+	}
+
+	items = append(items, strings.TrimSpace(s[start:end]))
+	slices.Sort(items)
+
+	return s[:open] + "(" + strings.Join(items, ", ") + ")" + s[end+1:]
 }

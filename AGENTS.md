@@ -30,6 +30,12 @@ conventions (Go, Nix, Elm, git, services, secrets) are in
   and read the diff before committing.
 - **Old addresses keep working.** `TestAddresses` in `server/` lists every
   redirect; never remove a row.
+- **A schema change migrates whole.** Change `db/schema.sql` with an update
+  rule in `db/db.go` and keep the schema it replaces as
+  `db/testdata/schema-<digest>.sql`; squibble checks columns only, and
+  `TestMigratedEqualsFresh` fails when a check, key or index would not reach
+  an existing database. An older binary refuses a newer schema, so a
+  rollback across a schema change needs the database from before it.
 - **Generated files stay in step.** `sqlc generate` after `db/` changes (the
   `generate` check catches drift), `go run ./cmd/vendorhash update` after
   `go.mod`, `elm2nix` after an `elm.json`, the `yarn.<app>` hash in
