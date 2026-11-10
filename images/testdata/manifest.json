@@ -1,0 +1,232 @@
+{
+  "scene": {
+    "upright": [1200, 800],
+    "markers_upright_xywh": {
+      "red": [0, 0, 160, 160],
+      "green": [1040, 0, 160, 160],
+      "blue": [0, 640, 160, 160],
+      "yellow": [1040, 640, 160, 160],
+      "magenta": [800, 240, 160, 160]
+    },
+    "background": "grey gradient, ~#909090 left to ~#505050 right",
+    "colours_srgb": {
+      "red": [255, 0, 0],
+      "green": [0, 255, 0],
+      "blue": [0, 0, 255],
+      "yellow": [255, 255, 0],
+      "magenta": [255, 0, 255]
+    },
+    "tolerance": 12,
+    "example_crop": {
+      "kind": "card",
+      "rect_upright_xywh": [700, 150, 480, 600],
+      "out": [480, 600],
+      "expect_at_out_xy": {
+        "magenta": [180, 170],
+        "yellow": [410, 550],
+        "green": [410, 4],
+        "grey": [20, 20]
+      }
+    }
+  },
+  "fixtures": [
+    {
+      "file": "upright.jpg",
+      "accept": true,
+      "loader": "jpegload",
+      "stored": [1200, 800],
+      "upright": [1200, 800],
+      "orientation": 1,
+      "notes": "no EXIF, no ICC: treated as sRGB"
+    },
+    {
+      "file": "orient3.jpg",
+      "accept": true,
+      "loader": "jpegload",
+      "stored": [1200, 800],
+      "upright": [1200, 800],
+      "orientation": 3,
+      "notes": "pixels stored rotated 180"
+    },
+    {
+      "file": "orient6.jpg",
+      "accept": true,
+      "loader": "jpegload",
+      "stored": [800, 1200],
+      "upright": [1200, 800],
+      "orientation": 6,
+      "notes": "stored sideways, viewer turns 90 CW; vipsheader reports stored dims"
+    },
+    {
+      "file": "orient8.jpg",
+      "accept": true,
+      "loader": "jpegload",
+      "stored": [800, 1200],
+      "upright": [1200, 800],
+      "orientation": 8,
+      "notes": "stored sideways, viewer turns 90 CCW"
+    },
+    {
+      "file": "orient2.jpg",
+      "accept": true,
+      "loader": "jpegload",
+      "stored": [1200, 800],
+      "upright": [1200, 800],
+      "orientation": 2,
+      "notes": "stored mirrored left-right"
+    },
+    {
+      "file": "orient4.jpg",
+      "accept": true,
+      "loader": "jpegload",
+      "stored": [1200, 800],
+      "upright": [1200, 800],
+      "orientation": 4,
+      "notes": "stored mirrored top-bottom"
+    },
+    {
+      "file": "orient5.jpg",
+      "accept": true,
+      "loader": "jpegload",
+      "stored": [800, 1200],
+      "upright": [1200, 800],
+      "orientation": 5,
+      "notes": "stored transposed"
+    },
+    {
+      "file": "orient7.jpg",
+      "accept": true,
+      "loader": "jpegload",
+      "stored": [800, 1200],
+      "upright": [1200, 800],
+      "orientation": 7,
+      "notes": "stored transversed"
+    },
+    {
+      "file": "rotated.heic",
+      "accept": true,
+      "loader": "heifload",
+      "stored": [800, 1200],
+      "upright": [1200, 800],
+      "orientation": 1,
+      "notes": "HEVC; rotation in HEIF irot box AND EXIF Orientation=6 (iPhone shape). vipsheader already reports upright dims and no orientation field; must not be rotated twice"
+    },
+    {
+      "file": "p3.jpg",
+      "accept": true,
+      "loader": "jpegload",
+      "stored": [1200, 800],
+      "upright": [1200, 800],
+      "orientation": 1,
+      "notes": "Display-P3 ICC embedded; P3-encoded values. Output must be sRGB: red ~ 255,0,0 (ignoring the profile gives ~234,51,35)"
+    },
+    {
+      "file": "gps.jpg",
+      "accept": true,
+      "loader": "jpegload",
+      "stored": [1200, 800],
+      "upright": [1200, 800],
+      "orientation": 1,
+      "notes": "EXIF GPS 59.9139N 10.7522E, XMP GPS, IPTC City, Make/Model/DateTimeOriginal. No output may carry exif/xmp/iptc"
+    },
+    {
+      "file": "alpha.png",
+      "accept": true,
+      "loader": "pngload",
+      "stored": [1200, 800],
+      "upright": [1200, 800],
+      "orientation": 1,
+      "notes": "RGBA 8-bit; fully transparent hole at upright [400,300,320,200]. JPEG output flattened on white; AVIF/WebP keep alpha"
+    },
+    {
+      "file": "rgb16.png",
+      "accept": true,
+      "loader": "pngload",
+      "stored": [1200, 800],
+      "upright": [1200, 800],
+      "orientation": 1,
+      "notes": "16-bit RGB; outputs are 8-bit"
+    },
+    {
+      "file": "upright.webp",
+      "accept": true,
+      "loader": "webpload",
+      "stored": [1200, 800],
+      "upright": [1200, 800],
+      "orientation": 1,
+      "notes": "lossy WebP"
+    },
+    {
+      "file": "orient6.webp",
+      "accept": true,
+      "loader": "webpload",
+      "stored": [800, 1200],
+      "upright": [1200, 800],
+      "orientation": 6,
+      "notes": "WebP with EXIF orientation 6; vips honours it"
+    },
+    {
+      "file": "cmyk.jpg",
+      "accept": true,
+      "loader": "jpegload",
+      "stored": [1200, 800],
+      "upright": [1200, 800],
+      "orientation": 1,
+      "notes": "CMYK, no profile; vips uses its built-in CMYK profile, so colours shift (assert geometry and hue family, not exact values)"
+    },
+    {
+      "file": "animated.webp",
+      "accept": true,
+      "loader": "webpload",
+      "stored": [600, 400],
+      "upright": [600, 400],
+      "orientation": 1,
+      "pages": 3,
+      "notes": "3 frames; vips uses frame 0 (the scene at 50%). Policy decision: accept first frame or reject pages>1"
+    },
+    {
+      "file": "animated.gif",
+      "accept": false,
+      "loader": "gifload",
+      "reason": "loader not in allow-list (gifload is trusted by libvips, so only our allow-list stops it)"
+    },
+    {
+      "file": "truncated.jpg",
+      "accept": false,
+      "loader": "jpegload",
+      "stored": [1200, 800],
+      "reason": "header reads fine (preflight passes); decode with --fail-on error exits 1. Without fail-on, vips exits 0 and pads with grey"
+    },
+    {
+      "file": "empty.jpg",
+      "accept": false,
+      "reason": "zero bytes: vipsheader exit 1, 'is not a known file format'"
+    },
+    {
+      "file": "text.jpg",
+      "accept": false,
+      "reason": "text: vipsheader exit 1, 'is not a known file format'"
+    },
+    {
+      "file": "matrix.jpg",
+      "accept": false,
+      "loader": "matrixload",
+      "reason": "text libvips reads as a 2x2 matrix image even under VIPS_BLOCK_UNTRUSTED; the Go sniff and the loader allow-list both stop it"
+    },
+    {
+      "file": "bomb-dims.jpg",
+      "accept": false,
+      "loader": "jpegload",
+      "stored": [60000, 60000],
+      "reason": "header claims 3.6 GP in 287 bytes; pixel cap must trip from vipsheader alone. vips would otherwise decode it with exit 0 even under --fail-on error"
+    }
+  ],
+  "generated_only": {
+    "command": "./gen.sh overcap DIR",
+    "files": {
+      "overcap.jpg": "12000x9000 = 108 MP black, ~1.7 MB: over a 100 MP cap",
+      "pano.jpg": "40000x1500 = 60 MP noise, ~21 MB: under the cap, extreme aspect",
+      "bomb.png": "20000x20000 = 400 MP zeros, ~0.4 MB: PNG decompression bomb"
+    }
+  }
+}
