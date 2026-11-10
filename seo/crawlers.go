@@ -3,7 +3,6 @@ package seo
 import (
 	"net/http"
 	"net/url"
-	"regexp"
 	"strings"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -18,30 +17,30 @@ const (
 	purposeUserFetch  = "user_fetch"  // a person asked an assistant, or shared a link
 )
 
-// crawlers are matched as substrings of the User-Agent, case-insensitively,
-// first match first: "Claude-User" before "ClaudeBot" and so on. Robots
-// tokens that never appear in a User-Agent (Google-Extended,
-// Applebot-Extended) cannot be counted; their owners fetch as Googlebot
-// and Applebot.
+// crawlers are matched as substrings of the lower-cased User-Agent, so the
+// tokens are written in lower case; each token is also its label. First
+// match first: "claude-user" before "claudebot" and so on. Robots tokens
+// that never appear in a User-Agent (Google-Extended, Applebot-Extended)
+// cannot be counted; their owners fetch as Googlebot and Applebot.
 var crawlers = []struct{ token, purpose string }{
-	{"OAI-SearchBot", purposeAISearch},
-	{"ChatGPT-User", purposeUserFetch},
-	{"GPTBot", purposeAITraining},
-	{"Claude-SearchBot", purposeAISearch},
-	{"Claude-User", purposeUserFetch},
-	{"ClaudeBot", purposeAITraining},
-	{"PerplexityBot", purposeAISearch},
-	{"Perplexity-User", purposeUserFetch},
-	{"MistralAI-User", purposeUserFetch},
-	{"DuckAssistBot", purposeAISearch},
+	{"oai-searchbot", purposeAISearch},
+	{"chatgpt-user", purposeUserFetch},
+	{"gptbot", purposeAITraining},
+	{"claude-searchbot", purposeAISearch},
+	{"claude-user", purposeUserFetch},
+	{"claudebot", purposeAITraining},
+	{"perplexitybot", purposeAISearch},
+	{"perplexity-user", purposeUserFetch},
+	{"mistralai-user", purposeUserFetch},
+	{"duckassistbot", purposeAISearch},
 	{"meta-externalagent", purposeAITraining},
-	{"CCBot", purposeAITraining},
-	{"Bytespider", purposeAITraining},
-	{"Googlebot", purposeSearch},
+	{"ccbot", purposeAITraining},
+	{"bytespider", purposeAITraining},
+	{"googlebot", purposeSearch},
 	{"bingbot", purposeSearch},
-	{"Applebot", purposeSearch},
-	{"DuckDuckBot", purposeSearch},
-	{"YandexBot", purposeSearch},
+	{"applebot", purposeSearch},
+	{"duckduckbot", purposeSearch},
+	{"yandexbot", purposeSearch},
 	{"facebookexternalhit", purposeUserFetch},
 }
 
@@ -61,36 +60,71 @@ var (
 func crawler(userAgent string) (agent, purpose string, ok bool) {
 	ua := strings.ToLower(userAgent)
 	for _, c := range crawlers {
-		if strings.Contains(ua, strings.ToLower(c.token)) {
-			return strings.ToLower(c.token), c.purpose, true
+		if strings.Contains(ua, c.token) {
+			return c.token, c.purpose, true
 		}
 	}
 
 	return "", "", false
 }
 
-// sources map a referring host (or a utm_source) to its label, first match
-// first: Gemini lives under google.com.
-var sources = []struct {
-	re     *regexp.Regexp
-	source string
-}{
-	{regexp.MustCompile(`^(chatgpt\.com|chat\.openai\.com|chatgpt)$`), "chatgpt"},
-	{regexp.MustCompile(`^(perplexity\.ai|perplexity)$`), "perplexity"},
-	{regexp.MustCompile(`^(claude\.ai|claude)$`), "claude"},
-	{regexp.MustCompile(`^(gemini\.google\.com|gemini)$`), "gemini"},
-	{regexp.MustCompile(`^(copilot\.microsoft\.com|copilot\.com|copilot)$`), "copilot"},
-	{regexp.MustCompile(`^google(\.[a-z]{2,3}){1,2}$`), "google"},
-	{regexp.MustCompile(`^bing\.com$`), "bing"},
-	{regexp.MustCompile(`^duckduckgo\.com$`), "duckduckgo"},
+// sources map a referring host (or a utm_source) to its label. Gemini lives
+// under google.com, so it is named before isGoogle is asked.
+var sources = map[string]string{
+	"chatgpt.com":           "chatgpt",
+	"chat.openai.com":       "chatgpt",
+	"chatgpt":               "chatgpt",
+	"perplexity.ai":         "perplexity",
+	"perplexity":            "perplexity",
+	"claude.ai":             "claude",
+	"claude":                "claude",
+	"gemini.google.com":     "gemini",
+	"gemini":                "gemini",
+	"copilot.microsoft.com": "copilot",
+	"copilot.com":           "copilot",
+	"copilot":               "copilot",
+	"bing.com":              "bing",
+	"duckduckgo.com":        "duckduckgo",
+}
+
+// isGoogle reports whether host is Google search in some country: google
+// followed by one or two labels of two or three letters (google.no,
+// google.co.uk).
+func isGoogle(host string) bool {
+	rest, ok := strings.CutPrefix(host, "google.")
+	if !ok {
+		return false
+	}
+
+	labels := strings.Split(rest, ".")
+	if len(labels) > 2 {
+		return false
+	}
+
+	for _, l := range labels {
+		if len(l) < 2 || len(l) > 3 || strings.Trim(l, "abcdefghijklmnopqrstuvwxyz") != "" {
+			return false
+		}
+	}
+
+	return true
 }
 
 // referral names where a visit came from: its utm_source, which assistants
 // add to links, or else the referring site. ok is false for anywhere else.
 func referral(r *http.Request) (source string, ok bool) {
-	from := r.URL.Query().Get("utm_source")
+	var from string
+	if strings.Contains(r.URL.RawQuery, "utm_source") {
+		from = r.URL.Query().Get("utm_source")
+	}
+
 	if from == "" {
-		u, err := url.Parse(r.Referer())
+		ref := r.Referer()
+		if ref == "" {
+			return "", false
+		}
+
+		u, err := url.Parse(ref)
 		if err != nil {
 			return "", false
 		}
@@ -99,10 +133,12 @@ func referral(r *http.Request) (source string, ok bool) {
 	}
 
 	from = strings.TrimPrefix(strings.ToLower(from), "www.")
-	for _, s := range sources {
-		if s.re.MatchString(from) {
-			return s.source, true
-		}
+	if s, ok := sources[from]; ok {
+		return s, true
+	}
+
+	if isGoogle(from) {
+		return "google", true
 	}
 
 	return "", false

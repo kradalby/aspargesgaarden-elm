@@ -57,6 +57,11 @@ func TestReferral(t *testing.T) {
 		{"/", "https://duckduckgo.com/", "duckduckgo"},
 		{"/", "https://aspargesgaarden.no/kontakt", ""},
 		{"/", "https://google.evil.example/", ""},
+		{"/", "https://google.co.uk.example/", ""},
+		{"/", "https://google.n0/", ""},
+		{"/", "https://google./", ""},
+		{"/", "https://www.GOOGLE.de/", "google"},
+		{"/?utm_source=Claude.ai", "", "claude"},
 		{"/", "https://notchatgpt.com/", ""},
 		{"/?utm_source=newsletter", "", ""},
 		{"/", "", ""},
@@ -86,4 +91,20 @@ func TestCountVisit(t *testing.T) {
 
 	require.InDelta(t, chatgpt+1, testutil.ToFloat64(metricReferrals.WithLabelValues("chatgpt")), 0)
 	require.InDelta(t, bots+1, testutil.ToFloat64(metricBots.WithLabelValues("gptbot", "ai_training")), 0)
+}
+
+// CountVisit runs on every request, photos and files included.
+func BenchmarkCountVisit(b *testing.B) {
+	browser := httptest.NewRequestWithContext(b.Context(), http.MethodGet, "/img/v1/x.jpg", nil)
+	browser.Header.Set("User-Agent", "Mozilla/5.0 (iPhone; CPU iPhone OS 18_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.1 Mobile/15E148 Safari/604.1")
+	page := httptest.NewRequestWithContext(b.Context(), http.MethodGet, "/lokaler", nil)
+	page.Header.Set("User-Agent", browser.UserAgent())
+	page.Header.Set("Referer", "https://www.google.no/")
+
+	b.ReportAllocs()
+
+	for b.Loop() {
+		CountVisit(browser)
+		CountVisit(page)
+	}
 }
