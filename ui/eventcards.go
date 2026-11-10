@@ -17,8 +17,10 @@ func EventCards(items ...EventItem) elem.Node {
 
 		kids := []elem.Node{
 			PhotoCredit(it.By, hiddenLink(it.Href, pic)),
-			elem.H3(attrs.Props{attrs.Class: "pt-2 font-display text-xl text-tre break-words hyphens-auto"},
-				elem.A(attrs.Props{attrs.Href: it.Href, attrs.Class: "hover:text-rust"}, elem.Text(it.Title))),
+			// At text-xl the title is normal-size text, which needs 4.5:1:
+			// rust has 5.7 on white, the headings' tre only 3.5.
+			elem.H3(attrs.Props{attrs.Class: "pt-2 font-display text-xl text-rust break-words hyphens-auto"},
+				elem.A(attrs.Props{attrs.Href: it.Href, attrs.Class: "hover:text-sort"}, elem.Text(it.Title))),
 			elem.P(attrs.Props{attrs.Class: "text-sm text-brown-text"}, elem.Text(it.Date)),
 		}
 		if it.Cancelled {
