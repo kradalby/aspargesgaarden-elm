@@ -5,6 +5,10 @@ import (
 	"errors"
 	"io/fs"
 	"log/slog"
+	"net"
+	"net/http"
+	"net/http/httptest"
+	"net/netip"
 	"os"
 	"path/filepath"
 	"strings"
@@ -118,6 +122,35 @@ func TestIndexNowEndpoint(t *testing.T) {
 	require.Equal(t, seo.IndexNowEndpoint, serveConfig{}.indexNowEndpoint())
 	require.Empty(t, serveConfig{dev: true}.indexNowEndpoint())
 	require.Empty(t, serveConfig{noindex: true}.indexNowEndpoint())
+}
+
+// The tsnet listener is the admin's origin: a public page there would run
+// with the admin API's privileges.
+func TestAdminFilesOnTailnet(t *testing.T) {
+	h := adminFilesOnTailnet(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusTeapot)
+	}))
+
+	tests := []struct {
+		local string
+		path  string
+		want  int
+	}{
+		{"127.0.0.1:8090", "/", http.StatusTeapot},
+		{"127.0.0.1:8090", "/arrangementer", http.StatusTeapot},
+		{"100.64.0.1:80", "/", http.StatusNotFound},
+		{"100.64.0.1:443", "/arrangementer", http.StatusNotFound},
+		{"[fd7a:115c:a1e0::1]:80", "/robots.txt", http.StatusNotFound},
+		{"100.64.0.1:80", "/static/admin.js", http.StatusTeapot},
+		{"[fd7a:115c:a1e0::1]:80", "/img/v1/x.avif", http.StatusTeapot},
+	}
+	for _, tt := range tests {
+		r := httptest.NewRequest(http.MethodGet, tt.path, nil)
+		r = r.WithContext(context.WithValue(r.Context(), http.LocalAddrContextKey, net.TCPAddrFromAddrPort(netip.MustParseAddrPort(tt.local))))
+		w := httptest.NewRecorder()
+		h.ServeHTTP(w, r)
+		assert.Equal(t, tt.want, w.Code, "%s %s", tt.local, tt.path)
+	}
 }
 
 func TestServeConfigValidate(t *testing.T) {

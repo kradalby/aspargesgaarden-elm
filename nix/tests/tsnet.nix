@@ -169,6 +169,10 @@ in
         server.wait_until_succeeds(f"curl -fsS -o /dev/null http://127.0.0.1:8090{url}", timeout=300)
         for path in ["/admin/", "/admin/api/me"]:
             assert public(path)[0] == 404, path
+        # The tailnet listener is the admin's origin: its files, no pages.
+        assert call(admin, "GET", base + url)[0] == 200, url
+        for path in ["/", e["path"], "/robots.txt"]:
+            assert call(admin, "GET", base + path)[0] == 404, path
 
     with subtest("the admin refuses other hosts and cross-origin writes"):
         # A page elsewhere whose name was rebound to the node's address.

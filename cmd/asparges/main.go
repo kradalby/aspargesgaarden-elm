@@ -12,11 +12,13 @@ import (
 	"fmt"
 	"log/slog"
 	"net"
+	"net/http"
 	"net/netip"
 	"net/url"
 	"os"
 	"os/signal"
 	"path/filepath"
+	"strings"
 	"syscall"
 	"time"
 
@@ -24,6 +26,7 @@ import (
 	"github.com/peterbourgon/ff/v4"
 	"github.com/peterbourgon/ff/v4/ffhelp"
 	"golang.org/x/sync/errgroup"
+	"tailscale.com/net/tsaddr"
 
 	"github.com/kradalby/asparges/db"
 	"github.com/kradalby/asparges/images"
@@ -31,6 +34,7 @@ import (
 	"github.com/kradalby/asparges/seo"
 	"github.com/kradalby/asparges/server"
 	"github.com/kradalby/asparges/site"
+	"github.com/kradalby/asparges/static"
 )
 
 const envPrefix = "ASPARGES"
@@ -243,7 +247,7 @@ func serve(ctx context.Context, log *slog.Logger, cfg serveConfig) error {
 		Admin:            admin,
 		UmamiSiteID:      cfg.umamiSiteID,
 	})
-	srv.Handle("/", public.Public())
+	srv.Handle("/", adminFilesOnTailnet(public.Public()))
 
 	// In --dev, Public carries the admin on the loopback listener.
 	if !cfg.dev {
@@ -264,6 +268,37 @@ func serve(ctx context.Context, log *slog.Logger, cfg serveConfig) error {
 	g.Go(func() error { return sweepUnusedPhotos(ctx, log, store, public) })
 
 	return g.Wait()
+}
+
+// adminFilesOnTailnet keeps h to /static/ and /img/, what the admin app
+// loads, for requests that arrived over the tailnet. kra's Handle mounts h
+// on the tsnet listener too, and a public page there, with its third-party
+// script, would share the admin's origin.
+func adminFilesOnTailnet(h http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		p := r.URL.Path
+		if overTailnet(r) && !strings.HasPrefix(p, static.Prefix) && !strings.HasPrefix(p, "/img/") {
+			http.NotFound(w, r)
+			return
+		}
+
+		h.ServeHTTP(w, r)
+	})
+}
+
+// overTailnet reports whether r was sent to one of the node's tailnet
+// addresses: tsnet's listener has only those, the local one never.
+// shortcut: assumes the tailnet uses Tailscale's own ranges (100.64.0.0/10,
+// fd7a:115c:a1e0::/48); drop for a local-only Handle once kra has one.
+func overTailnet(r *http.Request) bool {
+	a, _ := r.Context().Value(http.LocalAddrContextKey).(net.Addr)
+	if a == nil {
+		return false
+	}
+
+	ap, err := netip.ParseAddrPort(a.String())
+
+	return err == nil && tsaddr.IsTailscaleIP(ap.Addr().Unmap())
 }
 
 // unusedPhotoAge is how long a photo no event or gallery uses is kept after
