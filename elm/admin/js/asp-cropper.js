@@ -31,7 +31,11 @@ class AspCropper extends CropperBase {
     this.img.src = this.getAttribute("src");
   }
 
+  // Only her own drags are reported. The rect it starts from, or that Elm
+  // sets, is already Elm's; reporting it back in rounded preview pixels
+  // would change a crop she never touched.
   create(rect) {
+    this.settle(rect);
     this.cropper = new Cropper(this.img, {
       viewMode: 1, // crop box stays inside the image
       dragMode: "move", // dragging outside the box pans the image, never starts a new box
@@ -41,15 +45,22 @@ class AspCropper extends CropperBase {
       checkOrientation: false, // the browser already applies EXIF orientation to <img>
       rotatable: false,
       scalable: false,
-      zoomable: true,
+      // The wheel scrolls the dialog; Større and Mindre resize the frame.
+      zoomable: false,
       toggleDragModeOnDblclick: false,
       responsive: false, // ResizeObserver below covers window and container resizes
       data: this.dataFor(rect),
       ready: () => {
         this.ready = true;
-        this.emit();
       },
-      crop: () => this.ready && this.emit(),
+      cropstart: () => {
+        this.dragging = true;
+      },
+      crop: () => this.dragging && this.emit(),
+      cropend: () => {
+        this.emit();
+        this.dragging = false;
+      },
     });
   }
 
@@ -65,11 +76,12 @@ class AspCropper extends CropperBase {
   }
 
   applyRect(r) {
+    this.settle(r);
     this.cropper.setData(this.dataFor(r));
   }
 
   // Cropper's own resize() restores by scaling the old box and drifted in tests;
-  // a fresh instance from the last source rect is exact. Zoom level is lost.
+  // a fresh instance from the last source rect is exact.
   onResize() {
     this.ready = false;
     this.cropper.destroy();

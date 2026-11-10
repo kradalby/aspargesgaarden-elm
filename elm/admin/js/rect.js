@@ -1,4 +1,4 @@
-// Geometry shared by both cropper wrappers. All rects are {x,y,w,h}.
+// Geometry for the cropper wrapper. All rects are {x,y,w,h}.
 // "source" = full-size upright original; "preview" = naturalWidth/Height of the <img> shown.
 
 // "4:5", "1200:630", "16/9" or "0.8".
@@ -122,6 +122,12 @@ export class CropperBase extends HTMLElement {
     return r && r.x >= 0 && r.y >= 0 && r.x + r.w <= W && r.y + r.h <= H
       ? r
       : defaultRect(W, H, this.aspect);
+  }
+
+  // r is the rect shown now, as Elm has it; Elm echoing it back is no move.
+  settle(r) {
+    this.current = r;
+    this.lastEmitted = rectString(r);
   }
 
   report(p) {

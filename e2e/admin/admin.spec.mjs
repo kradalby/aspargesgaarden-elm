@@ -69,6 +69,29 @@ async function noSideScroll(page) {
   expect(wide, "elements wider than the screen").toEqual([]);
 }
 
+// An event body for the API: a publishable draft with landskap as its
+// main photo, changed by extra.
+const draftInput = (seed, extra = {}) => ({
+  updatedAt: "",
+  slug: "",
+  title: "Høstmarked",
+  summary: "",
+  body: "",
+  start: "2026-11-21",
+  startTime: "",
+  end: "",
+  endTime: "",
+  extraDates: [],
+  priceText: "",
+  ticketUrl: "",
+  showInMenu: false,
+  menuLabel: "",
+  cancelled: false,
+  mainPhoto: { id: seed.landskap, alt: "Boder", photographerId: null },
+  extraPhotos: [],
+  ...extra,
+});
+
 const live = (page) => page.getByRole("status").filter({ hasNotText: /^$/ });
 
 test("new event, from first word to published, copied and deleted", async ({
@@ -438,25 +461,10 @@ test("two editors: «Lagre min versjon» publishes hers, not theirs", async ({
   seed,
   request,
 }) => {
-  const input = {
-    updatedAt: "",
-    slug: "",
+  const input = draftInput(seed, {
     title: "Høstmarked",
     summary: "Hennes tekst.",
-    body: "",
-    start: "2026-11-21",
-    startTime: "",
-    end: "",
-    endTime: "",
-    extraDates: [],
-    priceText: "",
-    ticketUrl: "",
-    showInMenu: false,
-    menuLabel: "",
-    cancelled: false,
-    mainPhoto: { id: seed.landskap, alt: "Boder", photographerId: null },
-    extraPhotos: [],
-  };
+  });
   const draft = await (
     await request.post("/admin/api/events", { data: input })
   ).json();
@@ -482,10 +490,10 @@ test("two editors: «Lagre min versjon» publishes hers, not theirs", async ({
   await expect(
     page.getByText("Publisert! Arrangementet er nå på nettsiden.").first(),
   ).toBeVisible();
-  const live = await publicText(request, "/arrangementer/2026/hostmarked");
-  expect(live.status).toBe(200);
-  expect(live.text).toContain("Hennes tekst.");
-  expect(live.text).not.toContain("Deres tekst.");
+  const published = await publicText(request, "/arrangementer/2026/hostmarked");
+  expect(published.status).toBe(200);
+  expect(published.text).toContain("Hennes tekst.");
+  expect(published.text).not.toContain("Deres tekst.");
 });
 
 test("someone without the grant is told so, plainly", async ({ page }) => {
@@ -921,4 +929,53 @@ test("a late answer stays with the page that asked", async ({ page, seed }) => {
   await expect(
     page.getByText("Arrangementet er gjort om til kladd"),
   ).toHaveCount(0);
+});
+
+test("opening the crops and pressing Bruk changes none of them", async ({
+  page,
+  request,
+  seed,
+}) => {
+  // landskap is 1300 px wide: its stored share crop is 682 high, which a
+  // round trip through the preview's pixels would make 683.
+  const draft = await (
+    await request.post("/admin/api/events", { data: draftInput(seed) })
+  ).json();
+  const stored = (
+    await (await request.get(`/admin/api/photos/${seed.landskap}`)).json()
+  ).crops;
+  await page.goto(`/admin/arrangementer/${draft.id}`);
+  await page.getByRole("button", { name: "Beskjær" }).click();
+  const crop = page.getByRole("dialog", { name: "Beskjær bildet" });
+  for (const kind of [/Øverst på siden/, /Når noen deler lenken/, /I listen/]) {
+    await crop.getByRole("button", { name: kind }).click();
+    // The cropper reports on load what it would report; give it the time.
+    await page.waitForTimeout(500);
+  }
+  const put = page.waitForRequest(
+    (r) => r.url().endsWith("/crops") && r.method() === "PUT",
+  );
+  await crop.getByRole("button", { name: "Bruk" }).click();
+  expect((await put).postDataJSON()).toEqual(stored);
+});
+
+test("the mouse wheel over the photo leaves the frame alone", async ({
+  page,
+  seed,
+}) => {
+  await page.goto(`/admin/arrangementer/${seed.course}`);
+  await page.getByRole("button", { name: "Beskjær" }).click();
+  const crop = page.getByRole("dialog", { name: "Beskjær bildet" });
+  const cropper = crop.locator("asp-cropper");
+  await expect(cropper).toBeVisible();
+  await page.waitForTimeout(500);
+  const before = await cropper.getAttribute("rect");
+  await cropper.hover();
+  for (let i = 0; i < 3; i++) {
+    await page.mouse.wheel(0, -300);
+    // Cropper takes one wheel step per 50 ms.
+    await page.waitForTimeout(100);
+  }
+  await page.waitForTimeout(500);
+  await expect(cropper).toHaveAttribute("rect", before);
 });
