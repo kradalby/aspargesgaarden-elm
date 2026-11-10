@@ -20,14 +20,15 @@ photoJson =
         "banner": { "minWidth": 800, "sharpWidth": 896, "soft": true },
         "share": { "minWidth": 1200, "sharpWidth": 1200, "soft": false },
         "full": { "minWidth": 480, "sharpWidth": 992, "soft": false } },
-      "status": { "state": "preparing", "done": 12, "total": 46, "previewReady": true, "reason": "" } }
+      "status": { "state": "preparing", "done": 12, "total": 46, "previewReady": true, "reason": "" },
+      "updatedAt": "2026-11-09T17:02:10Z" }
     """
 
 
 eventJson : String
 eventJson =
     """
-    { "id": 7, "status": "draft", "slug": "julemarked", "slugFrozen": false, "year": 2026,
+    { "id": 7, "status": "draft", "slug": "julemarked", "slugFrozen": false, "slugFromTitle": true, "year": 2026,
       "path": "/arrangementer/2026/julemarked", "url": "https://aspargesgaarden.no/arrangementer/2026/julemarked",
       "dateText": "14. november 2026 på Aspargesgården", "isOver": false,
       "title": "Julemarked", "summary": "", "body": "## Hei", "start": "2026-11-14", "startTime": "12:00",
@@ -81,11 +82,11 @@ suite =
                                     ]
                                 )
                             )
-            , test "a conflict carries the stored event" <|
+            , test "a conflict carries the stored event and the photos changed elsewhere" <|
                 \_ ->
-                    case D.decodeString (Api.errorDecoder 409) ("""{"errors":[{"code":"conflict"}],"current":""" ++ eventJson ++ "}") of
-                        Ok (Api.Conflict e) ->
-                            Expect.equal e.id 7
+                    case D.decodeString (Api.errorDecoder 409) ("""{"errors":[{"code":"conflict","field":"mainPhoto","photoId":12}],"current":""" ++ eventJson ++ ""","photos":[""" ++ photoJson ++ "]}") of
+                        Ok (Api.Conflict e photos) ->
+                            Expect.equal ( e.id, List.map .updatedAt photos ) ( 7, [ "2026-11-09T17:02:10Z" ] )
 
                         other ->
                             Expect.fail (Debug.toString other)
@@ -119,7 +120,7 @@ suite =
                     , showInMenu = False
                     , menuLabel = ""
                     , cancelled = False
-                    , mainPhoto = Just { id = 12, alt = "Låven", photographerId = Nothing }
+                    , mainPhoto = Just { id = 12, alt = "Låven", photographerId = Nothing, updatedAt = "2026-11-09T17:02:10Z" }
                     , extraPhotos = []
                     }
                     |> E.encode 0
@@ -131,10 +132,17 @@ suite =
                                 [ "updatedAt", "slug", "title", "summary", "body", "start", "startTime", "end", "endTime", "extraDates", "priceText", "ticketUrl", "showInMenu", "menuLabel", "cancelled", "mainPhoto", "extraPhotos" ]
                             )
                         )
+        , test "a photo reference carries the photo's version" <|
+            \_ ->
+                Api.encodeEventInput
+                    { updatedAt = "", slug = "", title = "", summary = "", body = "", start = "", startTime = "", end = "", endTime = "", extraDates = [], priceText = "", ticketUrl = "", showInMenu = False, menuLabel = "", cancelled = False, mainPhoto = Just { id = 12, alt = "", photographerId = Nothing, updatedAt = "2026-11-09T17:02:10Z" }, extraPhotos = [] }
+                    |> E.encode 0
+                    |> D.decodeString (D.at [ "mainPhoto", "updatedAt" ] D.string)
+                    |> Expect.equal (Ok "2026-11-09T17:02:10Z")
         , test "a photo reference without a photographer sends null" <|
             \_ ->
                 Api.encodeEventInput
-                    { updatedAt = "", slug = "", title = "", summary = "", body = "", start = "", startTime = "", end = "", endTime = "", extraDates = [], priceText = "", ticketUrl = "", showInMenu = False, menuLabel = "", cancelled = False, mainPhoto = Just { id = 12, alt = "", photographerId = Nothing }, extraPhotos = [] }
+                    { updatedAt = "", slug = "", title = "", summary = "", body = "", start = "", startTime = "", end = "", endTime = "", extraDates = [], priceText = "", ticketUrl = "", showInMenu = False, menuLabel = "", cancelled = False, mainPhoto = Just { id = 12, alt = "", photographerId = Nothing, updatedAt = "" }, extraPhotos = [] }
                     |> E.encode 0
                     |> D.decodeString (D.at [ "mainPhoto", "photographerId" ] (D.null "none"))
                     |> Expect.equal (Ok "none")

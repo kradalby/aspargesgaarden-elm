@@ -1,6 +1,7 @@
 module FormTest exposing (suite)
 
 import Expect
+import Fixture
 import Form
 import Test exposing (Test, describe, test)
 import Text
@@ -42,21 +43,61 @@ suite =
                     Form.errorsFor "tittel" [ problem "title_required" (Just "title") Nothing, problem "ticket_url" (Just "ticketUrl") Nothing ]
                         |> Expect.equal [ Text.problem (problem "title_required" Nothing Nothing) ]
             ]
+        , describe "the address"
+            [ test "one that follows the title is an empty field" <|
+                \_ -> Form.fromEvent (Fixture.event { id = 4, updatedAt = "1", summary = "" }) |> .slug |> Expect.equal ""
+            , test "one she chose is in the field" <|
+                \_ ->
+                    Fixture.event { id = 4, updatedAt = "1", summary = "" }
+                        |> (\e -> Form.fromEvent { e | slugFromTitle = False })
+                        |> .slug
+                        |> Expect.equal "kurs"
+            , test "a published one is shown as it is" <|
+                \_ ->
+                    Fixture.event { id = 4, updatedAt = "1", summary = "" }
+                        |> (\e -> Form.fromEvent { e | slugFrozen = True })
+                        |> .slug
+                        |> Expect.equal "kurs"
+            ]
         , describe "afterSave"
             [ test "nothing typed meanwhile: take what was stored" <|
                 \_ ->
-                    Form.afterSave { sent = emptyForm, current = emptyForm, stored = { emptyForm | slug = "julemarked" } }
-                        |> .slug
-                        |> Expect.equal "julemarked"
-            , test "typing meanwhile is kept, and the address is taken over" <|
+                    Form.afterSave { sent = emptyForm, current = emptyForm, stored = { emptyForm | title = "Julemarked" } }
+                        |> .title
+                        |> Expect.equal "Julemarked"
+            , test "typing meanwhile is kept, and the address still follows the title" <|
                 \_ ->
+                    -- A first title saved as a draft must not fix the address:
+                    -- stored, an address made from the title is an empty field.
                     Form.afterSave
-                        { sent = { emptyForm | title = "Jul" }
+                        { sent = { emptyForm | title = "Julemarkd" }
                         , current = { emptyForm | title = "Julemarked" }
-                        , stored = { emptyForm | title = "Jul", slug = "jul" }
+                        , stored = { emptyForm | title = "Julemarkd" }
                         }
                         |> (\f -> ( f.title, f.slug ))
-                        |> Expect.equal ( "Julemarked", "jul" )
+                        |> Expect.equal ( "Julemarked", "" )
+            , test "a chosen address comes back as the server stored it" <|
+                \_ ->
+                    Form.afterSave
+                        { sent = { emptyForm | slug = "jul " }
+                        , current = { emptyForm | slug = "jul ", title = "Jul" }
+                        , stored = { emptyForm | slug = "jul" }
+                        }
+                        |> .slug
+                        |> Expect.equal "jul"
+            , test "typing meanwhile answers to the photos' new versions" <|
+                \_ ->
+                    let
+                        photo v alt =
+                            Just { id = 12, alt = alt, photographerId = Nothing, updatedAt = v }
+                    in
+                    Form.afterSave
+                        { sent = { emptyForm | mainPhoto = photo "1" "Låven" }
+                        , current = { emptyForm | mainPhoto = photo "1" "Låven i snø" }
+                        , stored = { emptyForm | mainPhoto = photo "2" "Låven" }
+                        }
+                        |> .mainPhoto
+                        |> Expect.equal (photo "2" "Låven i snø")
             , test "an address typed meanwhile is kept too" <|
                 \_ ->
                     Form.afterSave

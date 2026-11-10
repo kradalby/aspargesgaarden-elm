@@ -60,7 +60,8 @@ photoJson p =
         "full": { "minWidth": 480, "sharpWidth": 992, "soft": false } },
       "status": { "state": """
         ++ quote p.state
-        ++ """, "done": 0, "total": 0, "previewReady": true, "reason": "" } }"""
+        ++ """, "done": 0, "total": 0, "previewReady": true, "reason": "" },
+      "updatedAt": "2026-11-09T17:02:10Z" }"""
 
 
 quote : String -> String
@@ -81,7 +82,7 @@ eventWith main e =
         json =
             """{ "id": """
                 ++ String.fromInt e.id
-                ++ """, "status": "draft", "slug": "kurs", "slugFrozen": false, "year": 2026,
+                ++ """, "status": "draft", "slug": "kurs", "slugFrozen": false, "slugFromTitle": true, "year": 2026,
       "path": "/arrangementer/2026/kurs", "url": "http://127.0.0.1/arrangementer/2026/kurs",
       "dateText": "", "isOver": false, "title": "Kurs", "summary": """
                 ++ quote e.summary

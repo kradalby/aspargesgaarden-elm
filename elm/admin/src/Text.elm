@@ -1,11 +1,15 @@
 module Text exposing
-    ( askForOriginal
+    ( address
+    , askForOriginal
     , atFloor
     , cropTooSmall
     , error
     , movedTo
     , noAccess
     , noCrop
+    , photoConflict
+    , photoConflictChoice
+    , photoConflictTitle
     , photoFailure
     , problem
     , sharp
@@ -13,6 +17,7 @@ module Text exposing
     , softCrop
     , softKind
     , softWhole
+    , tookTheirs
     , uploadFailure
     , withoutScheme
     )
@@ -135,7 +140,7 @@ uploadFailure code =
             "Bildet er for lite (under 480 punkter bredt). Velg et større bilde."
 
         "too_many_pixels" ->
-            "Bildet har for mange punkter til at nettsiden kan behandle det (over 100 millioner). Lagre det i mindre størrelse, og prøv igjen."
+            "Bildet har for mange punkter til at nettsiden kan behandle det (over 100 millioner). Lagre en mindre kopi av bildet, og last opp den."
 
         _ ->
             "Noe gikk galt på serveren. Prøv igjen om litt."
@@ -240,6 +245,18 @@ photoFailure reason =
         "too_small" ->
             "Bildet er for lite til å brukes. Ta det bort og velg et større."
 
+        "missing_original" ->
+            "Den opprinnelige filen til bildet er borte fra serveren. Last opp det samme bildet på nytt."
+
+        "unsupported_type" ->
+            uploadFailure reason
+
+        "too_large" ->
+            uploadFailure reason
+
+        "too_many_pixels" ->
+            uploadFailure reason
+
         _ ->
             "Bildet kunne ikke klargjøres. Trykk «Prøv igjen»."
 
@@ -256,7 +273,7 @@ error e =
         Api.Problems ps ->
             String.join " " (List.map problem ps)
 
-        Api.Conflict _ ->
+        Api.Conflict _ _ ->
             "Noen andre har lagret endringer her mens du jobbet."
 
         Api.PhotoInUse _ ->
@@ -281,3 +298,66 @@ withoutScheme url =
 
     else
         url
+
+
+{-| After «Hent deres versjon».
+-}
+tookTheirs : String
+tookTheirs =
+    "Den nyeste versjonen er hentet."
+
+
+photoConflictTitle : String
+photoConflictTitle =
+    "Noen andre har endret et bilde"
+
+
+{-| alts: the descriptions of the photos someone else changed, as stored.
+-}
+photoConflict : List String -> String
+photoConflict alts =
+    let
+        which =
+            case List.filter ((/=) "") alts of
+                [ alt ] ->
+                    "bildet «" ++ alt ++ "»"
+
+                _ ->
+                    "et av bildene her"
+    in
+    "Mens du skrev, har noen andre endret beskrivelsen eller fotografen til "
+        ++ which
+        ++ ". Bildet brukes også et annet sted. Det du har skrevet er ikke borte."
+
+
+photoConflictChoice : String
+photoConflictChoice =
+    "Vil du bruke din beskrivelse og fotograf, eller deres? Resten av det du har skrevet lagres uansett."
+
+
+{-| Under the address field. site is where the public site is, slug what
+she typed (empty: made from the title), path the address as last saved
+("" while there is none), titleSaved whether the title is as saved, so
+path is still true.
+-}
+address : { site : String, year : String, slug : String, path : String, titleSaved : Bool } -> String
+address a =
+    if a.slug == "" then
+        if a.path /= "" && a.titleSaved then
+            "Lages av tittelen: " ++ withoutScheme a.site ++ a.path ++ ". Den følger tittelen til arrangementet publiseres. Vil du ha en annen, skriv den her."
+
+        else
+            "Lages av tittelen når du lagrer, og følger tittelen til arrangementet publiseres. Vil du ha en annen, skriv den her."
+
+    else
+        withoutScheme a.site
+            ++ "/arrangementer/"
+            ++ (if a.year == "" then
+                    "<år>"
+
+                else
+                    a.year
+               )
+            ++ "/"
+            ++ a.slug
+            ++ " – tøm feltet for å lage den av tittelen igjen. Kan ikke endres etter publisering."

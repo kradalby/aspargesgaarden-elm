@@ -42,7 +42,7 @@ type alias Model =
     , sending : Form
     , result : Maybe Action
     , failure : Maybe ( Action, Api.Error )
-    , conflict : Maybe ( Action, Event )
+    , conflict : Maybe Conflict
     , crop : Maybe CropDialog
     , preview : Preview
     , announce : String
@@ -79,6 +79,14 @@ type alias Preview =
     , failed : Bool
     , seq : Int
     }
+
+
+{-| A save refused because someone else saved first: the event as stored
+now, and each photo whose description or credit they changed (none when
+only the event itself was changed).
+-}
+type alias Conflict =
+    { action : Action, current : Event, photos : List Photo }
 
 
 type Out
@@ -267,8 +275,20 @@ update msg model =
             let
                 ( photos, cmd, outs ) =
                     Photos.update pm model.photos
+
+                -- The preview draws only sizes that exist, so it is drawn
+                -- again once a photo in it has them all.
+                done =
+                    List.any (\p -> p.status.state /= Api.Ready && Maybe.map (.status >> .state) (Photos.get p.id photos) == Just Api.Ready) (formPhotos model)
+
+                ( m, c, o ) =
+                    List.foldl applyPhotosOut ( { model | photos = photos }, Cmd.map PhotosMsg cmd, Nothing ) outs
             in
-            List.foldl applyPhotosOut ( { model | photos = photos }, Cmd.map PhotosMsg cmd, Nothing ) outs
+            if done then
+                schedulePreview ( m, c ) |> withOut o
+
+            else
+                ( m, c, o )
 
         Run action ->
             run action { model | result = Nothing, failure = Nothing, conflict = Nothing }
@@ -299,10 +319,16 @@ update msg model =
 
         KeepMine ->
             case model.conflict of
-                Just ( action, current ) ->
+                Just c ->
                     -- Theirs is what is stored now, so hers must be saved
                     -- over it before a publish, even if she typed nothing.
-                    run action { model | event = Just current, saved = Form.fromEvent current, conflict = Nothing }
+                    run c.action
+                        { model
+                            | event = Just c.current
+                            , saved = Form.fromEvent c.current
+                            , form = Form.withVersions (c.photos ++ eventPhotos c.current) model.form
+                            , conflict = Nothing
+                        }
 
                 Nothing ->
                     ( model, Cmd.none, Nothing )
@@ -313,8 +339,21 @@ update msg model =
 
         TakeTheirs ->
             case model.conflict of
-                Just ( _, current ) ->
-                    schedulePreview ( load current { model | conflict = Nothing, announce = "Den nyeste versjonen er hentet." }, Cmd.none ) |> noOut
+                Just c ->
+                    if List.isEmpty c.photos then
+                        schedulePreview ( load c.current { model | conflict = Nothing, announce = Text.tookTheirs }, Cmd.none ) |> noOut
+
+                    else
+                        -- Only those photos' words are theirs; the rest of
+                        -- what she wrote is saved as she meant to.
+                        run c.action
+                            { model
+                                | event = Just c.current
+                                , saved = Form.fromEvent c.current
+                                , form = Form.takePhotos c.photos model.form
+                                , photos = Photos.add c.photos model.photos
+                                , conflict = Nothing
+                            }
 
                 Nothing ->
                     ( model, Cmd.none, Nothing )
@@ -357,7 +396,16 @@ update msg model =
 
         CropSaved (Ok photo) ->
             schedulePreview
-                ( { model | crop = Nothing, photos = Photos.add [ photo ] model.photos, announce = "Beskjæringen er lagret." }
+                ( { model
+                    | crop = Nothing
+                    , photos = Photos.add [ photo ] model.photos
+
+                    -- A crop is a new version of the photo; the event save
+                    -- must not take it for someone else's change.
+                    , form = Form.withVersions [ photo ] model.form
+                    , saved = Form.withVersions [ photo ] model.saved
+                    , announce = "Beskjæringen er lagret."
+                  }
                 , focus "beskjaer"
                 )
                 |> noOut
@@ -625,8 +673,8 @@ failed action e model =
         Api.Problems ps ->
             ( { m | problems = ps, problemsFor = action }, focus "feil-oppsummering", Nothing )
 
-        Api.Conflict current ->
-            ( { m | conflict = Just ( action, current ) }, Cmd.none, Nothing )
+        Api.Conflict current photos ->
+            ( { m | conflict = Just { action = action, current = current, photos = photos } }, Cmd.none, Nothing )
 
         _ ->
             ( { m | failure = Just ( action, e ) }, focus "lagre-feil", Nothing )
@@ -636,7 +684,7 @@ applyPhotosOut : Photos.Out -> ( Model, Cmd Msg, Maybe Out ) -> ( Model, Cmd Msg
 applyPhotosOut out ( model, cmd, o ) =
     let
         ref p =
-            { id = p.id, alt = p.alt, photographerId = Maybe.map .id p.photographer }
+            { id = p.id, alt = p.alt, photographerId = Maybe.map .id p.photographer, updatedAt = p.updatedAt }
 
         ( m, c, _ ) =
             case out of
@@ -738,6 +786,11 @@ focus =
 photosPending : Model -> Bool
 photosPending model =
     formPhotos model |> List.any Photos.isPending
+
+
+eventPhotos : Event -> List Photo
+eventPhotos e =
+    List.filterMap identity [ e.mainPhoto ] ++ e.extraPhotos
 
 
 formPhotos : Model -> List Photo
@@ -932,22 +985,13 @@ formView siteUrl model =
                 { id = "adresse"
                 , label = "Adresse til siden (valgfritt)"
                 , help =
-                    Text.withoutScheme siteUrl
-                        ++ "/arrangementer/"
-                        ++ (if year == "" then
-                                "<år>"
-
-                            else
-                                year
-                           )
-                        ++ "/"
-                        ++ (if f.slug == "" then
-                                "…"
-
-                            else
-                                f.slug
-                           )
-                        ++ " – lages av tittelen hvis du lar feltet stå tomt. Kan ikke endres etter publisering."
+                    Text.address
+                        { site = siteUrl
+                        , year = year
+                        , slug = f.slug
+                        , path = model.event |> Maybe.map .path |> Maybe.withDefault ""
+                        , titleSaved = f.title == model.saved.title
+                        }
                 , errors = errs model "adresse"
                 , control = Ui.input [ A.value f.slug, onInput (Set Slug), A.placeholder "Lages av tittelen", attribute "autocapitalize" "off", attribute "spellcheck" "false" ]
                 }
@@ -1588,15 +1632,26 @@ rectDecoder =
 conflictDialog : Model -> Html Msg
 conflictDialog model =
     case model.conflict of
-        Just _ ->
-            Ui.modal { id = "konflikt-dialog", title = "Noen andre har endret arrangementet", onClose = CloseConflict, wide = False }
-                [ p [ class "text-lg" ] [ text "Mens du skrev, har noen andre lagret endringer i dette arrangementet. Det du har skrevet er ikke lagret ennå, men det er ikke borte." ]
-                , p [ class "text-lg" ] [ text "Vil du lagre din versjon over deres, eller hente deres versjon og la din være?" ]
-                , div [ class "flex flex-col sm:flex-row gap-3 justify-end" ]
-                    [ Ui.secondaryButton [] TakeTheirs "Hent deres versjon"
-                    , Ui.primaryButton [ A.autofocus True ] KeepMine "Lagre min versjon"
+        Just c ->
+            if not (List.isEmpty c.photos) then
+                Ui.modal { id = "konflikt-dialog", title = Text.photoConflictTitle, onClose = CloseConflict, wide = False }
+                    [ p [ class "text-lg" ] [ text (Text.photoConflict (List.map .alt c.photos)) ]
+                    , p [ class "text-lg" ] [ text Text.photoConflictChoice ]
+                    , div [ class "flex flex-col sm:flex-row gap-3 justify-end" ]
+                        [ Ui.secondaryButton [] TakeTheirs "Bruk deres"
+                        , Ui.primaryButton [ A.autofocus True ] KeepMine "Bruk min"
+                        ]
                     ]
-                ]
+
+            else
+                Ui.modal { id = "konflikt-dialog", title = "Noen andre har endret arrangementet", onClose = CloseConflict, wide = False }
+                    [ p [ class "text-lg" ] [ text "Mens du skrev, har noen andre lagret endringer i dette arrangementet. Det du har skrevet er ikke lagret ennå, men det er ikke borte." ]
+                    , p [ class "text-lg" ] [ text "Vil du lagre din versjon over deres, eller hente deres versjon og la din være?" ]
+                    , div [ class "flex flex-col sm:flex-row gap-3 justify-end" ]
+                        [ Ui.secondaryButton [] TakeTheirs "Hent deres versjon"
+                        , Ui.primaryButton [ A.autofocus True ] KeepMine "Lagre min versjon"
+                        ]
+                    ]
 
         Nothing ->
             text ""

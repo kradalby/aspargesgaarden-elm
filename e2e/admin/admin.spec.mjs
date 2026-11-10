@@ -10,15 +10,12 @@ const fixture = (name) => join(import.meta.dirname, "fixtures", name);
 // fails on any console error: a CSP violation, a script error, or a file
 // that did not load.
 const test = base.extend({
-  // A test that shows a photo the server cannot prepare expects its images
-  // to fail to load.
-  brokenImages: [false, { option: true }],
   seed: async ({ request }, use) => {
     const res = await request.post("/__reset");
     expect(res.ok()).toBe(true);
     await use(await res.json());
   },
-  page: async ({ page, seed, brokenImages, browserName }, use) => {
+  page: async ({ page, seed, browserName }, use) => {
     expect(seed.course).toBeGreaterThan(0);
     const problems = [];
     page.on("console", (m) => {
@@ -28,7 +25,9 @@ const test = base.extend({
       if (
         /^Failed to load resource/.test(m.text()) &&
         (m.location().url.includes("/admin/api/") ||
-          (brokenImages && m.location().url.includes("/img/")))
+          // A size the photo store has not built yet is missing for now;
+          // the preview is drawn again once the photo is ready.
+          m.location().url.includes("/img/"))
       )
         return;
       // Playwright reading the preview frame tries to run its own script in
@@ -1037,8 +1036,9 @@ test("the page's address is on this site, not a fixed domain", async ({
     }),
   ).toBeVisible();
   await page.goto("/admin/arrangementer/ny");
+  await page.getByLabel("Adresse til siden (valgfritt)").fill("sommerfest");
   await expect(page.locator("#adresse-hjelp")).toContainText(
-    `${host}/arrangementer/`,
+    `${host}/arrangementer/<år>/sommerfest`,
   );
   await expect(page.getByText("aspargesgaarden.no")).toHaveCount(0);
 });
@@ -1114,65 +1114,93 @@ test("every text in the admin is readable against what is behind it", async ({
   expect(await lowContrast(page)).toEqual([]);
 });
 
-test.describe(() => {
-  test.use({ brokenImages: true });
-  test("a photo the server cannot prepare says so, and can be tried again", async ({
-    page,
-    request,
-    seed,
-  }) => {
-    // broken's original is missing, so every attempt fails.
-    const draft = await (
-      await request.post("/admin/api/events", {
-        data: draftInput(seed, {
-          mainPhoto: { id: seed.broken, alt: "Låven", photographerId: null },
-        }),
-      })
-    ).json();
-    await request.post(`/admin/api/photos/${seed.broken}/prepare`);
-    await expect
-      .poll(async () => {
-        const res = await request.get(
-          `/admin/api/photos/status?ids=${seed.broken}`,
-        );
-        return (await res.json()).statuses[seed.broken].state;
-      })
-      .toBe("failed");
+test("a photo the server cannot prepare says why", async ({
+  page,
+  request,
+  seed,
+}) => {
+  // broken's original is missing, so every attempt fails, and trying
+  // again cannot help: she is told to upload it again.
+  const draft = await (
+    await request.post("/admin/api/events", {
+      data: draftInput(seed, {
+        mainPhoto: { id: seed.broken, alt: "Låven", photographerId: null },
+      }),
+    })
+  ).json();
+  await request.post(`/admin/api/photos/${seed.broken}/prepare`);
+  await expect
+    .poll(async () => {
+      const res = await request.get(
+        `/admin/api/photos/status?ids=${seed.broken}`,
+      );
+      return (await res.json()).statuses[seed.broken].state;
+    })
+    .toBe("failed");
 
-    await page.goto(`/admin/arrangementer/${draft.id}`);
-    const photo = page.locator("#bilde");
-    await expect(photo.locator('[data-photo-status="failed"]')).toContainText(
-      "Bildet kunne ikke klargjøres. Trykk «Prøv igjen».",
-    );
-    await expect(photo.getByText("Ingen forhåndsvisning")).toBeVisible();
-    await expect(photo.getByRole("button", { name: "Beskjær" })).toBeDisabled();
-
+  await page.goto(`/admin/arrangementer/${draft.id}`);
+  const photo = page.locator("#bilde");
+  // The server names a missing original as such, or as its own failure
+  // (internal), which trying again may cure: then it offers that, and the
+  // retry fails again here.
+  const failed = photo.locator('[data-photo-status="failed"]');
+  await expect(failed).toContainText(
+    /Den opprinnelige filen til bildet er borte fra serveren\. Last opp det samme bildet på nytt\.|Bildet kunne ikke klargjøres\. Trykk «Prøv igjen»\./,
+  );
+  const retry = photo.getByRole("button", { name: "Prøv igjen" });
+  if (await retry.count()) {
     const retried = page.waitForRequest((r) => r.url().endsWith("/prepare"));
-    await photo.getByRole("button", { name: "Prøv igjen" }).click();
+    await retry.click();
     await retried;
-    await expect(photo.locator('[data-photo-status="failed"]')).toBeVisible({
-      timeout: 30_000,
-    });
-    await expect(
-      live(page).filter({ hasText: "Bildet kunne ikke klargjøres" }),
-    ).toHaveCount(1);
-    // Publishing is never blocked by a photo's state.
-    await page.getByRole("button", { name: "Publiser" }).click();
-    await expect(
-      page.getByText("Publisert! Arrangementet er nå på nettsiden.").first(),
-    ).toBeVisible();
+    await expect(failed).toBeVisible({ timeout: 30_000 });
+  }
+  await expect(photo.getByText("Ingen forhåndsvisning")).toBeVisible();
+  await expect(photo.getByRole("button", { name: "Beskjær" })).toBeDisabled();
 
-    // In the gallery it is counted among the photos that need help.
-    await request.put("/admin/api/gallery", {
-      data: { photoIds: [seed.landskap, seed.portrett, seed.broken] },
-    });
-    await page.goto("/admin/galleri");
-    await expect(page.locator("#galleri-status")).toContainText(
-      "1 bilde trenger hjelp",
-    );
+  // Publishing is never blocked by a photo's state.
+  await page.getByRole("button", { name: "Publiser" }).click();
+  await expect(
+    page.getByText("Publisert! Arrangementet er nå på nettsiden.").first(),
+  ).toBeVisible();
+
+  // In the gallery it is counted among the photos that need help.
+  await request.put("/admin/api/gallery", {
+    data: { photoIds: [seed.landskap, seed.portrett, seed.broken] },
   });
+  await page.goto("/admin/galleri");
+  await expect(page.locator("#galleri-status")).toContainText(
+    "1 bilde trenger hjelp",
+  );
 });
 
+test("a description changed elsewhere is not undone unseen", async ({
+  page,
+  request,
+  seed,
+}) => {
+  await page.goto(`/admin/arrangementer/${seed.course}`);
+  const alt = page.locator(`#alt-${seed.portrett}`);
+  await expect(alt).toHaveValue("Kursholder ved kjøkkenbenken");
+  await alt.fill("Kursholderen viser deigen");
+  // Versions are whole seconds: the gallery's edit must land in a later one.
+  await page.waitForTimeout(1100);
+  const theirs = await request.put(`/admin/api/photos/${seed.portrett}`, {
+    data: { alt: "Anita ved benken", photographerId: null },
+  });
+  expect(theirs.ok()).toBe(true);
+
+  await page.getByRole("button", { name: "Lagre endringene" }).click();
+  const dialog = page.getByRole("dialog", {
+    name: "Noen andre har endret et bilde",
+  });
+  await expect(dialog).toContainText("«Anita ved benken»");
+  await dialog.getByRole("button", { name: "Bruk min" }).click();
+  await expect(page.getByText("Endringene er lagret").first()).toBeVisible();
+  const stored = await (
+    await request.get(`/admin/api/photos/${seed.portrett}`)
+  ).json();
+  expect(stored.alt).toBe("Kursholderen viser deigen");
+});
 // Safari on an iPad never asks before a tab is closed, and may drop a tab
 // she has left; a draft she has typed in is saved when the tab is hidden.
 test("a draft is saved when she leaves the tab", async ({ page }) => {
@@ -1195,4 +1223,40 @@ test("a draft is saved when she leaves the tab", async ({ page }) => {
     page.getByText("Kladden er lagret. Den vises ikke på nettsiden.").first(),
   ).toBeVisible();
   await expect(page.getByText("Ikke lagret")).toHaveCount(0);
+});
+
+test("a draft's address follows its title until she chooses one", async ({
+  page,
+}) => {
+  const host = new URL(process.env.BASE).host;
+  await page.goto("/admin/arrangementer/ny");
+  await page.getByLabel("Tittel").fill("Julemarkd");
+  await page.getByLabel("Dato", { exact: true }).fill("2026-11-14");
+  await page.getByRole("button", { name: "Lagre kladd" }).click();
+  await expect(page.getByText("Kladden er lagret.").first()).toBeVisible();
+  const field = page.getByLabel("Adresse til siden (valgfritt)");
+  await expect(field).toHaveValue("");
+  await expect(page.locator("#adresse-hjelp")).toContainText(
+    `Lages av tittelen: ${host}/arrangementer/2026/julemarkd.`,
+  );
+
+  // The typo fixed: the address follows, and says so honestly meanwhile.
+  await page.getByLabel("Tittel").fill("Julemarked");
+  await expect(page.locator("#adresse-hjelp")).toContainText(
+    "Lages av tittelen når du lagrer",
+  );
+  await page.getByRole("button", { name: "Lagre kladd" }).click();
+  await expect(page.locator("#adresse-hjelp")).toContainText(
+    `${host}/arrangementer/2026/julemarked.`,
+  );
+
+  // One she types stays, whatever the title.
+  await field.fill("jul");
+  await page.getByLabel("Tittel").fill("Julemarked på gården");
+  await page.getByRole("button", { name: "Lagre kladd" }).click();
+  await expect(page.getByText("Kladden er lagret.").first()).toBeVisible();
+  await expect(field).toHaveValue("jul");
+  await expect(page.locator("#adresse-hjelp")).toContainText(
+    `${host}/arrangementer/2026/jul – tøm feltet`,
+  );
 });

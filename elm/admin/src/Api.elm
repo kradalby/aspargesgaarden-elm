@@ -86,6 +86,10 @@ type alias Photo =
     , crops : Crops
     , quality : Qualities
     , status : PhotoStatus
+
+    -- The photo's version, sent back with an event save so a description
+    -- changed elsewhere meanwhile is not undone unseen.
+    , updatedAt : String
     }
 
 
@@ -120,6 +124,7 @@ type alias Event =
     , status : String
     , slug : String
     , slugFrozen : Bool
+    , slugFromTitle : Bool
     , year : Int
     , path : String
     , url : String
@@ -149,7 +154,7 @@ type alias EventLists =
 
 
 type alias PhotoRef =
-    { id : Int, alt : String, photographerId : Maybe Int }
+    { id : Int, alt : String, photographerId : Maybe Int, updatedAt : String }
 
 
 type alias EventInput =
@@ -189,7 +194,7 @@ arrives as Problems; the special 409s carry what the user needs next.
 type Error
     = Network
     | Problems (List Problem)
-    | Conflict Event
+    | Conflict Event (List Photo)
     | PhotoInUse (List UsedBy)
     | NameTaken Photographer
     | Unexpected
@@ -222,6 +227,7 @@ photoDecoder =
         |> field "crops" (D.dict rectDecoder)
         |> field "quality" qualitiesDecoder
         |> field "status" statusDecoder
+        |> field "updatedAt" D.string
 
 
 qualitiesDecoder : Decoder Qualities
@@ -264,6 +270,7 @@ eventDecoder =
         |> field "status" D.string
         |> field "slug" D.string
         |> field "slugFrozen" D.bool
+        |> field "slugFromTitle" D.bool
         |> field "year" D.int
         |> field "path" D.string
         |> field "url" D.string
@@ -312,7 +319,7 @@ errorDecoder status =
                         List.map .code problems
                 in
                 if status == 409 && List.member "conflict" codes then
-                    D.map Conflict (D.field "current" eventDecoder)
+                    D.map2 Conflict (D.field "current" eventDecoder) (D.field "photos" (D.list photoDecoder))
 
                 else if status == 409 && List.member "photo_in_use" codes then
                     D.map PhotoInUse
@@ -347,6 +354,7 @@ encodePhotoRef p =
         [ ( "id", E.int p.id )
         , ( "alt", E.string p.alt )
         , ( "photographerId", maybe E.int p.photographerId )
+        , ( "updatedAt", E.string p.updatedAt )
         ]
 
 

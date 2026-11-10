@@ -9,14 +9,16 @@ module Form exposing
     , removeAt
     , setAt
     , summaryLimit
+    , takePhotos
     , toInput
+    , withVersions
     )
 
 {-| The event form's state and its rules: what is sent, which control a
 server error belongs to. Kept apart from the view so the rules are tested.
 -}
 
-import Api exposing (Event, EventInput, PhotoRef, Problem)
+import Api exposing (Event, EventInput, Photo, PhotoRef, Problem)
 import Text
 
 
@@ -64,13 +66,17 @@ empty =
     }
 
 
+{-| An address that follows the title is an empty field: she has not
+chosen one, and sending it empty keeps it following.
+-}
 fromEvent : Event -> Form
 fromEvent e =
-    let
-        ref p =
-            { id = p.id, alt = p.alt, photographerId = Maybe.map .id p.photographer }
-    in
-    { slug = e.slug
+    { slug =
+        if e.slugFromTitle && not e.slugFrozen then
+            ""
+
+        else
+            e.slug
     , title = e.title
     , summary = e.summary
     , body = e.body
@@ -87,6 +93,48 @@ fromEvent e =
     , mainPhoto = Maybe.map ref e.mainPhoto
     , extraPhotos = List.map ref e.extraPhotos
     }
+
+
+ref : Photo -> PhotoRef
+ref p =
+    { id = p.id, alt = p.alt, photographerId = Maybe.map .id p.photographer, updatedAt = p.updatedAt }
+
+
+{-| The form's photos at the versions given, their words kept: what she
+wrote is hers, but it now answers to the photo as stored.
+-}
+withVersions : List Photo -> Form -> Form
+withVersions photos =
+    mapRefs
+        (\r ->
+            case List.filter (\p -> p.id == r.id) photos of
+                p :: _ ->
+                    { r | updatedAt = p.updatedAt }
+
+                [] ->
+                    r
+        )
+
+
+{-| The form's photos with the description and photographer of the given
+photos, as stored.
+-}
+takePhotos : List Photo -> Form -> Form
+takePhotos photos =
+    mapRefs
+        (\r ->
+            case List.filter (\p -> p.id == r.id) photos of
+                p :: _ ->
+                    ref p
+
+                [] ->
+                    r
+        )
+
+
+mapRefs : (PhotoRef -> PhotoRef) -> Form -> Form
+mapRefs f form =
+    { form | mainPhoto = Maybe.map f form.mainPhoto, extraPhotos = List.map f form.extraPhotos }
 
 
 {-| The request body. A date row left empty is an unused "add a date" click,
@@ -197,20 +245,35 @@ errorsFor id =
 
 
 {-| The form after a save answered with stored. If nothing was typed while
-the request was out, the form becomes what the server stored (it fills in
-the address from the title). Otherwise the newer typing is kept, and only
-the address the server made is taken over, so no keystroke is lost.
+the request was out, the form becomes what the server stored. Otherwise the
+newer typing is kept, and only the address as stored (trimmed, or empty
+while it follows the title) and the photos' new versions are taken over, so
+no keystroke is lost.
 -}
 afterSave : { sent : Form, current : Form, stored : Form } -> Form
 afterSave { sent, current, stored } =
+    let
+        -- The save gave its photos new versions; her newer words answer to them.
+        versioned =
+            mapRefs
+                (\r ->
+                    case List.filter (\s -> s.id == r.id) (List.filterMap identity [ stored.mainPhoto ] ++ stored.extraPhotos) of
+                        s :: _ ->
+                            { r | updatedAt = s.updatedAt }
+
+                        [] ->
+                            r
+                )
+                current
+    in
     if current == sent then
         stored
 
     else if current.slug == sent.slug then
-        { current | slug = stored.slug }
+        { versioned | slug = stored.slug }
 
     else
-        current
+        versioned
 
 
 

@@ -729,7 +729,9 @@ statusView toMsg photo =
 
             Api.Failed reason ->
                 [ Ui.errorText ("bildefeil-" ++ String.fromInt photo.id) [ Text.photoFailure reason ]
-                , if reason == "damaged" || reason == "too_small" then
+
+                -- Trying again only helps when the server, not the file, failed.
+                , if List.member reason [ "damaged", "too_small", "unsupported_type", "too_large", "too_many_pixels", "missing_original" ] then
                     text ""
 
                   else
