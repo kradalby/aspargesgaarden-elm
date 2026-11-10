@@ -17,12 +17,10 @@ var frontDescription = fmt.Sprintf(
 
 // Front is the front page: the farm photo, filling the screen.
 func Front(s Site) *elem.Element {
-	return s.page(ui.Meta{
-		Title:       "Bryllups- og selskapslokale i " + seo.Venue.Area + ", " + seo.Venue.Municipality,
-		Description: frontDescription,
-		Path:        "/",
-		JSONLD:      []any{seo.VenueNode(s.BaseURL), seo.WebSiteNode(s.BaseURL)},
-	},
+	m := meta("/", frontDescription)
+	m.JSONLD = []any{seo.VenueNode(s.BaseURL), seo.WebSiteNode(s.BaseURL)}
+
+	return s.page(m,
 		ui.Backdrop("Aspargesgården – selskapslokaler ved kysten i Vestfold", static.Photo("forside")),
 	)
 }

@@ -159,7 +159,7 @@ func TestAddresses(t *testing.T) {
 		wantBody string // for pages
 	}{
 		{path: "/", wantCode: http.StatusOK, wantBody: `<link href="https://aspargesgaarden.no/" rel="canonical">`},
-		{path: "/lokaler", wantCode: http.StatusOK, wantBody: ">Muligheter</h1>"},
+		{path: "/lokaler", wantCode: http.StatusOK, wantBody: ">Selskapslokaler</h1>"},
 		{path: "/om-oss", wantCode: http.StatusOK, wantBody: ">Om gården</h1>"},
 		{path: "/kontakt", wantCode: http.StatusOK, wantBody: ">Kontakt oss</h1>"},
 		{path: "/arrangementer", wantCode: http.StatusOK, wantBody: ">Arrangementer</h1>"},

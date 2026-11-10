@@ -16,10 +16,10 @@ import (
 func testPage(path string) string {
 	return Page(PageProps{
 		BaseURL: "https://aspargesgaarden.no",
-		Meta:    Meta{Title: "Muligheter", Description: "Lokaler & mat", Path: path},
+		Meta:    Meta{Title: "Selskapslokaler", Description: "Lokaler & mat", Path: path},
 		Menu:    testMenu,
 		Umami:   testUmami,
-	}, Container(Headline("Muligheter"), elem.P(nil, elem.Text("Tekst")))).Render()
+	}, Container(Headline("Selskapslokaler"), elem.P(nil, elem.Text("Tekst")))).Render()
 }
 
 func TestPage(t *testing.T) {

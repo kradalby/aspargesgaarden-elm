@@ -15,7 +15,7 @@ func TestLLMs(t *testing.T) {
 	}
 
 	got := LLMs(testBase,
-		[]Link{{Title: "Muligheter", Path: "/lokaler"}, {Title: "Kontakt", Path: "/kontakt"}},
+		[]Link{{Title: "Selskapslokaler: låven, fjøset og hagen", Path: "/lokaler"}, {Title: "Kontakt oss – Tjølling, Larvik", Path: "/kontakt"}},
 		[]site.Event{testEvent(), kurs})
 
 	require.Equal(t, `# Aspargesgården
@@ -35,8 +35,8 @@ func TestLLMs(t *testing.T) {
 
 ## Sider
 
-- [Muligheter](https://aspargesgaarden.no/lokaler)
-- [Kontakt](https://aspargesgaarden.no/kontakt)
+- [Selskapslokaler: låven, fjøset og hagen](https://aspargesgaarden.no/lokaler)
+- [Kontakt oss – Tjølling, Larvik](https://aspargesgaarden.no/kontakt)
 
 ## Kommende arrangementer
 

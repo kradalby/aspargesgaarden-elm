@@ -11,7 +11,7 @@ import (
 )
 
 var testMenu = []MenuItem{
-	{Label: "Muligheter", Href: "/lokaler"},
+	{Label: "Lokaler", Href: "/lokaler"},
 	{Label: "Arrangementer", Href: "/arrangementer"},
 	{Label: "Om gården", Href: "/om-oss"},
 }
@@ -25,7 +25,7 @@ func TestHeaderMarksCurrentSection(t *testing.T) {
 		current string
 		want    string
 	}{
-		{current: "/lokaler", want: "Muligheter"},
+		{current: "/lokaler", want: "Lokaler"},
 		{current: "/arrangementer/2026/julemarked", want: "Arrangementer"},
 		{current: "/", want: ""},
 		{current: "", want: ""},

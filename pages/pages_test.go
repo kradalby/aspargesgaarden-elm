@@ -61,9 +61,18 @@ func TestMenu(t *testing.T) {
 		labels = append(labels, m.Label)
 	}
 
-	require.Equal(t, []string{"Muligheter", "Arrangementer", "Julemarked", "Galleri", "Om gården", "Kontakt"}, labels)
+	require.Equal(t, []string{"Lokaler", "Arrangementer", "Julemarked", "Galleri", "Om gården", "Kontakt"}, labels)
 	require.Equal(t, "/arrangementer/2026/julemarked", got[2].Href)
 	require.Len(t, Menu(), 5)
+
+	// llms.txt names the menu's own pages by their titles.
+	for _, m := range Menu() {
+		require.NotEmpty(t, Titles[m.Href], m.Href)
+	}
+
+	for path, page := range Fixed {
+		require.Contains(t, page(testSite).Render(), "<title>"+Titles[path]+" | ", path)
+	}
 }
 
 func TestFixedPagesAreCanonicalAtTheirAddress(t *testing.T) {

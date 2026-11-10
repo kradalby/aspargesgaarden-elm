@@ -10,6 +10,7 @@ import (
 	"github.com/chasefleming/elem-go"
 
 	"github.com/kradalby/asparges/images"
+	"github.com/kradalby/asparges/seo"
 	"github.com/kradalby/asparges/site"
 	"github.com/kradalby/asparges/ui"
 )
@@ -45,12 +46,28 @@ func (s Site) page(meta ui.Meta, body ...elem.Node) *elem.Element {
 	return ui.Page(ui.PageProps{BaseURL: s.BaseURL, Meta: meta, Menu: s.Menu, Umami: s.Umami}, body...)
 }
 
+// Titles are the site's own pages' titles by address: their <title> before
+// the site name, and their names in llms.txt. Menu labels are shorter.
+var Titles = map[string]string{
+	"/":              "Bryllups- og selskapslokale i " + seo.Venue.Area + ", " + seo.Venue.Municipality,
+	"/lokaler":       "Selskapslokaler: låven, fjøset og hagen",
+	"/arrangementer": "Arrangementer i " + seo.Venue.Area + ", " + seo.Venue.Municipality,
+	"/galleri":       "Galleri – bilder fra gården i " + seo.Venue.Area,
+	"/om-oss":        "Om gården og vertskapet",
+	"/kontakt":       "Kontakt oss – " + seo.Venue.Area + ", " + seo.Venue.Municipality,
+}
+
+// meta is the head of the page at path, titled from Titles.
+func meta(path, description string) ui.Meta {
+	return ui.Meta{Title: Titles[path], Description: description, Path: path}
+}
+
 // Menu is the main menu. events are the entries of events marked "Vis i
 // menyen" (site.Menu); they follow Arrangementer, where Julemarked has
 // always been.
 func Menu(events ...site.MenuEntry) []ui.MenuItem {
 	items := []ui.MenuItem{
-		{Label: "Muligheter", Href: "/lokaler"},
+		{Label: "Lokaler", Href: "/lokaler"},
 		{Label: "Arrangementer", Href: "/arrangementer"},
 	}
 	for _, e := range events {

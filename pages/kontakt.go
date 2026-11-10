@@ -15,13 +15,11 @@ const calendar = ui.CalendarOrigin + "/calendar/embed?src=klatrerosen.no_hgf7kik
 
 // Kontakt has the contact details and the booking calendar (old /contact).
 func Kontakt(s Site) *elem.Element {
-	return s.page(ui.Meta{
-		Title: "Kontakt oss – " + seo.Venue.Area + ", " + seo.Venue.Municipality,
-		Description: fmt.Sprintf("Ring %s eller send e-post for å leie låven eller fjøset. Aspargesgården ligger i %s i %s.",
-			seo.Venue.Phone, seo.Venue.AddressLine(), seo.Venue.Municipality),
-		Path:   "/kontakt",
-		JSONLD: []any{seo.VenueNode(s.BaseURL)},
-	},
+	m := meta("/kontakt", fmt.Sprintf("Ring %s eller send e-post for å leie låven eller fjøset. Aspargesgården ligger i %s i %s.",
+		seo.Venue.Phone, seo.Venue.AddressLine(), seo.Venue.Municipality))
+	m.JSONLD = []any{seo.VenueNode(s.BaseURL)}
+
+	return s.page(m,
 		ui.Container(
 			elem.Div(nil, ui.Headline("Kontakt oss")),
 			elem.Div(attrs.Props{attrs.Class: "flex flex-row flex-wrap"},

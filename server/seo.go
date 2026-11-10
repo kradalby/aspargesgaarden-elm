@@ -1,6 +1,7 @@
 package server
 
 import (
+	"cmp"
 	"context"
 	"fmt"
 	"maps"
@@ -98,7 +99,7 @@ func (s *Server) llms(w http.ResponseWriter, r *http.Request) {
 
 	links := make([]seo.Link, len(st.Menu))
 	for i, m := range st.Menu {
-		links[i] = seo.Link{Title: m.Label, Path: m.Href}
+		links[i] = seo.Link{Title: cmp.Or(pages.Titles[m.Href], m.Label), Path: m.Href}
 	}
 
 	upcoming, _ := site.Split(events, s.cfg.Now())

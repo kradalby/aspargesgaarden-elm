@@ -11,18 +11,14 @@ import (
 
 // Galleri is the photo gallery (old /gallery), photos in the admin's order.
 func Galleri(s Site, photos []site.Photo) *elem.Element {
-	meta := ui.Meta{
-		Title:       "Galleri – bilder fra gården i Tjølling",
-		Description: "Bilder fra Aspargesgården i Tjølling, Larvik: låven og fjøset pyntet til fest, det engelske lysthuset og hagen.",
-		Path:        "/galleri",
-	}
+	m := meta("/galleri", "Bilder fra Aspargesgården i Tjølling, Larvik: låven og fjøset pyntet til fest, det engelske lysthuset og hagen.")
 
 	// The first photo is the one the owner put first: the link preview.
 	if len(photos) > 0 {
-		meta.Image, _ = seo.PhotoImage(photos[0])
+		m.Image, _ = seo.PhotoImage(photos[0])
 	}
 
-	return s.page(meta,
+	return s.page(m,
 		ui.Container(
 			elem.Div(nil, ui.Headline("Galleri")),
 			ui.Gallery(ui.GalleryPage, galleryPhotos(photos)...),

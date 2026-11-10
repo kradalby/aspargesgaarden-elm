@@ -91,13 +91,9 @@ func Lokaler(s Site) *elem.Element {
 		rows[i] = ui.Row{Photo: static.Photo(f.photo), Alt: f.alt, By: f.by, Body: markdown.Render(f.text)}
 	}
 
-	return s.page(ui.Meta{
-		Title: "Selskapslokaler: låven, fjøset og hagen",
-		Description: fmt.Sprintf("Låven fra 1906 tar %d gjester ved runde bord, fjøset %d ved langbord. Storkjøkken, engelsk lysthus for vielser og alt til festbordet.",
-			seo.Venue.Guests("Låven"), seo.Venue.Guests("Fjøset")),
-		Path: "/lokaler",
-	},
-		ui.Container(elem.Div(nil, ui.Headline("Muligheter"))),
+	return s.page(meta("/lokaler", fmt.Sprintf("Låven fra 1906 tar %d gjester ved runde bord, fjøset %d ved langbord. Storkjøkken, engelsk lysthus for vielser og alt til festbordet.",
+		seo.Venue.Guests("Låven"), seo.Venue.Guests("Fjøset"))),
+		ui.Container(elem.Div(nil, ui.Headline("Selskapslokaler"))),
 		ui.PhotoRows(ui.RowFacility, rows...),
 	)
 }
