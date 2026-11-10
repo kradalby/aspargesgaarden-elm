@@ -1,6 +1,9 @@
 package main
 
 import (
+	"context"
+	"log/slog"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -43,7 +46,9 @@ func TestE2EHooks(t *testing.T) {
 
 	post := func(path string) int {
 		rec := httptest.NewRecorder()
-		hooks.ServeHTTP(rec, httptest.NewRequestWithContext(t.Context(), "POST", path, nil))
+		req := httptest.NewRequestWithContext(t.Context(), http.MethodPost, path, nil)
+		req.Host = "127.0.0.1:8090"
+		hooks.ServeHTTP(rec, req)
 
 		return rec.Code
 	}
@@ -86,12 +91,83 @@ func TestE2EHooks(t *testing.T) {
 
 	// An old import's banner, under today's floor of 800.
 	rec := httptest.NewRecorder()
-	hooks.ServeHTTP(rec, httptest.NewRequestWithContext(t.Context(), "POST", "/__crop/2", strings.NewReader(`{"banner":{"x":0,"y":0,"w":700,"h":394}}`)))
+	req := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/__crop/2", strings.NewReader(`{"banner":{"x":0,"y":0,"w":700,"h":394}}`))
+	req.Host = "127.0.0.1:8090"
+	hooks.ServeHTTP(rec, req)
 	require.Equal(t, http.StatusNoContent, rec.Code, rec.Body.String())
 
 	p, err := store.Photo(t.Context(), 2)
 	require.NoError(t, err)
 	require.Equal(t, images.Rect{X: 0, Y: 0, W: 700, H: 394}, p.Crops[images.Banner])
+
+	// The hooks delete everything, so they refuse what the admin refuses: a
+	// write from another page in the browser, and a name that is not this
+	// machine (a rebound DNS name).
+	for name, change := range map[string]func(r *http.Request){
+		"cross-site": func(r *http.Request) { r.Header.Set("Sec-Fetch-Site", "cross-site") },
+		"other host": func(r *http.Request) { r.Host = "evil.example:8090" },
+	} {
+		rec := httptest.NewRecorder()
+		r := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/__reset", nil)
+		r.Host = "127.0.0.1:8090"
+		change(r)
+		hooks.ServeHTTP(rec, r)
+		require.Equal(t, http.StatusForbidden, rec.Code, name)
+	}
+
+	kept, err := store.Event(t.Context(), 4)
+	require.NoError(t, err)
+	require.Equal(t, after.CreatedAt, kept.CreatedAt, "a refused reset changed nothing")
+}
+
+// Without --e2e-fixtures, serve has no hooks: a POST that would wipe the
+// data reaches the public site and is not found.
+func TestServeHasNoHooksWithoutTheFlag(t *testing.T) {
+	l, err := net.Listen("tcp", "127.0.0.1:0")
+	require.NoError(t, err)
+	addr := l.Addr().String()
+	require.NoError(t, l.Close())
+
+	ctx, cancel := context.WithCancel(t.Context())
+	done := make(chan error, 1)
+
+	go func() {
+		done <- serve(ctx, slog.New(slog.DiscardHandler), serveConfig{
+			dataDir: t.TempDir(), listenAddr: addr, baseURL: "http://" + addr, dev: true,
+		})
+	}()
+
+	t.Cleanup(func() {
+		cancel()
+		require.NoError(t, <-done)
+	})
+
+	base := "http://" + addr
+	require.Eventually(t, func() bool {
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, base+"/", nil)
+		if err != nil {
+			return false
+		}
+
+		res, err := http.DefaultClient.Do(req)
+		if err != nil {
+			return false
+		}
+
+		_ = res.Body.Close()
+
+		return true
+	}, 30*time.Second, 50*time.Millisecond)
+
+	for _, path := range []string{"/__reset", "/__touch/1", "/__crop/1"} {
+		req, err := http.NewRequestWithContext(t.Context(), http.MethodPost, base+path, nil)
+		require.NoError(t, err)
+
+		res, err := http.DefaultClient.Do(req)
+		require.NoError(t, err)
+		require.NoError(t, res.Body.Close())
+		require.Contains(t, []int{http.StatusNotFound, http.StatusMethodNotAllowed}, res.StatusCode, path)
+	}
 }
 
 // Every day the suite runs is the same day to the server: its events are

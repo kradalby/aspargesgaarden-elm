@@ -5,10 +5,12 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net"
 	"net/http"
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -53,7 +55,9 @@ func (c *e2eClock) advance(d time.Duration) {
 // so they run against the real server: POST /__reset replaces everything
 // with their seed data, POST /__touch/{id} saves an event as a second
 // editor would, POST /__crop/{id} stores crops unchecked. Only
-// `serve --dev --e2e-fixtures` mounts them.
+// `serve --dev --e2e-fixtures` mounts them, and like the admin they answer
+// only to a loopback Host and never to a write from another origin, so no
+// page open in the developer's browser can wipe the data.
 func e2eHooks(store *site.Store, imgs *images.Store, srv *server.Server, fixtures string, clock *e2eClock) http.Handler {
 	mux := http.NewServeMux()
 
@@ -116,7 +120,19 @@ func e2eHooks(store *site.Store, imgs *images.Store, srv *server.Server, fixture
 		w.WriteHeader(http.StatusNoContent)
 	})
 
-	return mux
+	return http.NewCrossOriginProtection().Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		host := r.Host
+		if h, _, err := net.SplitHostPort(host); err == nil {
+			host = h
+		}
+
+		if !isLoopback(net.JoinHostPort(strings.Trim(host, "[]"), "0")) {
+			http.Error(w, "not a loopback host", http.StatusForbidden)
+			return
+		}
+
+		mux.ServeHTTP(w, r)
+	}))
 }
 
 // e2eReset deletes every event, photo and photographer and puts in the
