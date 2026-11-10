@@ -324,7 +324,12 @@ update msg model =
         OpenCrop ->
             case model.form.mainPhoto |> Maybe.andThen (\r -> Photos.get r.id model.photos) of
                 Just photo ->
-                    ( { model | crop = Just { photoId = photo.id, kind = "card", rects = photo.crops, saving = False, error = Nothing } }, Cmd.none, Nothing )
+                    case usableKinds photo of
+                        first :: _ ->
+                            ( { model | crop = Just { photoId = photo.id, kind = first.key, rects = photo.crops, saving = False, error = Nothing } }, Cmd.none, Nothing )
+
+                        [] ->
+                            ( model, Cmd.none, Nothing )
 
                 Nothing ->
                     ( model, Cmd.none, Nothing )
@@ -1127,7 +1132,12 @@ mainPhotoView model =
                         [ Photos.statusView PhotosMsg photo
                         , div [ class "flex flex-wrap gap-2" ]
                             [ Ui.secondaryButton [ A.id "hovedbilde" ] (PhotosMsg (Photos.pick Photos.Main False)) "Bytt bilde"
-                            , Ui.secondaryButton [ A.id "beskjaer", A.disabled (not photo.status.previewReady) ] OpenCrop "Beskjær"
+                            , if List.isEmpty (usableKinds photo) then
+                                -- Too small for every crop; the notes below say what is shown instead.
+                                text ""
+
+                              else
+                                Ui.secondaryButton [ A.id "beskjaer", A.disabled (not photo.status.previewReady) ] OpenCrop "Beskjær"
                             , Ui.quietButton [] RemoveMain "Ta bort bildet"
                             ]
                         , if not photo.status.previewReady then
@@ -1203,6 +1213,13 @@ smallPhotoNote photo =
                         [ Ui.verdict "soft" [ A.id "bilde-uskarpt" ] (soft ++ [ Text.askForOriginal ]) ]
                    )
             )
+
+
+{-| The crops the photo is large enough for; the dialog opens on the first.
+-}
+usableKinds : Photo -> List Crop.Kind
+usableKinds photo =
+    List.filter (\k -> Crop.usable k { width = photo.width, height = photo.height }) (Crop.kinds photo.quality)
 
 
 fallbackText : Crop.Kind -> String
