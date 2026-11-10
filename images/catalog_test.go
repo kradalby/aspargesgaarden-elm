@@ -76,8 +76,8 @@ func TestGroupsLadder(t *testing.T) {
 	}
 
 	want := map[Kind][]string{
-		// Never wider than the crop: 1000 stops the card at 800.
-		Card:   {"avif/480", "avif/800", "webp/480", "webp/800", "jpeg/480", "jpeg/800"},
+		// Never wider than the crop, and the crop's own width on top.
+		Card:   ladder(480, 800, 1000),
 		Banner: ladder(480, 800, 1200, 1600, 2000),
 		Share:  {"jpeg/1200"},
 		Full:   ladder(480, 800, 1200, 1600, 2000),
@@ -86,7 +86,53 @@ func TestGroupsLadder(t *testing.T) {
 		t.Fatalf("groups (-want +got):\n%s", d)
 	}
 
-	require.Len(t, Expected(p), 6+15+1+15)
+	require.Len(t, Expected(p), 9+15+1+15)
+}
+
+func TestRungs(t *testing.T) {
+	for _, tt := range []struct {
+		crop int
+		want []int
+	}{
+		{480, []int{480}},
+		{500, []int{480}},             // within topSlack of 480
+		{768, []int{480, 768}},        // the old site's small originals
+		{1000, []int{480, 800, 1000}}, // between rungs
+		{1210, []int{480, 800, 1200}}, // within topSlack of 1200
+		{1824, []int{480, 800, 1200, 1600, 1824}},
+		{2000, []int{480, 800, 1200, 1600, 2000}},
+		{2106, []int{480, 800, 1200, 1600, 2000}}, // the ladder's top caps it
+		{2400, []int{480, 800, 1200, 1600, 2000}},
+	} {
+		require.Equal(t, tt.want, rungs(tt.crop), "crop %d", tt.crop)
+	}
+}
+
+// A photo between rungs is offered at its own width: the largest variant is
+// the photo, so the page and the share image are as sharp as it allows.
+func TestRefForPhotoBetweenRungs(t *testing.T) {
+	p := Photo{SHA256: testSHA, MIME: "image/jpeg", Width: 768, Height: 1024}
+
+	ref, err := RefFor(p, Full)
+	require.NoError(t, err)
+	require.Equal(t, 768, ref.Width)
+	require.Equal(t, 1024, ref.Height)
+	require.Len(t, ref.Variants, 6)
+
+	// The queue's first pass and the crop tool take it too.
+	require.Contains(t, PreviewURL(p), "-768.jpg")
+
+	g := groups(p)[0]
+	require.Equal(t, []string{"avif/768"}, specNames(firstPass(p, g)[1:]))
+}
+
+func specNames(specs []VariantSpec) []string {
+	out := make([]string, len(specs))
+	for i, s := range specs {
+		out[i] = fmt.Sprintf("%s/%d", s.Format, s.Width)
+	}
+
+	return out
 }
 
 func ladder(ws ...int) []string {
@@ -136,8 +182,8 @@ func TestRefFor(t *testing.T) {
 
 	full, err := RefFor(p, Full)
 	require.NoError(t, err)
-	require.Equal(t, 1200, full.Width)
-	require.Equal(t, 1600, full.Height)
+	require.Equal(t, 1500, full.Width)
+	require.Equal(t, 2000, full.Height)
 
 	_, err = RefFor(p, Banner)
 	require.ErrorIs(t, err, ErrNotFound)

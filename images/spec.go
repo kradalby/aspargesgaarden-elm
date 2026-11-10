@@ -28,9 +28,31 @@ const (
 	jpegOptions = "[Q=82,optimize-coding=true,interlace=true,background=255,keep=none]"
 )
 
-// widths is the ladder every kind but Share is cut into. A variant is never
-// wider than its crop, so small photos get fewer steps rather than upscaling.
+// widths is the ladder every kind but Share is cut into; see rungs.
 var widths = []int{480, 800, 1200, 1600, 2000}
+
+// topSlack: a crop at most this much wider than the rung below it gets no
+// file at its own width, which would cost bytes and show nothing.
+const topSlack = 1.1
+
+// rungs are the widths a crop w pixels wide is cut into: the ladder's steps
+// up to w, never upscaling, and w itself on top when it lies between steps,
+// so the sharpest file is always the crop's own pixels. Adding a top rung
+// never renames or changes another file.
+func rungs(w int) []int {
+	var out []int
+	for _, r := range widths {
+		if r <= w {
+			out = append(out, r)
+		}
+	}
+
+	if len(out) > 0 && w < widths[len(widths)-1] && float64(w) > float64(out[len(out)-1])*topSlack {
+		out = append(out, w)
+	}
+
+	return out
+}
 
 // formats is also the order a <picture> lists its sources in: best first.
 var formats = []Format{AVIF, WebP, JPEG}

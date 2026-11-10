@@ -89,7 +89,7 @@ func TestPhotoImage(t *testing.T) {
 	}{
 		{name: "share crop", photo: testPhoto('a', 2400, 1600), wantKind: "/share-", width: 1200, height: 630},
 		// Too small for the share image: the banner's largest JPEG instead.
-		{name: "small", photo: testPhoto('b', 1000, 800), wantKind: "/banner-", width: 800, height: 450},
+		{name: "small", photo: testPhoto('b', 1000, 800), wantKind: "/banner-", width: 1000, height: 562},
 		{name: "no crops", photo: func() site.Photo { p := testPhoto('c', 1600, 1200); p.Crops = nil; return p }(), wantKind: "/full-", width: 1600, height: 1200},
 	}
 

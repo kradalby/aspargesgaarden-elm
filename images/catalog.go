@@ -79,16 +79,14 @@ func groups(p Photo) []group {
 		}
 
 		g := group{kind: k, rect: r}
-		ws, fs := widths, formats
+		ws, fs := rungs(r.W), formats
 		if k == Share {
 			ws, fs = []int{shareWidth}, []Format{JPEG}
 		}
 
 		for _, f := range fs {
 			for _, w := range ws {
-				if w <= r.W {
-					g.specs = append(g.specs, VariantSpec{Photo: p.SHA256, Kind: k, Crop: r.ID(), Width: w, Format: f})
-				}
+				g.specs = append(g.specs, VariantSpec{Photo: p.SHA256, Kind: k, Crop: r.ID(), Width: w, Format: f})
 			}
 		}
 

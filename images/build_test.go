@@ -145,8 +145,14 @@ func TestBuildStripsMetadata(t *testing.T) {
 func TestBuildSizes(t *testing.T) {
 	t.Parallel()
 	v := newTestVips(t)
-	crops := map[Kind]Rect{Banner: {X: 0, Y: 62, W: 1200, H: 675}, Share: {X: 0, Y: 85, W: 1200, H: 630}}
+	crops := map[Kind]Rect{
+		Banner: {X: 0, Y: 62, W: 1200, H: 675},
+		Share:  {X: 0, Y: 85, W: 1200, H: 630},
+		// Between rungs and odd: its top rung is the crop's own pixels.
+		Card: {X: 99, Y: 25, W: 601, H: 751},
+	}
 	p, orig := photoFromFixture(t, v, "upright.jpg", crops)
+	require.Contains(t, Expected(p), VariantSpec{Photo: p.SHA256, Kind: Card, Crop: crops[Card].ID(), Width: 601, Format: AVIF})
 
 	out := t.TempDir()
 	buildAll(t, v, p, orig, out)
