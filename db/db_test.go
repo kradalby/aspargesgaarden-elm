@@ -1,6 +1,7 @@
 package db
 
 import (
+	"context"
 	"database/sql"
 	"errors"
 	"os"
@@ -9,6 +10,7 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/require"
@@ -408,4 +410,28 @@ func canonical(stmt string) string {
 	slices.Sort(items)
 
 	return s[:open] + "(" + strings.Join(items, ", ") + ")" + s[end+1:]
+}
+
+// A connection the pool opens while a write is under way must not wait for
+// it: reads in WAL mode never need the write lock.
+func TestNewConnectionDoesNotWaitForAWrite(t *testing.T) {
+	d := openTest(t)
+
+	var mode int
+	// The schema catalog is outside sqlc; raw SQL in a test is the exception.
+	require.NoError(t, d.sql.QueryRowContext(t.Context(), "PRAGMA auto_vacuum").Scan(&mode))
+	require.Equal(t, 2, mode, "incremental, kept in the file")
+
+	write, err := d.sql.BeginTx(t.Context(), nil)
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = write.Rollback() })
+
+	ctx, cancel := context.WithTimeout(t.Context(), 2*time.Second)
+	defer cancel()
+
+	// Every idle connection is busy, so this read opens a new one.
+	require.NoError(t, d.ReadTx(ctx, func(q *dbsqlc.Queries) error {
+		_, err := q.ListEvents(ctx)
+		return err
+	}))
 }

@@ -64,7 +64,14 @@ type DB struct {
 // Open opens (creating if needed) the SQLite database at path and migrates it
 // to the embedded schema.
 func Open(ctx context.Context, path string) (*DB, error) {
-	uri, err := sqliteconfig.Default(path).ToURL()
+	cfg := sqliteconfig.Default(path)
+	// Set on each new connection, auto_vacuum takes the write lock, so a
+	// read that needed a connection waited for any write under way, up to
+	// the busy timeout and past its own context. It is kept in the file, so
+	// setAutoVacuum sets it once instead.
+	cfg.AutoVacuum = ""
+
+	uri, err := cfg.ToURL()
 	if err != nil {
 		return nil, fmt.Errorf("building sqlite uri: %w", err)
 	}
@@ -74,12 +81,49 @@ func Open(ctx context.Context, path string) (*DB, error) {
 		return nil, fmt.Errorf("opening sqlite: %w", err)
 	}
 
+	if err := setAutoVacuum(ctx, sqlDB); err != nil {
+		_ = sqlDB.Close()
+		return nil, err
+	}
+
 	if err := schema.Apply(ctx, sqlDB); err != nil {
 		_ = sqlDB.Close()
 		return nil, fmt.Errorf("applying schema: %w", err)
 	}
 
 	return &DB{sql: sqlDB, q: dbsqlc.New(sqlDB)}, nil
+}
+
+// setAutoVacuum makes the file give back the space of deleted rows
+// (incremental auto_vacuum). An existing file takes the mode only through
+// VACUUM, which is run once, when the mode is not set yet.
+func setAutoVacuum(ctx context.Context, sqlDB *sql.DB) error {
+	// One connection: the mode set on it is what its VACUUM writes.
+	conn, err := sqlDB.Conn(ctx)
+	if err != nil {
+		return fmt.Errorf("connecting: %w", err)
+	}
+	defer conn.Close()
+
+	// Pragmas are outside sqlc; these maintenance statements are the
+	// exception.
+	var mode int
+	if err := conn.QueryRowContext(ctx, "PRAGMA auto_vacuum").Scan(&mode); err != nil {
+		return fmt.Errorf("reading auto_vacuum: %w", err)
+	}
+
+	const incremental = 2
+	if mode == incremental {
+		return nil
+	}
+
+	for _, stmt := range []string{"PRAGMA auto_vacuum = INCREMENTAL", "VACUUM"} {
+		if _, err := conn.ExecContext(ctx, stmt); err != nil {
+			return fmt.Errorf("%s: %w", stmt, err)
+		}
+	}
+
+	return nil
 }
 
 // Close closes the database.
