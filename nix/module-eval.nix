@@ -43,6 +43,7 @@ let
     baseURL = "https://beta.aspargesgaarden.no";
     noindex = true;
     umamiSiteId = "11111111-2222-4333-8444-555555555555";
+    logLevel = "debug";
     tailscaleKeyPath = "/run/agenix/asparges-tskey";
     environmentFile = "/run/agenix/asparges-env";
   };
@@ -62,6 +63,13 @@ assert check (
 assert check (
   !lib.hasInfix "--noindex" default.ExecStart
 ) "the default must be indexable: ${default.ExecStart}";
+assert check (lib.hasInfix "--log-level=info" default.ExecStart)
+  "default ExecStart missing log-level: ${default.ExecStart}";
+assert check (lib.hasInfix "--log-level=debug" custom.ExecStart)
+  "custom ExecStart missing log-level: ${custom.ExecStart}";
+assert check (
+  !lib.hasInfix "--dev" default.ExecStart && !lib.hasInfix "--e2e-fixtures" default.ExecStart
+) "the module must never reach the dev-only switches: ${default.ExecStart}";
 assert check (
   !lib.hasInfix "--umami-site-id" default.ExecStart
 ) "the default must load no tracker: ${default.ExecStart}";

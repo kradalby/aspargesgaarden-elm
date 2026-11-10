@@ -1,10 +1,14 @@
 package main
 
 import (
+	"os"
+	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/peterbourgon/ff/v4"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/kradalby/asparges/seo"
@@ -138,6 +142,47 @@ func TestServeConfigValidate(t *testing.T) {
 			require.ErrorIs(t, err, tt.wantErr)
 		})
 	}
+}
+
+// devOnlyFlags are the serve flags the NixOS module must never pass: they
+// are for local work and the browser tests, not a deploy.
+var devOnlyFlags = map[string]bool{
+	"dev":          true, // no Tailscale, the admin on the local listener
+	"e2e-fixtures": true, // hooks that delete everything
+}
+
+// Every setting the server takes is settable through services.asparges
+// (owner rule): each serve flag, the root ones included, must be rendered
+// into the unit by nix/module.nix, and the dev-only ones never.
+func TestEveryServeFlagIsInTheModule(t *testing.T) {
+	module, err := os.ReadFile(filepath.Join("..", "..", "nix", "module.nix"))
+	require.NoError(t, err)
+
+	var serve *ff.Command
+	for _, c := range newRootCmd(&app{}).Subcommands {
+		if c.Name == "serve" {
+			serve = c
+		}
+	}
+	require.NotNil(t, serve)
+
+	require.NoError(t, serve.Flags.WalkFlags(func(f ff.Flag) error {
+		name, _ := f.GetLongName()
+		rendered := strings.Contains(string(module), `"--`+name+`=`) || strings.Contains(string(module), `"--`+name+`"`)
+
+		if devOnlyFlags[name] {
+			assert.False(t, rendered, "--%s is dev-only: the module must not pass it", name)
+		} else {
+			assert.True(t, rendered, "--%s has no services.asparges option rendered into the unit in nix/module.nix", name)
+		}
+
+		return nil
+	}))
+
+	// The module puts the root flags after "serve"; they must parse there.
+	a := &app{}
+	require.NoError(t, newRootCmd(a).Parse([]string{"serve", "--log-level=debug", "--data-dir=/var/lib/x"}))
+	require.Equal(t, "debug", a.logLevel)
 }
 
 // The browser tests' hooks delete everything: never on a real deploy.

@@ -161,8 +161,12 @@
           goPkg = pkgs.go_latest;
           subPackages = [ "cmd/asparges" ];
           # db/db.go embeds schema.sql; flake-checks' source filter keeps only
-          # .go files, so the schema has to be added by hand.
-          extraSrc = [ ./db/schema.sql ];
+          # .go files, so the schema has to be added by hand. cmd/asparges'
+          # tests read the module, to keep every serve flag settable there.
+          extraSrc = [
+            ./db/schema.sql
+            ./nix/module.nix
+          ];
           # Committed embedded files; static/dist comes from withStatic.
           embedDirs = [ ./static/files ];
 

@@ -44,6 +44,11 @@ go run ./cmd/asparges serve --dev --listen-addr 127.0.0.1:8090 \
   `services.asparges.umamiSiteId`): the site's id on umami.kradalby.no.
   Unset, pages carry no tracker and the CSP no Umami origin; set, the
   tracker reports only from the host of `--base-url`.
+- Every `serve` setting is also a `services.asparges` option in
+  `nix/module.nix` (`dataDir`, `listenAddr`, `hostname`, `baseURL`,
+  `tailscaleKeyPath`, `noindex`, `umamiSiteId`, `logLevel`); a test in
+  `cmd/asparges` fails on a flag the module does not pass. Only the
+  dev-only `--dev` and `--e2e-fixtures` are left out on purpose.
 
 ### Elm apps and the gallery
 

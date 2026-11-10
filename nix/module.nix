@@ -73,6 +73,17 @@ in
       '';
     };
 
+    logLevel = lib.mkOption {
+      type = lib.types.enum [
+        "debug"
+        "info"
+        "warn"
+        "error"
+      ];
+      default = "info";
+      description = "Log level of the service.";
+    };
+
     umamiSiteId = lib.mkOption {
       type = lib.types.nullOr lib.types.str;
       default = null;
@@ -143,6 +154,7 @@ in
           [
             (lib.getExe cfg.package)
             "serve"
+            "--log-level=${cfg.logLevel}"
             "--data-dir=${cfg.dataDir}"
             "--listen-addr=${cfg.listenAddr}"
             "--hostname=${cfg.hostname}"
