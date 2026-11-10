@@ -67,12 +67,23 @@ func (s *Store) Get(ctx context.Context, key string, build Builder) (*Page, erro
 	ctx = context.WithoutCancel(ctx)
 
 	v, err, _ := s.flight.Do(strconv.FormatUint(gen, 10)+" "+key, func() (any, error) {
+		// The miss above and this flight are not atomic: a flight that began
+		// after it may already have ended with the page kept. Any kept page
+		// is at least as new as gen, as Invalidate empties the map.
+		s.mu.Lock()
+		p, ok := s.pages[key]
+		s.mu.Unlock()
+
+		if ok {
+			return p, nil
+		}
+
 		page, err := build(ctx)
 		if err != nil {
 			return nil, err
 		}
 
-		p := newPage(page.Render())
+		p = newPage(page.Render())
 
 		s.mu.Lock()
 		if s.gen == gen {
