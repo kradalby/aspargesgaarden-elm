@@ -16,6 +16,7 @@ result-*
 *_*w_resize.jpeg
 *.webp
 *.avif
+!/images/testdata/*.webp
 
 # asparges
 /asparges
