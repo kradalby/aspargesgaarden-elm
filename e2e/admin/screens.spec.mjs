@@ -1,19 +1,13 @@
 // Screenshots of every screen at both widths, for a person to look at
-// (e2e/screens/, not compared). Run with ASP_FONTS_DIR set to see the real
-// fonts; without it the browser falls back to its own.
+// ($OUT, not compared).
 import { test, expect } from "@playwright/test";
 import { join } from "node:path";
 
 const fixture = (name) => join(import.meta.dirname, "fixtures", name);
+const file = (testInfo, name) =>
+  join(process.env.OUT || "out", `${testInfo.project.name}-${name}.png`);
 const shot = (page, testInfo, name) =>
-  page.screenshot({
-    path: join(
-      import.meta.dirname,
-      "screens",
-      `${testInfo.project.name}-${name}.png`,
-    ),
-    fullPage: true,
-  });
+  page.screenshot({ path: file(testInfo, name), fullPage: true });
 
 test.beforeEach(async ({ request }) => {
   await request.post("/__reset");
@@ -40,13 +34,9 @@ test("screens", async ({ page }, testInfo) => {
   await page.getByRole("button", { name: "Velg bilde" }).click();
   await (await chooser).setFiles(fixture("konsert.jpg"));
   await expect(page.getByText("Klargjør bildet … 23 av 46")).toBeVisible();
-  await page.locator("#bilde").screenshot({
-    path: join(
-      import.meta.dirname,
-      "screens",
-      `${testInfo.project.name}-2a-klargjor.png`,
-    ),
-  });
+  await page
+    .locator("#bilde")
+    .screenshot({ path: file(testInfo, "2a-klargjor") });
   await expect(page.locator('[data-photo-status="ready"]')).toBeVisible();
   await page.getByLabel("Beskriv bildet").fill("Boder i låven");
   await expect(page.locator("#forhandsvisning iframe")).toBeVisible();
@@ -57,13 +47,7 @@ test("screens", async ({ page }, testInfo) => {
     page.getByRole("dialog", { name: "Beskjær bildet" }),
   ).toBeVisible();
   await page.waitForTimeout(500);
-  await page.screenshot({
-    path: join(
-      import.meta.dirname,
-      "screens",
-      `${testInfo.project.name}-3-beskjaer.png`,
-    ),
-  });
+  await page.screenshot({ path: file(testInfo, "3-beskjaer") });
   await page.getByRole("button", { name: "Avbryt" }).click();
 
   await page.getByRole("button", { name: "Publiser" }).click();

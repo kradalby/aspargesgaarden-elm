@@ -1,9 +1,0 @@
-{
-  "name": "asparges-admin-e2e",
-  "private": true,
-  "license": "UNLICENSED",
-  "type": "module",
-  "devDependencies": {
-    "@playwright/test": "1.64.1"
-  }
-}

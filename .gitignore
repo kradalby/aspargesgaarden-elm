@@ -34,7 +34,5 @@ result-*
 /e2e/gallery/out/
 __pycache__/
 
-# admin front end, built by e2e/build.sh
-/elm/admin/out/
-/e2e/screens/
-/e2e/test-results/
+# Admin browser test screenshots and results (e2e/admin/run.sh)
+/e2e/admin/out/

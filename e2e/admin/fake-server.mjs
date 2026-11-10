@@ -1,14 +1,14 @@
 // A small in-memory stand-in for the admin API in docs/admin-api.md, for the
 // browser tests and for working on the admin without the Go server. Dev and
-// test only: no auth, no persistence, and a fake preview.
+// test only: no auth, no persistence, and a fake preview. The admin document
+// and its files come from Go (server/main.go), which passes the rest here.
 //
-//   node e2e/fake-server.mjs --port 8790 --static <dir with app.js, elements.js, admin.css>
+//   node e2e/admin/fake-server.mjs --port 8097
 //
-// Optional: ASP_FONTS_DIR serves /static/fonts/ from a folder of WOFF2 files.
 // Test hooks (not part of the contract): POST /__reset, POST /__touch/<id>.
 import { createServer } from "node:http";
 import { readFile } from "node:fs/promises";
-import { join, extname, dirname } from "node:path";
+import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -16,10 +16,7 @@ const arg = (name, def) => {
   const i = process.argv.indexOf(`--${name}`);
   return i > 0 ? process.argv[i + 1] : def;
 };
-const port = Number(arg("port", 8790));
-const staticDir = arg("static", join(here, "..", "elm", "admin", "out"));
-const shell = join(here, "..", "elm", "admin", "index.html");
-const fontsDir = process.env.ASP_FONTS_DIR;
+const port = Number(arg("port", 8097));
 
 const MAX_UPLOAD = 40 * 1024 * 1024;
 const ASPECT = { card: 4 / 5, banner: 16 / 9, share: 1200 / 630 };
@@ -398,17 +395,10 @@ function previewHtml(view, input) {
 
 // --- HTTP ---
 
-// The policy docs/admin-api.md asks of the real server, so the tests prove
-// the app needs nothing looser.
-const CSP =
-  "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self'; font-src 'self'; connect-src 'self'; " +
-  "frame-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'";
-
 function send(res, status, body, type = "application/json; charset=utf-8") {
   res.writeHead(status, {
     "Content-Type": type,
     "Cache-Control": "no-store",
-    "Content-Security-Policy": CSP,
   });
   res.end(
     type.startsWith("application/json") && body !== undefined
@@ -461,26 +451,6 @@ function filePart(buf, contentType) {
     start = next;
   }
   return null;
-}
-
-const types = {
-  ".js": "text/javascript",
-  ".css": "text/css",
-  ".woff2": "font/woff2",
-  ".html": "text/html; charset=utf-8",
-};
-
-async function serveFile(res, path) {
-  try {
-    send(
-      res,
-      200,
-      await readFile(path),
-      types[extname(path)] || "application/octet-stream",
-    );
-  } catch {
-    send(res, 404, "not found", "text/plain");
-  }
 }
 
 async function api(req, res, path, url) {
@@ -785,24 +755,12 @@ const server = createServer(async (req, res) => {
     }
     if (p.startsWith("/admin/api/"))
       return await api(req, res, p.slice("/admin/api/".length), url);
-    if (p.startsWith("/admin/static/"))
-      return await serveFile(
-        res,
-        join(staticDir, p.slice("/admin/static/".length).replace(/\.\./g, "")),
-      );
-    if (p.startsWith("/static/fonts/") && fontsDir)
-      return await serveFile(
-        res,
-        join(fontsDir, p.slice("/static/fonts/".length).replace(/\.\./g, "")),
-      );
     if ((t = /^\/fake-img\/(\d+)\/(preview|thumb)$/.exec(p))) {
       const photo = db.photos.get(Number(t[1]));
       if (!photo || !photo.status.previewReady)
         return send(res, 404, "not found", "text/plain");
       return send(res, 200, photo.bytes, photo.mime);
     }
-    if (p === "/admin" || p.startsWith("/admin/"))
-      return await serveFile(res, shell);
     send(res, 404, "not found", "text/plain");
   } catch (err) {
     console.error(err);
@@ -812,5 +770,5 @@ const server = createServer(async (req, res) => {
 
 await reset();
 server.listen(port, "127.0.0.1", () =>
-  console.log(`fake admin API on http://127.0.0.1:${port}/admin/`),
+  console.log(`ready: fake admin API on http://127.0.0.1:${port}/admin/api/`),
 );
