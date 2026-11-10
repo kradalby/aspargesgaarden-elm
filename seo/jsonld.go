@@ -37,6 +37,7 @@ type GeoCoordinates struct {
 
 type Place struct {
 	Type                    string          `json:"@type"`
+	ID                      string          `json:"@id,omitempty"`
 	Name                    string          `json:"name"`
 	Address                 *PostalAddress  `json:"address,omitempty"`
 	Geo                     *GeoCoordinates `json:"geo,omitempty"`
@@ -45,6 +46,7 @@ type Place struct {
 
 type Organization struct {
 	Type string `json:"@type"`
+	ID   string `json:"@id,omitempty"`
 	Name string `json:"name"`
 	URL  string `json:"url"`
 }
@@ -58,6 +60,7 @@ type LocalBusiness struct {
 	Description   string         `json:"description"`
 	URL           string         `json:"url"`
 	Telephone     string         `json:"telephone"`
+	Logo          string         `json:"logo"`
 	Image         []string       `json:"image"`
 	Address       PostalAddress  `json:"address"`
 	Geo           GeoCoordinates `json:"geo"`
@@ -163,6 +166,7 @@ func VenueNode(baseURL string) LocalBusiness {
 		Description:   Venue.Description,
 		URL:           baseURL + "/",
 		Telephone:     Venue.PhoneE164,
+		Logo:          baseURL + static.URL("Aspargesgaarden_HOVEDLOGO_bredde_DempetSort.png"),
 		Image:         imgs,
 		Address:       addr,
 		Geo:           g,
@@ -194,6 +198,9 @@ type EventInput struct {
 func EventNodes(baseURL string, in EventInput) []any {
 	e := in.Event
 
+	// Location and organiser are the venue node of the front and contact
+	// pages: the same @id ties them together, and each copy keeps the
+	// properties search engines need, since that node is not on this page.
 	base := Event{
 		Type:                "Event",
 		Name:                e.Title,
@@ -201,9 +208,9 @@ func EventNodes(baseURL string, in EventInput) []any {
 		URL:                 baseURL + e.Path(),
 		EventStatus:         schemaOrg + "/EventScheduled",
 		EventAttendanceMode: schemaOrg + "/OfflineEventAttendanceMode",
-		Location:            Place{Type: "Place", Name: Venue.Name, Address: new(address()), Geo: new(geo())},
+		Location:            Place{Type: "Place", ID: venueID(baseURL), Name: Venue.Name, Address: new(address()), Geo: new(geo())},
 		Image:               eventImages(baseURL, e),
-		Organizer:           Organization{Type: "Organization", Name: Venue.Name, URL: baseURL + "/"},
+		Organizer:           Organization{Type: "Organization", ID: venueID(baseURL), Name: Venue.Name, URL: baseURL + "/"},
 		InLanguage:          "nb",
 	}
 

@@ -30,7 +30,7 @@ var required = map[string][]string{
 	"Place":          {"name", "address", "geo"},
 	"PostalAddress":  {"streetAddress", "postalCode", "addressLocality", "addressCountry"},
 	"GeoCoordinates": {"latitude", "longitude"},
-	"LocalBusiness":  {"@id", "name", "url", "telephone", "address", "geo", "image", "sameAs"},
+	"LocalBusiness":  {"@id", "name", "url", "telephone", "logo", "address", "geo", "image", "sameAs"},
 	"EventVenue":     {"name", "maximumAttendeeCapacity"},
 	"WebSite":        {"@id", "name", "url"},
 	"Organization":   {"name", "url"},
@@ -162,6 +162,11 @@ func TestEventNodes(t *testing.T) {
 	require.Len(t, ev.Image, 3, "share, banner and card")
 	require.Contains(t, ev.Image[0], "/share-")
 	require.Equal(t, "Østbyveien 75", ev.Location.Address.StreetAddress)
+
+	// One graph across pages: the event's place and organiser are the venue.
+	venue := VenueNode(testBase).ID
+	require.Equal(t, venue, ev.Location.ID)
+	require.Equal(t, venue, ev.Organizer.ID)
 }
 
 // The offset is the one in force on the day: summer time in May, winter
@@ -289,6 +294,7 @@ func TestVenueNode(t *testing.T) {
 		{Type: "EventVenue", Name: "Fjøset", MaximumAttendeeCapacity: 68},
 	}, v.ContainsPlace)
 	require.Equal(t, "+4790919812", v.Telephone)
+	require.True(t, strings.HasPrefix(v.Logo, testBase+"/static/Aspargesgaarden_HOVEDLOGO"), v.Logo)
 
 	for _, img := range v.Image {
 		require.True(t, strings.HasPrefix(img, testBase+"/static/"), img)
