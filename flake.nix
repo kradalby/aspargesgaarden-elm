@@ -7,6 +7,11 @@
     flake-checks.url = "github:kradalby/flake-checks";
     flake-checks.inputs.nixpkgs.follows = "nixpkgs";
     flake-checks.inputs.flake-utils.follows = "flake-utils";
+    # The control server for the tsnet VM test, with its test kit.
+    headscale.url = "github:juanfont/headscale";
+    headscale.inputs.nixpkgs.follows = "nixpkgs";
+    headscale.inputs.flake-utils.follows = "flake-utils";
+    headscale.inputs.flake-checks.follows = "flake-checks";
   };
 
   outputs =
@@ -15,6 +20,7 @@
       nixpkgs,
       flake-utils,
       flake-checks,
+      headscale,
     }:
     let
       hashes = builtins.fromJSON (builtins.readFile ./flakehashes.json);
@@ -354,6 +360,14 @@
             import ./nix/tests/basic.nix {
               inherit pkgs vips;
               module = self.nixosModules.default;
+            }
+          );
+          vm-tsnet = pkgs.testers.nixosTest (
+            import ./nix/tests/tsnet.nix {
+              inherit pkgs;
+              module = self.nixosModules.default;
+              headscaleTestkit = headscale.nixosModules.testkit;
+              headscaleTestkitPeer = headscale.nixosModules.testkit-peer;
             }
           );
         };

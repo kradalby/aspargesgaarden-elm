@@ -42,6 +42,32 @@
         "type": "github"
       }
     },
+    "headscale": {
+      "inputs": {
+        "flake-checks": [
+          "flake-checks"
+        ],
+        "flake-utils": [
+          "flake-utils"
+        ],
+        "nixpkgs": [
+          "nixpkgs"
+        ]
+      },
+      "locked": {
+        "lastModified": 1793971524,
+        "narHash": "sha256-lpI95MdysJa7wk/U3ly3rGKqWFsWg8TLC5rfY8nP9Cs=",
+        "owner": "juanfont",
+        "repo": "headscale",
+        "rev": "48416ce0894ef7bef0ef9c064609b4aa76a0d9b6",
+        "type": "github"
+      },
+      "original": {
+        "owner": "juanfont",
+        "repo": "headscale",
+        "type": "github"
+      }
+    },
     "nixpkgs": {
       "locked": {
         "lastModified": 1793977579,
@@ -62,6 +88,7 @@
       "inputs": {
         "flake-checks": "flake-checks",
         "flake-utils": "flake-utils",
+        "headscale": "headscale",
         "nixpkgs": "nixpkgs"
       }
     },
