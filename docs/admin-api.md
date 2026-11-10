@@ -575,7 +575,9 @@ route adds (after an upload), removes and reorders. A body without
 `404 not_found` with `photoId` for an unknown id, `422 duplicate_photo` with
 `photoId` for an id listed twice. No precondition: the last order saved
 wins. A photo the saved list leaves out that nothing else uses is deleted a
-week later, so a list that lost a photo can be put right within the week.
+week later, so the app sends one order at a time and reads the gallery just
+before each: it keeps a photo someone else added since it last heard from
+the server, and leaves out one someone else took out.
 
 ## The admin page
 

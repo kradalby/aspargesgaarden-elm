@@ -1,6 +1,7 @@
 // The admin app at desktop and phone size against `asparges serve --dev
 // --e2e-fixtures` (run.sh), and the public pages the admin changes.
 import { test as base, expect } from "@playwright/test";
+import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
 const fixture = (name) => join(import.meta.dirname, "fixtures", name);
@@ -709,6 +710,58 @@ test("a small gallery photo is said to be shown smaller, calmly", async ({
   await expect(
     page.locator(`[data-photo="${seed.landskap}"] [data-verdict]`),
   ).toHaveCount(0);
+});
+
+test("gallery: quick moves and another admin's photo all end up saved", async ({
+  page,
+  request,
+  seed,
+}) => {
+  await page.goto("/admin/galleri");
+  await expect(page.getByText("Bilde 2 av 2")).toBeVisible();
+
+  // Another admin adds a photo after her page loaded.
+  const upload = await request.post("/admin/api/photos", {
+    multipart: {
+      file: {
+        name: "hage.jpg",
+        mimeType: "image/jpeg",
+        buffer: readFileSync(fixture("hage.jpg")),
+      },
+    },
+  });
+  expect(upload.ok()).toBe(true);
+  const theirs = (await upload.json()).id;
+  expect(
+    (
+      await request.put("/admin/api/gallery", {
+        data: { photoIds: [seed.landskap, seed.portrett, theirs] },
+      })
+    ).ok(),
+  ).toBe(true);
+
+  // Her first save is slow; her second move comes before its answer.
+  let puts = 0;
+  await page.route("**/admin/api/gallery", async (route) => {
+    if (route.request().method() === "PUT" && puts++ === 0)
+      await new Promise((r) => setTimeout(r, 1500));
+    await route.continue();
+  });
+  await page.getByRole("button", { name: "Flytt bilde 2 tidligere" }).click();
+  await page.getByRole("button", { name: "Flytt bilde 2 tidligere" }).click();
+
+  const stored = async () =>
+    (await (await request.get("/admin/api/gallery")).json()).photos.map(
+      (p) => p.id,
+    );
+  await expect
+    .poll(stored, { timeout: 15_000 })
+    .toEqual([seed.landskap, seed.portrett, theirs]);
+  await expect(page.getByText("Bilde 3 av 3")).toBeVisible();
+  const shown = await page
+    .locator("[data-photo]")
+    .evaluateAll((els) => els.map((e) => Number(e.dataset.photo)));
+  expect(shown).toEqual([seed.landskap, seed.portrett, theirs]);
 });
 
 // Holds requests to url (a glob) with the method for ms before they go on;

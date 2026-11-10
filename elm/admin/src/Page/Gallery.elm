@@ -1,4 +1,4 @@
-module Page.Gallery exposing (Model, Msg, init, isDirty, subscriptions, update, view)
+module Page.Gallery exposing (Model, Msg(..), OrderSave(..), creditOf, init, isDirty, merge, subscriptions, update, view)
 
 {-| "Galleri": the photos on /galleri, in order. Every change is saved at
 once (there is no save button to forget); what could not be saved says so
@@ -19,16 +19,31 @@ import Ui
 
 type alias Model =
     { loading : Loading
+
+    -- The order she sees, and the last one the server confirmed.
     , order : List Int
     , savedOrder : List Int
-    , orderSaving : Bool
+    , orderSave : OrderSave
     , orderFailed : Maybe Api.Error
+
+    -- What she changed on a photo that the server has not confirmed yet.
     , alts : Dict Int String
+    , credits : Dict Int (Maybe Int)
     , saves : Dict Int Save
     , photos : Photos.Model
     , delete : Maybe Delete
     , announce : String
     }
+
+
+{-| One order save at a time, each reading the gallery first: a later
+order then never loses to an earlier answer, and photos someone else added
+meanwhile are kept instead of being dropped (and deleted a week later).
+-}
+type OrderSave
+    = Idle
+    | Reading
+    | Writing
 
 
 type Loading
@@ -63,9 +78,10 @@ init =
     ( { loading = Loading
       , order = []
       , savedOrder = []
-      , orderSaving = False
+      , orderSave = Idle
       , orderFailed = Nothing
       , alts = Dict.empty
+      , credits = Dict.empty
       , saves = Dict.empty
       , photos = photos
       , delete = Nothing
@@ -79,8 +95,11 @@ isDirty : Model -> Bool
 isDirty model =
     model.order
         /= model.savedOrder
-        || not (List.isEmpty model.photos.uploads)
-        || List.any (\( id, alt ) -> Just alt /= Maybe.map .alt (Photos.get id model.photos)) (Dict.toList model.alts)
+        || model.orderSave
+        /= Idle
+        || Photos.unsaved model.photos
+        || List.any (\( id, alt ) -> Just (String.trim alt) /= Maybe.map .alt (Photos.get id model.photos)) (Dict.toList model.alts)
+        || List.any (\( id, ph ) -> Just ph /= Maybe.map storedCredit (Photos.get id model.photos)) (Dict.toList model.credits)
 
 
 type Msg
@@ -88,10 +107,11 @@ type Msg
     | RetryLoad
     | PhotosMsg Photos.Msg
     | Move Int Int
+    | GotCurrent (Result Api.Error (List Photo))
     | OrderSaved (Result Api.Error (List Photo))
     | RetryOrder
     | SetAlt Int String
-    | SaveAlt Int
+    | SavePhoto Int
     | SetPhotographer Int (Maybe Int)
     | PhotoSaved Int (Result Api.Error Photo)
     | AskDelete Int
@@ -131,11 +151,40 @@ update msg model =
                 , focus (Ui.moveId (i + d) d)
                 )
 
+        GotCurrent (Ok current) ->
+            let
+                ids =
+                    List.map .id current
+
+                order =
+                    merge { mine = model.order, known = model.savedOrder, server = ids }
+
+                photos =
+                    List.foldl Photos.remove (Photos.add current model.photos) (List.filter (\id -> not (List.member id order)) model.order)
+            in
+            if order == ids then
+                ( { model | order = order, savedOrder = ids, orderSave = Idle, photos = photos }, Cmd.none )
+
+            else
+                ( { model | order = order, orderSave = Writing, photos = photos }, Api.setGallery order OrderSaved )
+
+        GotCurrent (Err e) ->
+            ( { model | orderSave = Idle, orderFailed = Just e }, Cmd.none )
+
         OrderSaved (Ok photos) ->
-            ( { model | orderSaving = False, orderFailed = Nothing, savedOrder = List.map .id photos, photos = Photos.add photos model.photos }, Cmd.none )
+            let
+                m =
+                    { model | orderSave = Idle, savedOrder = List.map .id photos, photos = Photos.add photos model.photos }
+            in
+            if m.order == m.savedOrder then
+                ( m, Cmd.none )
+
+            else
+                -- She moved or added a photo while this one was out.
+                saveOrder m.order ( m, Cmd.none )
 
         OrderSaved (Err e) ->
-            ( { model | orderSaving = False, orderFailed = Just e }, Cmd.none )
+            ( { model | orderSave = Idle, orderFailed = Just e }, Cmd.none )
 
         RetryOrder ->
             saveOrder model.order ( model, Cmd.none )
@@ -143,23 +192,30 @@ update msg model =
         SetAlt id s ->
             ( { model | alts = Dict.insert id s model.alts, saves = Dict.remove id model.saves }, Cmd.none )
 
-        SaveAlt id ->
-            savePhoto id (photographerOf id model) model
+        SavePhoto id ->
+            savePhoto id model
 
         SetPhotographer id ph ->
-            savePhoto id ph model
+            savePhoto id { model | credits = Dict.insert id ph model.credits }
 
         PhotoSaved id (Ok photo) ->
             ( { model
                 | photos = Photos.add [ photo ] model.photos
                 , saves = Dict.insert id Saved model.saves
+
+                -- Keep what she changed while the save was out.
                 , alts =
-                    -- Keep typing that happened while the save was out.
-                    if Dict.get id model.alts == Just photo.alt then
+                    if Maybe.map String.trim (Dict.get id model.alts) == Just photo.alt then
                         Dict.remove id model.alts
 
                     else
                         model.alts
+                , credits =
+                    if Dict.get id model.credits == Just (storedCredit photo) then
+                        Dict.remove id model.credits
+
+                    else
+                        model.credits
                 , announce = "Lagret."
               }
             , Cmd.none
@@ -184,6 +240,7 @@ update msg model =
                 | delete = Nothing
                 , order = List.filter ((/=) id) model.order
                 , savedOrder = List.filter ((/=) id) model.savedOrder
+                , photos = Photos.remove id model.photos
                 , announce = "Bildet er slettet."
               }
             , focus "legg-til-bilder"
@@ -208,6 +265,16 @@ update msg model =
             ( model, Cmd.none )
 
 
+{-| The order to save: hers, with what the server shows changed by someone
+else since she last heard from it. A photo she never saw is kept (at the
+end); one taken out elsewhere stays out; one she took out stays out.
+-}
+merge : { mine : List Int, known : List Int, server : List Int } -> List Int
+merge { mine, known, server } =
+    List.filter (\id -> List.member id server || not (List.member id known)) mine
+        ++ List.filter (\id -> not (List.member id mine) && not (List.member id known)) server
+
+
 applyOut : Photos.Out -> ( Model, Cmd Msg ) -> ( Model, Cmd Msg )
 applyOut out ( model, cmd ) =
     case out of
@@ -221,16 +288,23 @@ applyOut out ( model, cmd ) =
         Photos.Credit id ph ->
             let
                 ( m, c ) =
-                    savePhoto id ph model
+                    update (SetPhotographer id ph) model
             in
             ( m, Cmd.batch [ cmd, c ] )
 
 
+{-| Asks for the gallery as it is now, unless a save is already out; its
+answer sends the order again if she has changed it since.
+-}
 saveOrder : List Int -> ( Model, Cmd Msg ) -> ( Model, Cmd Msg )
 saveOrder order ( model, cmd ) =
-    ( { model | order = order, orderSaving = True, orderFailed = Nothing }
-    , Cmd.batch [ cmd, Api.setGallery order OrderSaved ]
-    )
+    if model.orderSave == Idle then
+        ( { model | order = order, orderSave = Reading, orderFailed = Nothing }
+        , Cmd.batch [ cmd, Api.getGallery GotCurrent ]
+        )
+
+    else
+        ( { model | order = order, orderFailed = Nothing }, cmd )
 
 
 altOf : Int -> Model -> String
@@ -243,15 +317,27 @@ altOf id model =
             Photos.get id model.photos |> Maybe.map .alt |> Maybe.withDefault ""
 
 
-photographerOf : Int -> Model -> Maybe Int
-photographerOf id model =
-    Photos.get id model.photos |> Maybe.andThen .photographer |> Maybe.map .id
+{-| The photographer she chose for the photo, saved or not.
+-}
+creditOf : Int -> Model -> Maybe Int
+creditOf id model =
+    case Dict.get id model.credits of
+        Just ph ->
+            ph
+
+        Nothing ->
+            Photos.get id model.photos |> Maybe.andThen storedCredit
 
 
-savePhoto : Int -> Maybe Int -> Model -> ( Model, Cmd Msg )
-savePhoto id ph model =
+storedCredit : Photo -> Maybe Int
+storedCredit photo =
+    Maybe.map .id photo.photographer
+
+
+savePhoto : Int -> Model -> ( Model, Cmd Msg )
+savePhoto id model =
     ( { model | saves = Dict.insert id Saving model.saves }
-    , Api.updatePhoto id { alt = String.trim (altOf id model), photographerId = ph } (PhotoSaved id)
+    , Api.updatePhoto id { alt = String.trim (altOf id model), photographerId = creditOf id model } (PhotoSaved id)
     )
 
 
@@ -341,7 +427,7 @@ photoCard model n i photo =
             , label = "Beskriv bildet"
             , help = "Lagres når du går videre fra feltet."
             , errors = []
-            , control = Ui.input [ A.value alt, onInput (SetAlt photo.id), on "change" (D.map (\_ -> SaveAlt photo.id) targetValue) ]
+            , control = Ui.input [ A.value alt, onInput (SetAlt photo.id), on "change" (D.map (\_ -> SavePhoto photo.id) targetValue) ]
             }
         , if String.trim alt == "" then
             p [ class "flex gap-2 items-center" ]
@@ -359,14 +445,14 @@ photoCard model n i photo =
             Just (SaveFailed e) ->
                 div [ class "flex flex-col gap-2" ]
                     [ Ui.errorText ("lagre-feil-" ++ String.fromInt photo.id) [ "Ikke lagret. " ++ Text.error e ]
-                    , div [] [ Ui.secondaryButton [] (SaveAlt photo.id) "Prøv igjen" ]
+                    , div [] [ Ui.secondaryButton [] (SavePhoto photo.id) "Prøv igjen" ]
                     ]
 
             Nothing ->
                 text ""
         , Photos.photographerField
             { photoId = photo.id
-            , selected = photographerOf photo.id model
+            , selected = creditOf photo.id model
             , onSelect = SetPhotographer photo.id
             , toMsg = PhotosMsg
             }

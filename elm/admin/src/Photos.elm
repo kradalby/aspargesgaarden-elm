@@ -14,9 +14,11 @@ module Photos exposing
     , liveRegion
     , photographerField
     , pick
+    , remove
     , sizeNote
     , statusView
     , subscriptions
+    , unsaved
     , update
     , uploadRow
     , uploadsFor
@@ -148,6 +150,14 @@ add photos model =
     }
 
 
+{-| Forget a photo the page no longer shows, such as a deleted one, so its
+state is no longer followed.
+-}
+remove : Int -> Model -> Model
+remove id model =
+    { model | photos = Dict.remove id model.photos }
+
+
 get : Int -> Model -> Maybe Photo
 get id model =
     Dict.get id model.photos
@@ -174,6 +184,24 @@ pendingIds model =
 uploadsFor : Slot -> Model -> List Upload
 uploadsFor slot model =
     List.filter (\u -> u.slot == slot) model.uploads
+
+
+{-| Uploads that leaving the page would lose: on their way, or stopped by a
+lost connection and kept to send again. One the server refused has nothing
+left to lose.
+-}
+unsaved : Model -> Bool
+unsaved model =
+    List.any
+        (\u ->
+            case u.state of
+                UploadFailed (Api.Problems _) ->
+                    False
+
+                _ ->
+                    True
+        )
+        model.uploads
 
 
 
