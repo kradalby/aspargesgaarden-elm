@@ -6,7 +6,7 @@ import { CropperBase, toPreview } from "./rect.js";
 
 const hostCss = `
 :host { display: block; }
-.box { width: 100%; max-height: var(--asp-cropper-max-height, 70vh); }
+.box { width: 100%; max-height: var(--asp-cropper-max-height, 55vh); }
 img { display: block; max-width: 100%; }
 `;
 
