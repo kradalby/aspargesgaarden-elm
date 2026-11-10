@@ -264,11 +264,13 @@ service ever starts:
 - Copied after a first start, it would meet the service's own empty
   database and `tsnet/`, and the single-use key would be spent.
 
+The seed directory is the one last refreshed with the binary being
+deployed.
 The copy leaves `-wal` and `-shm` behind, so fold the WAL into the database
 first, then check it:
 
 ```bash
-S=~/.local/share/asparges-seed
+S=<the seed directory>
 nix shell nixpkgs#sqlite -c sqlite3 $S/asparges.db 'PRAGMA wal_checkpoint(TRUNCATE)'
 nix shell nixpkgs#sqlite -c sqlite3 $S/asparges.db 'PRAGMA integrity_check'   # ok
 ssh root@core-oracldn 'id asparges; ls -d /var/lib/asparges'   # both missing; otherwise stop
