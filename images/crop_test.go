@@ -1,6 +1,7 @@
 package images
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -45,6 +46,38 @@ func TestValidateCrop(t *testing.T) {
 			}
 
 			require.ErrorIs(t, err, tt.want)
+		})
+	}
+}
+
+// The mild rule: the floors refuse, the sharp width only warns, and a
+// picture between the two is accepted but soft.
+func TestSharpness(t *testing.T) {
+	tests := []struct {
+		kind  Kind
+		w     int
+		valid bool
+		soft  bool
+	}{
+		{Card, 479, false, true},
+		{Card, 480, true, true},
+		{Card, 767, true, true},
+		{Card, 768, true, false},
+		{Banner, 799, false, true},
+		{Banner, 800, true, true},
+		{Banner, 895, true, true},
+		{Banner, 896, true, false},
+		{Share, 1199, false, true},
+		{Share, 1200, true, false},
+		{Full, 480, true, true},
+		{Full, 991, true, true},
+		{Full, 992, true, false},
+	}
+	for _, tt := range tests {
+		t.Run(fmt.Sprintf("%s %d", tt.kind, tt.w), func(t *testing.T) {
+			require.Equal(t, tt.valid, tt.w >= tt.kind.MinWidth(), "floor")
+			require.Equal(t, tt.soft, tt.kind.Soft(tt.w), "soft")
+			require.GreaterOrEqual(t, tt.kind.SharpWidth(), tt.kind.MinWidth(), "a crop the floor refuses is never called sharp")
 		})
 	}
 }

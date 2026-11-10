@@ -32,6 +32,35 @@ func (k Kind) MinWidth() int {
 	}
 }
 
+// SharpWidth is the widest CSS box a public page ever draws kind k in, so
+// the narrowest picture that is sharp (1×) on every screen; narrower ones
+// the browser stretches. It never refuses anything, MinWidth does that: the
+// admin only warns below it. ui's tests hold every layout to these numbers.
+func (k Kind) SharpWidth() int {
+	switch k {
+	case Card:
+		// Under the md breakpoint (48rem) an event row's photo spans the
+		// screen; from lg its column, and an EventCards card, stop at 48rem.
+		return 768
+	case Banner:
+		// EventColumn's max-w-4xl.
+		return 896
+	case Share:
+		// A fixed size, never upscaled: MinWidth already is the rule.
+		return shareWidth
+	case Full:
+		// The lightbox frame, elm/gallery's Lightbox.widest. Below it a photo
+		// is shown smaller there, not stretched.
+		return 992
+	default:
+		return 0
+	}
+}
+
+// Soft reports whether a picture w source pixels wide is stretched in kind
+// k's widest box.
+func (k Kind) Soft(w int) bool { return w < k.SharpWidth() }
+
 // The cropper rounds to whole pixels, so a crop may miss the exact ratio. The
 // pipeline cuts a window of the exact ratio from it, so the slack only
 // decides how much of the edge is lost, never stretches the picture.
