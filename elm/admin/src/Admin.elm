@@ -331,7 +331,7 @@ view model =
                         Html.map (OverviewMsg model.gen) (Overview.view m)
 
                     ( Nothing, Editor m ) ->
-                        Html.map (EditorMsg model.gen) (Editor.view m)
+                        Html.map (EditorMsg model.gen) (Editor.view (model.me |> Maybe.map .siteUrl |> Maybe.withDefault "") m)
 
                     ( Nothing, Gallery m ) ->
                         Html.map (GalleryMsg model.gen) (Gallery.view m)

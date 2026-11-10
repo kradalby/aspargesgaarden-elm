@@ -14,6 +14,7 @@ module Text exposing
     , softKind
     , softWhole
     , uploadFailure
+    , withoutScheme
     )
 
 {-| Every message the user reads about something that went wrong, or about
@@ -260,3 +261,17 @@ error e =
 
         Api.Unexpected ->
             "Noe gikk galt på serveren. Prøv igjen om litt. Det du har skrevet er ikke borte."
+
+
+{-| An address as she would type it: without <https://>.
+-}
+withoutScheme : String -> String
+withoutScheme url =
+    if String.startsWith "https://" url then
+        String.dropLeft 8 url
+
+    else if String.startsWith "http://" url then
+        String.dropLeft 7 url
+
+    else
+        url

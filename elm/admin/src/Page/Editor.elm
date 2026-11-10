@@ -745,8 +745,10 @@ subscriptions model =
 -- VIEW
 
 
-view : Model -> Html Msg
-view model =
+{-| siteUrl is where the public site is (Api.Me), for the page's address.
+-}
+view : String -> Model -> Html Msg
+view siteUrl model =
     case model.loading of
         Loading ->
             Ui.spinnerText "Henter arrangementet …"
@@ -769,7 +771,7 @@ view model =
                     [ div [ class "flex flex-col gap-5 min-w-0" ]
                         (div [ class "lg:hidden" ] [ Ui.secondaryButton [] ShowPreview "Se hvordan det blir" ]
                             :: messages model
-                            ++ formView model
+                            ++ formView siteUrl model
                         )
                     , previewView model
                     ]
@@ -894,8 +896,8 @@ text_ model id lbl fld value helpText =
         }
 
 
-formView : Model -> List (Html Msg)
-formView model =
+formView : String -> Model -> List (Html Msg)
+formView siteUrl model =
     let
         f =
             model.form
@@ -911,7 +913,7 @@ formView model =
         , if frozen then
             div [ class "flex flex-col gap-1" ]
                 [ p [ class "font-bold text-lg" ] [ text "Adresse til siden" ]
-                , p [ class "break-all" ] [ text ("aspargesgaarden.no" ++ (model.event |> Maybe.map .path |> Maybe.withDefault "")) ]
+                , p [ class "break-all" ] [ text (model.event |> Maybe.map (.url >> Text.withoutScheme) |> Maybe.withDefault "") ]
                 , Ui.help [] "Adressen endres ikke etter at siden er publisert, så lenker som er delt fortsatt virker."
                 ]
 
@@ -920,7 +922,8 @@ formView model =
                 { id = "adresse"
                 , label = "Adresse til siden (valgfritt)"
                 , help =
-                    "aspargesgaarden.no/arrangementer/"
+                    Text.withoutScheme siteUrl
+                        ++ "/arrangementer/"
                         ++ (if year == "" then
                                 "<år>"
 

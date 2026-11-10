@@ -1008,3 +1008,21 @@ test("the preview stays where she scrolled it while she writes", async ({
   ).toBeAttached();
   await expect.poll(() => frame.evaluate(() => scrollY)).toBe(y);
 });
+
+test("the page's address is on this site, not a fixed domain", async ({
+  page,
+  seed,
+}) => {
+  const host = new URL(process.env.BASE).host;
+  await page.goto(`/admin/arrangementer/${seed.course}`);
+  await expect(
+    page.getByText(`${host}/arrangementer/2026/takkebakstkurs`, {
+      exact: true,
+    }),
+  ).toBeVisible();
+  await page.goto("/admin/arrangementer/ny");
+  await expect(page.locator("#adresse-hjelp")).toContainText(
+    `${host}/arrangementer/`,
+  );
+  await expect(page.getByText("aspargesgaarden.no")).toHaveCount(0);
+});
