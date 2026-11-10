@@ -47,7 +47,7 @@ func Page(p PageProps, body ...elem.Node) *elem.Element {
 
 	head = append(head,
 		elem.Link(attrs.Props{attrs.Rel: "stylesheet", attrs.Href: static.URL("site.css")}),
-		elem.Script(attrs.Props{attrs.Src: umamiScript, "data-website-id": umamiSiteID, attrs.Defer: "true"}),
+		elem.Script(attrs.Props{attrs.Src: umamiScript, "data-website-id": umamiSiteID, "data-domains": umamiDomains, attrs.Defer: "true"}),
 	)
 
 	// The lightbox is the site's only own script, and loads only where a

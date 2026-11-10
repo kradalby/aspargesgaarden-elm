@@ -41,8 +41,21 @@ func TestPageLoadsLightboxOnlyWithGallery(t *testing.T) {
 	require.Equal(t, 1, strings.Count(page(Container(Gallery(GalleryPage, testGallery...), Gallery(GalleryColumn, testGallery[:1]...))), script))
 }
 
-// The old site rendered the Umami tag as an empty <p>, so it never loaded.
+// The old site rendered the Umami tag as an empty <p>, so it never loaded;
+// then the rebuild copied v1's /umami.js, which the v2 server no longer has.
 func TestPageLoadsUmami(t *testing.T) {
 	require.Contains(t, testPage("/"),
-		`<script data-website-id="168bd9f6-fec6-40dc-95b5-b0e4082c7a98" defer src="https://umami.kradalby.no/umami.js"></script>`)
+		`<script data-domains="aspargesgaarden.no" data-website-id="168bd9f6-fec6-40dc-95b5-b0e4082c7a98" defer src="https://umami.kradalby.no/script.js"></script>`)
+}
+
+// The tracker posts to /api/send next to its own address (Umami v2, unless
+// data-host-url says otherwise); CSP must let both through, and only them.
+func TestUmamiFitsTheCSP(t *testing.T) {
+	beacon := umamiScript[:strings.LastIndex(umamiScript, "/")] + "/api/send"
+
+	require.True(t, ExternalLoadAllowed("script-src", umamiScript))
+	require.True(t, ExternalLoadAllowed("connect-src", beacon))
+	require.Contains(t, CSP(), "script-src 'self' "+UmamiOrigin+";")
+	require.Contains(t, CSP(), "connect-src 'self' "+UmamiOrigin+";")
+	require.NotContains(t, testPage("/"), "data-host-url", "a beacon host elsewhere would need its own connect-src")
 }

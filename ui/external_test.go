@@ -21,13 +21,13 @@ func TestExternalLoadAllowed(t *testing.T) {
 	}{
 		{"script-src", "/static/x.js?v=1", true},
 		{"img-src", "/static/x.png", true},
-		{"script-src", "https://umami.kradalby.no/umami.js", true},
+		{"script-src", "https://umami.kradalby.no/script.js", true},
 		{"frame-src", "https://calendar.google.com/calendar/embed?src=x", true},
 		{"script-src", "https://calendar.google.com/x.js", false},
 		{"font-src", "https://fonts.gstatic.com/x.woff2", false},
 		{"style-src", "https://unpkg.com/x.css", false},
-		{"script-src", "//umami.kradalby.no/umami.js", false},
-		{"script-src", "http://umami.kradalby.no/umami.js", false},
+		{"script-src", "//umami.kradalby.no/script.js", false},
+		{"script-src", "http://umami.kradalby.no/script.js", false},
 		{"img-src", "data:image/png;base64,AAAA", false},
 	}
 

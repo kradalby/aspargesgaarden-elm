@@ -17,10 +17,15 @@ const (
 	CalendarOrigin = "https://calendar.google.com"
 )
 
-// The Umami site this site reports to.
+// The Umami site this site reports to. The v2 tracker lives at /script.js
+// (/umami.js was v1's and is gone) and posts its beacons to /api/send
+// beside itself, so UmamiOrigin covers both the script and connect-src.
 const (
-	umamiScript = UmamiOrigin + "/umami.js"
+	umamiScript = UmamiOrigin + "/script.js"
 	umamiSiteID = "168bd9f6-fec6-40dc-95b5-b0e4082c7a98"
+	// umamiDomains limits reporting to the live site: beta and local runs
+	// show the same pages, and must not count as visits.
+	umamiDomains = "aspargesgaarden.no"
 )
 
 // loadOrigins lists, per kind of load, the outside origins allowed. CSP and
