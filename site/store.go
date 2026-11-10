@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/kradalby/asparges/db"
@@ -598,6 +599,24 @@ func (s *Store) Photos(ctx context.Context) ([]Photo, error) {
 // a nil Photographer clears.
 func (s *Store) UpdatePhoto(ctx context.Context, p Photo) (Photo, error) {
 	return write(ctx, s, func(q *dbsqlc.Queries) (Photo, error) {
+		// Event saves check this with the publish rules; this route is the
+		// other way an edit reaches a live page.
+		if strings.TrimSpace(p.Alt) == "" {
+			events, err := q.ListPhotoEvents(ctx, p.ID)
+			if err != nil {
+				return Photo{}, fmt.Errorf("events of photo %d: %w", p.ID, err)
+			}
+
+			for _, e := range events {
+				if Status(e.Status) == Published {
+					return Photo{}, &FieldError{
+						Field: FieldAlt, PhotoID: p.ID,
+						Err: fmt.Errorf("%w: published event %d shows photo %d", ErrAltRequired, e.ID, p.ID),
+					}
+				}
+			}
+		}
+
 		n, err := q.UpdatePhotoMeta(ctx, dbsqlc.UpdatePhotoMetaParams{
 			Alt:            p.Alt,
 			PhotographerID: photographerRef(p.Photographer),

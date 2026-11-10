@@ -183,6 +183,43 @@ func TestStoreDeleteUnusedPhotos(t *testing.T) {
 	require.Equal(t, []string{renewed.SHA256}, gone)
 }
 
+// The gallery's own photo route may leave a description empty, but never on
+// a photo a published event shows: no edit breaks a live page.
+func TestStoreUpdatePhotoKeepsLivePagesDescribed(t *testing.T) {
+	s, _ := newTestStore(t, oslo("2026-10-10 12:00"))
+	ctx := t.Context()
+
+	live := addPhoto(t, s, 'a', "Boder i låven")
+	inDraft := addPhoto(t, s, 'b', "Kladd")
+	inGallery := addPhoto(t, s, 'c', "Hagen")
+
+	e, err := s.CreateEvent(ctx, Event{Title: "Julemarked", Start: d("2026-11-14"), MainPhoto: &live})
+	require.NoError(t, err)
+	_, err = s.Publish(ctx, e.ID, e.UpdatedAt)
+	require.NoError(t, err)
+	_, err = s.CreateEvent(ctx, Event{Title: "Kladd", MainPhoto: &inDraft})
+	require.NoError(t, err)
+	require.NoError(t, s.SetGallery(ctx, []int64{live.ID, inGallery.ID}))
+
+	live.Alt = " "
+	_, err = s.UpdatePhoto(ctx, live)
+	require.ErrorIs(t, err, ErrAltRequired)
+
+	var fe *FieldError
+	require.ErrorAs(t, err, &fe)
+	require.Equal(t, FieldError{Field: FieldAlt, PhotoID: live.ID}, FieldError{Field: fe.Field, PhotoID: fe.PhotoID})
+
+	stored, err := s.Photo(ctx, live.ID)
+	require.NoError(t, err)
+	require.Equal(t, "Boder i låven", stored.Alt)
+
+	for _, p := range []Photo{inDraft, inGallery} {
+		p.Alt = ""
+		_, err = s.UpdatePhoto(ctx, p)
+		require.NoError(t, err, "photo %d is on no live event page", p.ID)
+	}
+}
+
 // A photo taken out of use gets its whole week from that moment, however
 // old it is, so a slip in the gallery or an event can still be undone.
 func TestStoreUnusedGraceStartsWhenTakenOutOfUse(t *testing.T) {

@@ -17,6 +17,8 @@ const (
 	FieldTicketURL   Field = "ticketUrl"
 	FieldMainPhoto   Field = "mainPhoto"
 	FieldExtraPhotos Field = "extraPhotos"
+	// FieldAlt is a photo's description where it is edited on its own.
+	FieldAlt Field = "alt"
 )
 
 // FieldError is a broken rule tied to the field, and for photos the photo,

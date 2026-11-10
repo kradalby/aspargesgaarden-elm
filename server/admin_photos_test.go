@@ -230,6 +230,16 @@ func TestAdminPhoto(t *testing.T) {
 	require.Equal(t, http.StatusNotFound, rec.Code)
 	require.Equal(t, []problem{{Code: "not_found", Field: "photographerId", PhotoID: p.ID}}, errorsOf(t, rec))
 
+	// Not on a photo a published event shows.
+	rec = a.do(t, "PUT", path, req{body: map[string]any{"alt": "Hagen", "photographerId": nil}})
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+	e := decode[eventJSON](t, a.do(t, "POST", "/admin/api/events", req{body: julemarked(p)}))
+	require.Equal(t, http.StatusOK, a.do(t, "POST", "/admin/api/events/"+itoa(e.ID)+"/publish", req{body: map[string]string{"updatedAt": e.UpdatedAt}}).Code)
+
+	rec = a.do(t, "PUT", path, req{body: map[string]any{"alt": "", "photographerId": nil}})
+	require.Equal(t, http.StatusUnprocessableEntity, rec.Code, rec.Body.String())
+	require.Equal(t, []problem{{Code: "alt_required", Field: "alt", PhotoID: p.ID}}, errorsOf(t, rec))
+
 	for _, path := range []string{"/admin/api/photos/999", "/admin/api/photos/x", "/admin/api/photos/-1"} {
 		require.Equal(t, http.StatusNotFound, a.do(t, "GET", path, req{}).Code, path)
 	}

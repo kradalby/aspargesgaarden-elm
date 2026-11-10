@@ -72,7 +72,7 @@ Any `4xx`/`5xx` from `/admin/api/` has this body:
 | `title_required`                                                           | 422         | `ErrTitleRequired`     | `title`                              |                                                                                                                                                            |
 | `start_required`                                                           | 422         | `ErrStartRequired`     | `start`                              |                                                                                                                                                            |
 | `main_photo_required`                                                      | 422         | `ErrMainPhotoRequired` | `mainPhoto`                          |                                                                                                                                                            |
-| `alt_required`                                                             | 422         | `ErrAltRequired`       | `mainPhoto` or `extraPhotos`         | With `photoId`. One entry per photo.                                                                                                                       |
+| `alt_required`                                                             | 422         | `ErrAltRequired`       | `mainPhoto`, `extraPhotos` or `alt`  | With `photoId`. One entry per photo. `alt` on the photo route.                                                                                             |
 | `duplicate_photo`                                                          | 422         | `ErrDuplicatePhoto`    | `mainPhoto`, `extraPhotos` or —      | With `photoId`. No field for the gallery.                                                                                                                  |
 | `photographer_name_required`                                               | 422         | `ErrPhotographerName`  | `name`                               | Empty name on a photographer create or update.                                                                                                             |
 | `photographer_name_taken`                                                  | 409         | `ErrPhotographerTaken` | `name`                               | Another photographer has that name. Body also has `existing`: that Photographer, so the app can pick it instead.                                           |
@@ -435,7 +435,9 @@ building again after a `failed`; a no-op for a photo that is `preparing` or
 `200` Photo. Used by the gallery editor; event forms send these with the
 event. An unknown `photographerId` is `404 not_found` with `field`
 `photographerId`. An empty `alt` is allowed here (the gallery marks the
-photo instead); the publish rules only apply to events.
+photo instead), except on a photo a published event shows: an edit never
+breaks a live page, so that is `422 alt_required` with `field` `alt` and
+`photoId`.
 
 #### Crops
 
