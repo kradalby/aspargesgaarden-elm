@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Regenerates every fixture in this directory from nothing (synthetic, licence-clean).
-# Needs: vips, magick (ImageMagick 7), heif-enc (libheif, x265), exiftool.
+# Needs: vips (nixpkgs', with uhdrsave), magick (ImageMagick 7), heif-enc
+# (libheif, x265), exiftool.
 # Usage: ./gen.sh            -> stored fixtures
 #        ./gen.sh overcap D  -> writes the big generated-only inputs into D
 set -euo pipefail
@@ -72,6 +73,16 @@ exiftool -q -overwrite_original \
   -XMP-exif:GPSLatitude=59.9139N -XMP-exif:GPSLongitude=10.7522E \
   -Make=SpikeCam -Model=Fixture -DateTimeOriginal='2020:01:01 12:00:00' \
   -IPTC:City=Oslo gps.jpg
+# The same planted metadata in the other containers an upload brings it in:
+# an iPhone's HEIC, a PNG's eXIf and iTXt chunks, and an Ultra HDR JPEG,
+# whose gain map rides in an MPF segment.
+heif-enc -q 60 -o gps.heic gps.jpg >/dev/null
+magick upright.png -depth 8 gps.png
+vips colourspace upright.png hdr.v scrgb && vips linear hdr.v hdr2.v 3 0 && vips uhdrsave hdr2.v uhdr.jpg
+rm hdr.v hdr2.v
+plant=(-GPSLatitude=59.9139 -GPSLatitudeRef=N -XMP-exif:GPSLatitude=59.9139N -Make=SpikeCam -Model=Fixture)
+exiftool -q -overwrite_original "${plant[@]}" gps.png
+exiftool -q -overwrite_original "${plant[@]}" -IPTC:City=Oslo uhdr.jpg
 
 # PNG with alpha: transparent hole at x=400..719, y=300..499 (upright coords).
 magick upright.png \( -size 1200x800 xc:white -fill black -draw 'rectangle 400,300 719,499' \) \

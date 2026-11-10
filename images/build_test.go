@@ -115,8 +115,10 @@ func TestBuildAlpha(t *testing.T) {
 	}
 }
 
-// TestBuildStripsMetadata builds every kind of the GPS fixture: no output
-// may carry EXIF, XMP, IPTC or an ICC profile.
+// TestBuildStripsMetadata builds every kind of each fixture with planted
+// metadata, in every container an upload brings it in: no output may carry
+// EXIF, XMP, IPTC, an ICC profile or a gain map, by vips's fields and by
+// the bytes themselves.
 func TestBuildStripsMetadata(t *testing.T) {
 	t.Parallel()
 	v := newTestVips(t)
@@ -129,16 +131,47 @@ func TestBuildStripsMetadata(t *testing.T) {
 		crops[k] = r
 	}
 
-	p, orig := photoFromFixture(t, v, "gps.jpg", crops)
-	require.True(t, hasField(t, orig, "exif-data"), "the fixture must carry EXIF")
+	// Planted by testdata/gen.sh: EXIF Make, XMP GPS, IPTC city, the XMP
+	// namespace, the MPF segment that holds an Ultra HDR gain map.
+	needles := []string{"SpikeCam", "59,54.834N", "Oslo", "http://ns.adobe.com/xap", "MPF\x00"}
 
-	files := buildAll(t, v, p, orig, t.TempDir())
-	require.Len(t, files, len(Expected(p)))
+	tests := []struct {
+		file    string
+		planted []string // needles the fixture carries
+	}{
+		{"gps.jpg", []string{"SpikeCam", "59,54.834N", "Oslo", "http://ns.adobe.com/xap"}},
+		{"gps.heic", []string{"SpikeCam", "59,54.834N"}},
+		{"gps.png", []string{"SpikeCam", "59,54.834N"}},
+		{"uhdr.jpg", []string{"SpikeCam", "59,54.834N", "Oslo", "http://ns.adobe.com/xap", "MPF\x00"}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.file, func(t *testing.T) {
+			t.Parallel()
+			p, orig := photoFromFixture(t, v, tt.file, crops)
 
-	for _, f := range files {
-		for _, field := range []string{"exif-data", "xmp-data", "iptc-data", "icc-profile-data"} {
-			require.False(t, hasField(t, f, field), "%s still has %s", f, field)
-		}
+			b, err := os.ReadFile(orig)
+			require.NoError(t, err)
+
+			for _, n := range tt.planted {
+				require.Contains(t, string(b), n, "the fixture must carry it")
+			}
+
+			files := buildAll(t, v, p, orig, t.TempDir())
+			require.Len(t, files, len(Expected(p)))
+
+			for _, f := range files {
+				for _, field := range []string{"exif-data", "xmp-data", "iptc-data", "icc-profile-data", "gainmap-data"} {
+					require.False(t, hasField(t, f, field), "%s still has %s", f, field)
+				}
+
+				out, err := os.ReadFile(f)
+				require.NoError(t, err)
+
+				for _, n := range needles {
+					require.NotContains(t, string(out), n, f)
+				}
+			}
+		})
 	}
 }
 
