@@ -10,6 +10,7 @@ import (
 	"log/slog"
 	"net/http"
 	"net/url"
+	"runtime/debug"
 	"slices"
 	"strconv"
 	"time"
@@ -24,7 +25,7 @@ const IndexNowEndpoint = "https://api.indexnow.org/indexnow"
 
 var metricIndexNow = register(prometheus.NewCounterVec(prometheus.CounterOpts{
 	Name: "asparges_indexnow_submissions_total",
-	Help: "IndexNow submissions of changed addresses: sent, or failed after retrying.",
+	Help: "IndexNow submissions of changed addresses: sent, or failed (rejected, or still failing after retrying).",
 }, []string{"result"}))
 
 // IndexNowConfig configures an IndexNow.
@@ -91,11 +92,16 @@ func (n *IndexNow) Notify() {
 }
 
 // Run sends changes until ctx ends. The pages at start are the baseline:
-// a restart is not a change.
+// a restart is not a change. The baseline moves only past what was sent,
+// or refused for good, so a change is never dropped because a read or a
+// submission failed; those are tried again a moment later.
 func (n *IndexNow) Run(ctx context.Context) error {
 	prev, err := n.snapshot(ctx)
 	if err != nil {
+		// Nothing to tell changes apart by: the first one sends every page
+		// rather than none.
 		n.cfg.Log.ErrorContext(ctx, "indexnow: reading pages at start", "err", err)
+		prev = map[string]time.Time{}
 	}
 
 	for {
@@ -108,35 +114,60 @@ func (n *IndexNow) Run(ctx context.Context) error {
 		cur, err := n.snapshot(ctx)
 		if err != nil {
 			n.cfg.Log.ErrorContext(ctx, "indexnow: reading pages", "err", err)
+			n.later()
+
 			continue
 		}
 
 		changed := diff(prev, cur)
-		prev = cur
-
 		if len(changed) == 0 {
+			prev = cur
 			continue
 		}
 
-		if err := n.submit(ctx, changed); err != nil {
+		err = n.submit(ctx, changed)
+
+		switch {
+		case err == nil:
+			prev = cur
+			metricIndexNow.WithLabelValues("sent").Inc()
+			n.cfg.Log.InfoContext(ctx, "indexnow: submitted", "urls", changed)
+		case ctx.Err() != nil:
+			return nil //nolint:nilerr // shutting down: what is unsent is no failure
+		case errors.Is(err, errRejected):
+			// Sending it again would be refused again.
+			prev = cur
 			metricIndexNow.WithLabelValues("failed").Inc()
-			n.cfg.Log.WarnContext(ctx, "indexnow: submission failed", "urls", len(changed), "err", err)
-
-			continue
+			n.cfg.Log.ErrorContext(ctx, "indexnow: submission refused", "urls", len(changed), "err", err)
+		default:
+			metricIndexNow.WithLabelValues("failed").Inc()
+			n.cfg.Log.WarnContext(ctx, "indexnow: submission failed, trying again", "urls", len(changed), "err", err)
+			n.later()
 		}
-
-		metricIndexNow.WithLabelValues("sent").Inc()
-		n.cfg.Log.InfoContext(ctx, "indexnow: submitted", "urls", changed)
 	}
 }
 
-func (n *IndexNow) snapshot(ctx context.Context) (map[string]time.Time, error) {
+// later pokes the worker again after a pause, to retry what failed.
+func (n *IndexNow) later() {
+	time.AfterFunc(n.cfg.InitialInterval, n.Notify)
+}
+
+// snapshot reads the page list. The list is put together from the database
+// on this worker's goroutine, which nothing else recovers: a panic in that
+// is an error here, not the end of the process.
+func (n *IndexNow) snapshot(ctx context.Context) (out map[string]time.Time, err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			out, err = nil, fmt.Errorf("listing pages: panic: %v\n%s", r, debug.Stack())
+		}
+	}()
+
 	pages, err := n.cfg.Pages(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	out := make(map[string]time.Time, len(pages))
+	out = make(map[string]time.Time, len(pages))
 	for _, p := range pages {
 		out[n.cfg.BaseURL+p.Path] = p.LastMod
 	}
@@ -145,12 +176,7 @@ func (n *IndexNow) snapshot(ctx context.Context) (map[string]time.Time, error) {
 }
 
 // diff is every address added, removed or edited from prev to cur, sorted.
-// A nil prev (no baseline yet) has nothing to compare against.
 func diff(prev, cur map[string]time.Time) []string {
-	if prev == nil {
-		return nil
-	}
-
 	var out []string
 
 	for u, t := range cur {
@@ -176,7 +202,10 @@ type submission struct {
 	URLList []string `json:"urlList"`
 }
 
-var errStatus = errors.New("indexnow answered")
+var (
+	errStatus   = errors.New("indexnow answered")
+	errRejected = errors.New("indexnow refused the submission")
+)
 
 // submit posts urls, retrying what may pass later (network, 429, 5xx) and
 // giving up at once on what will not (a bad key, foreign addresses).
@@ -199,7 +228,7 @@ func (n *IndexNow) submit(ctx context.Context, urls []string) error {
 func (n *IndexNow) post(ctx context.Context, body []byte) error {
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, n.cfg.Endpoint, bytes.NewReader(body))
 	if err != nil {
-		return backoff.Permanent(err)
+		return backoff.Permanent(fmt.Errorf("%w: %w", errRejected, err))
 	}
 
 	req.Header.Set("Content-Type", "application/json; charset=utf-8")
@@ -224,6 +253,6 @@ func (n *IndexNow) post(ctx context.Context, body []byte) error {
 	case code >= 500:
 		return fmt.Errorf("%w %d", errStatus, code)
 	default:
-		return backoff.Permanent(fmt.Errorf("%w %d", errStatus, code))
+		return backoff.Permanent(fmt.Errorf("%w: %w %d", errRejected, errStatus, code))
 	}
 }
