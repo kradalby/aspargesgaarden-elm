@@ -496,10 +496,10 @@ building again after a `failed`; a no-op for a photo that is `preparing` or
 `PUT /admin/api/photos/{id}` with `{ "alt": "", "photographerId": null }` →
 `200` Photo. Used by the gallery editor; event forms send these with the
 event. An unknown `photographerId` is `404 not_found` with `field`
-`photographerId`. An empty `alt` is allowed here (the gallery marks the
-photo instead), except on a photo a published event shows: an edit never
-breaks a live page, so that is `422 alt_required` with `field` `alt` and
-`photoId`.
+`photographerId` and `photoId`. An empty or all-whitespace `alt` is allowed
+here (the gallery marks the photo instead), except on a photo a published
+event shows: an edit never breaks a live page, so that is `422 alt_required`
+with `field` `alt` and `photoId`.
 
 #### Crops
 
