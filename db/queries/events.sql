@@ -52,9 +52,6 @@ SELECT * FROM events
 WHERE status = 'published' AND show_in_menu = 1
 ORDER BY start_date, id;
 
--- name: ListAllEventDates :many
-SELECT event_id, date FROM event_dates ORDER BY event_id, date;
-
 -- name: ListEventDates :many
 SELECT event_id, date FROM event_dates
 WHERE event_id IN (sqlc.slice('event_ids'))
@@ -65,10 +62,6 @@ DELETE FROM event_dates WHERE event_id = ?;
 
 -- name: InsertEventDate :exec
 INSERT INTO event_dates (event_id, date) VALUES (?, ?);
-
--- name: ListAllEventPhotos :many
-SELECT event_id, photo_id, role, position FROM event_photos
-ORDER BY event_id, position;
 
 -- name: ListEventPhotos :many
 SELECT event_id, photo_id, role, position FROM event_photos
