@@ -112,6 +112,10 @@
             dir = ./elm + "/${app}";
             yarn = builtins.pathExists (dir + "/yarn.lock");
             yarnDeps = pkgs.fetchYarnDeps {
+              # A fixed-output path is found by name and hash alone: naming it
+              # after yarn.lock makes a stale hash fail instead of reusing old
+              # packages from the store.
+              name = "yarn-${app}-${builtins.substring 0 16 (builtins.hashFile "sha256" (dir + "/yarn.lock"))}";
               yarnLock = dir + "/yarn.lock";
               hash = hashes.yarn.${app};
             };
