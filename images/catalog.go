@@ -91,9 +91,10 @@ func groups(p Photo) []group {
 		// Every format must exist at every width a page offers.
 		ws = slices.DeleteFunc(ws, func(w int) bool { return k.height(r, w) > maxSide })
 
+		id := r.ID() // a hash: once per group, not per file
 		for _, f := range fs {
 			for _, w := range ws {
-				g.specs = append(g.specs, VariantSpec{Photo: p.SHA256, Kind: k, Crop: r.ID(), Width: w, Format: f})
+				g.specs = append(g.specs, VariantSpec{Photo: p.SHA256, Kind: k, Crop: id, Width: w, Format: f})
 			}
 		}
 
