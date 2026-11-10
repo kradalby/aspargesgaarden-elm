@@ -241,7 +241,9 @@ in
         peak = site.succeed("systemctl show -P MemoryPeak asparges.service").strip()
         cap = site.succeed("systemctl show -P MemoryMax asparges.service").strip()
         print(f"asparges MemoryPeak={peak} MemoryMax={cap}")
-        assert int(peak) < int(cap), (peak, cap)
+        # The cgroup never goes past its cap (the kernel reclaims or kills at
+        # it), so only a margin below it shows the builds fit.
+        assert int(peak) < int(cap) // 2, (peak, cap)
 
     with subtest("SIGTERM stops the unit cleanly, well inside its timeout"):
         t0 = time.monotonic()
