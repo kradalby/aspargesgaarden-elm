@@ -1,4 +1,4 @@
-// Package static embeds the site's own files (stylesheet, fonts, logo, icons,
+// Package static embeds the site's own files (stylesheets, fonts, logo, icons,
 // fixed-page photos, the Elm apps' scripts) and serves them under /static/
 // with content-hashed URLs.
 //
@@ -105,33 +105,38 @@ func load(fsys fs.FS) (map[string]asset, error) {
 		}
 	}
 
-	css, ok := out["site.css"]
-	if !ok {
+	if _, ok := out["site.css"]; !ok {
 		return nil, errors.New("dist/site.css missing: run go generate ./static")
 	}
 
-	// The stylesheet names fonts by plain path; point it at the hashed URLs so
+	// Stylesheets name fonts by plain path; point them at the hashed URLs so
 	// they can be cached immutably too. Hashing after the rewrite makes a font
 	// change a stylesheet change.
-	var missing []string
-
-	data := cssURL.ReplaceAllFunc(css.data, func(m []byte) []byte {
-		name := string(cssURL.FindSubmatch(m)[1])
-
-		a, ok := out[name]
-		if !ok {
-			missing = append(missing, name)
-
-			return m
+	for name, a := range out {
+		if path.Ext(name) != ".css" {
+			continue
 		}
 
-		return []byte("url(" + url(name, a.hash) + ")")
-	})
-	if len(missing) > 0 {
-		return nil, fmt.Errorf("site.css references files not embedded: %v", missing)
-	}
+		var missing []string
 
-	out["site.css"] = asset{data: data, hash: digest(data), ctype: css.ctype}
+		data := cssURL.ReplaceAllFunc(a.data, func(m []byte) []byte {
+			ref := string(cssURL.FindSubmatch(m)[1])
+
+			f, ok := out[ref]
+			if !ok {
+				missing = append(missing, ref)
+
+				return m
+			}
+
+			return []byte("url(" + url(ref, f.hash) + ")")
+		})
+		if len(missing) > 0 {
+			return nil, fmt.Errorf("%s references files not embedded: %v", name, missing)
+		}
+
+		out[name] = asset{data: data, hash: digest(data), ctype: a.ctype}
+	}
 
 	return out, nil
 }

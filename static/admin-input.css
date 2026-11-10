@@ -1,0 +1,7 @@
+/* admin.css: the admin app's stylesheet, with the site's theme. Built
+   apart from site.css so public pages carry no admin classes; served only on
+   the tailnet listener. */
+@import "tailwindcss" source(none);
+@import "./theme.css";
+
+@source "../elm/admin/src/**/*.elm";

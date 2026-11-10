@@ -18,15 +18,18 @@ shift || true
 apps=$(for f in ../elm/*/elm.json; do basename "$(dirname "$f")"; done)
 steps=${*:-css fonts photos $apps}
 
+# site.css for the public pages, admin.css for the admin app: one theme
+# (theme.css), two class scans, so a visitor never downloads admin styles.
 css() {
   tailwindcss --input input.css --output "$out/site.css" --minify 2>/dev/null
+  tailwindcss --input admin-input.css --output "$out/admin.css" --minify 2>/dev/null
 }
 
 # Convert exactly the fonts input.css references, so the weight mapping lives
 # in one place.
 fonts() {
   mkdir -p "$out/fonts"
-  for name in $(grep -o '/static/fonts/[A-Za-z0-9-]*\.woff2' input.css | sed 's|.*/||; s|\.woff2$||' | sort -u); do
+  for name in $(grep -oh '/static/fonts/[A-Za-z0-9-]*\.woff2' ./*.css | sed 's|.*/||; s|\.woff2$||' | sort -u); do
     local src=fonts-src/$name.otf dst=$out/fonts/$name.woff2
     [ "$dst" -nt "$src" ] && continue
     local tmp

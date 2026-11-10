@@ -24,12 +24,18 @@ var (
 // CSS generic families need no @font-face: the browser always has one.
 var genericFamilies = []string{"serif", "sans-serif", "monospace", "cursive", "fantasy", "system-ui", "math", "emoji", "fangsong"}
 
-// The plan's font check: every family the served stylesheet asks for has an
+// The plan's font check: every family a served stylesheet asks for has an
 // embedded @font-face, and every @font-face points at a file in the binary.
 // A var() fallback only counts when its variable is undefined, since only
 // then can the browser reach it.
 func TestFontsAreEmbedded(t *testing.T) {
-	css := string(assets["site.css"].data)
+	for _, sheet := range []string{"site.css", "admin.css"} {
+		t.Run(sheet, func(t *testing.T) { checkFonts(t, string(assets[sheet].data)) })
+	}
+}
+
+func checkFonts(t *testing.T, css string) {
+	t.Helper()
 
 	faces := map[string]bool{}
 
