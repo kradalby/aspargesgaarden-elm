@@ -105,6 +105,12 @@ server may add codes without breaking the app.
     "banner": { "x": 0, "y": 378, "w": 4032, "h": 2268 },
     "share": { "x": 0, "y": 453, "w": 4032, "h": 2117 }
   },
+  "quality": {
+    "card": { "minWidth": 480, "sharpWidth": 768, "soft": false },
+    "banner": { "minWidth": 800, "sharpWidth": 896, "soft": false },
+    "share": { "minWidth": 1200, "sharpWidth": 1200, "soft": false },
+    "full": { "minWidth": 480, "sharpWidth": 992, "soft": false }
+  },
   "status": PhotoStatus
 }
 ```
@@ -121,6 +127,17 @@ server may add codes without breaking the app.
 - `crops`: always all three kinds. A kind that was never set, or that the
   photo is too small for (see [Crops](#crops)), holds the largest centred
   rectangle of its shape, so the app never computes one itself.
+- `quality`: always all four kinds (`full` is the uncropped photo, in the
+  gallery and below an event). `minWidth` is the narrowest crop the server
+  takes (see [Crops](#crops)); `sharpWidth` the widest box, in CSS pixels,
+  the public pages draw the kind in, so the narrowest picture that is sharp
+  on every screen (`images.Kind.SharpWidth`). Both are the same for every
+  photo; the app takes them from here instead of knowing them. `soft`: what
+  the pages draw for the kind now — its stored crop, or the whole photo where
+  it has none (or one under `minWidth`) — is narrower than `sharpWidth`.
+  `share` without a crop is never soft: the link preview then uses the
+  banner. Soft never blocks anything; the app warns (for `full`: the photo is
+  only shown smaller when opened large).
 
 ### PhotoStatus
 
@@ -435,6 +452,11 @@ banner). Such a kind's rectangle in the photo is the centred one, and
 sending exactly that back is accepted and stores nothing, so the app may
 send every kind as it got them; any other rectangle for it is
 `crop_too_small`.
+A kind's stored crop sent back exactly as the photo has it is accepted
+without any check and left as it is, even under today's minimum (an old
+import may hold one); a moved or resized one is checked as above. A crop
+under `quality.sharpWidth` is accepted like any other: sharpness only warns,
+and event saves and publishing never look at it.
 A crop belongs to the photo, so it takes effect on every page that shows the
 photo as soon as it is saved, published or not. The app says so in the crop
 dialog.

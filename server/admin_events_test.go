@@ -256,6 +256,37 @@ func TestAdminPublishRules(t *testing.T) {
 	require.Equal(t, []problem{{Code: "title_required", Field: "title"}}, errorsOf(t, rec))
 }
 
+// Sharpness only ever warns: an event whose photos are soft, or carry a crop
+// under today's floor, is saved and published, and its page still shows.
+func TestAdminPhotoQualityNeverBlocks(t *testing.T) {
+	a := newAdmin(t, false)
+	main := a.storedPhoto(t, 'a')
+	require.NoError(t, a.store.SetCrops(t.Context(), main.ID, map[site.CropKind]site.Rect{
+		site.CropCard:   {X: 0, Y: 0, W: 500, H: 625},
+		site.CropBanner: {X: 0, Y: 0, W: 700, H: 394},
+	}))
+
+	e := decode[eventJSON](t, a.do(t, "POST", "/admin/api/events", req{body: julemarked(main)}))
+	require.True(t, e.MainPhoto.Quality["card"].Soft)
+
+	rec := a.do(t, "POST", "/admin/api/events/"+itoa(e.ID)+"/publish", req{body: map[string]string{"updatedAt": e.UpdatedAt}})
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+
+	edit := julemarked(main)
+	edit["updatedAt"], edit["slug"], edit["summary"] = decode[eventJSON](t, rec).UpdatedAt, e.Slug, "Ny tekst."
+	rec = a.do(t, "PUT", "/admin/api/events/"+itoa(e.ID), req{body: edit})
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+
+	stored, err := a.store.Photo(t.Context(), main.ID)
+	require.NoError(t, err)
+	require.Equal(t, site.Rect{X: 0, Y: 0, W: 700, H: 394}, stored.Crops[site.CropBanner], "a text edit leaves the crops alone")
+
+	page := a.get(t, e.Path)
+	require.Equal(t, http.StatusOK, page.Code)
+	require.Contains(t, page.Body.String(), "/full-", "the banner under the floor is drawn as the whole photo, as before")
+	require.Contains(t, a.get(t, "/arrangementer").Body.String(), "/card-", "the soft card is drawn")
+}
+
 // Two editors: a write made against an old version is refused with the
 // stored one, so neither loses what they typed.
 func TestAdminEventConflict(t *testing.T) {

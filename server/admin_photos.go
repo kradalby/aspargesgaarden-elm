@@ -44,15 +44,42 @@ type statusJSON struct {
 }
 
 type photoJSON struct {
-	ID           int64               `json:"id"`
-	Width        int                 `json:"width"`
-	Height       int                 `json:"height"`
-	Alt          string              `json:"alt"`
-	Photographer *photographerJSON   `json:"photographer"`
-	PreviewURL   string              `json:"previewUrl"`
-	ThumbURL     string              `json:"thumbUrl"`
-	Crops        map[string]rectJSON `json:"crops"`
-	Status       statusJSON          `json:"status"`
+	ID           int64                  `json:"id"`
+	Width        int                    `json:"width"`
+	Height       int                    `json:"height"`
+	Alt          string                 `json:"alt"`
+	Photographer *photographerJSON      `json:"photographer"`
+	PreviewURL   string                 `json:"previewUrl"`
+	ThumbURL     string                 `json:"thumbUrl"`
+	Crops        map[string]rectJSON    `json:"crops"`
+	Quality      map[string]qualityJSON `json:"quality"`
+	Status       statusJSON             `json:"status"`
+}
+
+// qualityJSON is the sharpness rule of one kind, and how this photo fares.
+type qualityJSON struct {
+	MinWidth   int  `json:"minWidth"`
+	SharpWidth int  `json:"sharpWidth"`
+	Soft       bool `json:"soft"`
+}
+
+// quality judges what the public pages draw for each kind, as pages'
+// photoRef picks it: the kind's crop, or the whole photo where it has none.
+// Share has no such stand-in (the link preview uses the banner), so without
+// a crop it is never soft.
+func quality(p site.Photo) map[string]qualityJSON {
+	out := map[string]qualityJSON{}
+
+	for _, k := range []images.Kind{images.Card, images.Banner, images.Share, images.Full} {
+		ref, err := images.RefFor(p.Image(), k)
+		if err != nil && k != images.Share {
+			ref, err = images.RefFor(p.Image(), images.Full)
+		}
+
+		out[string(k)] = qualityJSON{MinWidth: k.MinWidth(), SharpWidth: k.SharpWidth(), Soft: err == nil && k.Soft(ref.Width)}
+	}
+
+	return out
 }
 
 func toPhotographerJSON(p site.Photographer) photographerJSON {
@@ -66,6 +93,7 @@ func (s *Server) photoJSON(ctx context.Context, p site.Photo) photoJSON {
 		PreviewURL: images.PreviewURL(img),
 		ThumbURL:   images.ThumbURL(img),
 		Crops:      map[string]rectJSON{},
+		Quality:    quality(p),
 		Status:     s.photoStatus(ctx, p.SHA256),
 	}
 
@@ -396,6 +424,13 @@ func (s *Server) setCrops(w http.ResponseWriter, r *http.Request, p site.Photo) 
 	for _, k := range slices.Sorted(maps.Keys(in)) {
 		c := in[k]
 		kind, rect := images.Kind(k), images.Rect{X: c.X, Y: c.Y, W: c.W, H: c.H}
+
+		// The crop the photo has, sent back as the app got it, stays as it
+		// is: an old photo's crop may predate today's rules, and refusing it
+		// would block every other change in the dialog.
+		if stored, ok := p.Crops[site.CropKind(k)]; ok && stored == (site.Rect{X: c.X, Y: c.Y, W: c.W, H: c.H}) {
+			continue
+		}
 
 		// The app sends every kind back, also the centred one photoJSON
 		// shows for a kind the photo is too small for. Nothing to store.

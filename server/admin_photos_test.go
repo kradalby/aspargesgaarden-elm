@@ -13,6 +13,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/require"
 
 	"github.com/kradalby/asparges/images"
@@ -296,6 +297,72 @@ func TestAdminCrops(t *testing.T) {
 
 	rec = a.do(t, "PUT", path, req{body: map[string]rectJSON{"share": {0, 0, 950, 499}}})
 	require.Equal(t, []problem{{Code: "crop_too_small", Field: "share"}}, errorsOf(t, rec))
+}
+
+// A crop the photo already has is never re-judged: sent back unchanged it is
+// accepted, even under today's floor, so the other kinds can still be saved.
+func TestAdminCropsKeepAnOldCrop(t *testing.T) {
+	a := newAdmin(t, false)
+	p := a.storedPhoto(t, 'a') // 1600×1200
+	old := site.Rect{X: 10, Y: 20, W: 700, H: 394}
+	require.NoError(t, a.store.SetCrops(t.Context(), p.ID, map[site.CropKind]site.Rect{site.CropBanner: old}))
+
+	path := "/admin/api/photos/" + itoa(p.ID) + "/crops"
+	rec := a.do(t, "PUT", path, req{body: map[string]rectJSON{"banner": {10, 20, 700, 394}, "card": {0, 0, 600, 750}}})
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+
+	stored, err := a.store.Photo(t.Context(), p.ID)
+	require.NoError(t, err)
+	require.Equal(t, map[site.CropKind]site.Rect{site.CropBanner: old, site.CropCard: {X: 0, Y: 0, W: 600, H: 750}}, stored.Crops,
+		"the soft card is accepted too: sharpness only warns")
+
+	// Moved, it is a new crop, and today's floor applies.
+	rec = a.do(t, "PUT", path, req{body: map[string]rectJSON{"banner": {11, 20, 700, 394}}})
+	require.Equal(t, []problem{{Code: "crop_too_small", Field: "banner"}}, errorsOf(t, rec))
+}
+
+// The app learns each kind's floor and sharp width, and whether what the
+// pages draw for the kind is narrower than sharp.
+func TestAdminPhotoQuality(t *testing.T) {
+	a := newAdmin(t, false)
+
+	small, err := a.store.AddPhoto(t.Context(), site.Photo{SHA256: strings.Repeat("c", 64), MIME: "image/jpeg", Width: 768, Height: 1024})
+	require.NoError(t, err)
+	require.NoError(t, a.store.SetCrops(t.Context(), small.ID, map[site.CropKind]site.Rect{site.CropCard: {X: 0, Y: 32, W: 768, H: 960}}))
+
+	large := a.storedPhoto(t, 'a') // 1600×1200
+	require.NoError(t, a.store.SetCrops(t.Context(), large.ID, map[site.CropKind]site.Rect{
+		site.CropCard: {X: 0, Y: 0, W: 600, H: 750},
+		// Under the floor, as an old import may have it: the pages skip it
+		// and draw the whole photo, which is sharp.
+		site.CropBanner: {X: 0, Y: 0, W: 700, H: 394},
+		site.CropShare:  {X: 0, Y: 0, W: 1600, H: 840},
+	}))
+
+	tests := []struct {
+		name  string
+		photo site.Photo
+		soft  map[string]bool
+	}{
+		// The banner is the whole photo, 768 wide; there is no share image.
+		{"a photo sent on Messenger", small, map[string]bool{"card": false, "banner": true, "share": false, "full": true}},
+		{"a soft card", large, map[string]bool{"card": true, "banner": false, "share": false, "full": false}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := decode[photoJSON](t, a.do(t, "GET", "/admin/api/photos/"+itoa(tt.photo.ID), req{})).Quality
+
+			want := map[string]qualityJSON{
+				"card":   {MinWidth: 480, SharpWidth: 768, Soft: tt.soft["card"]},
+				"banner": {MinWidth: 800, SharpWidth: 896, Soft: tt.soft["banner"]},
+				"share":  {MinWidth: 1200, SharpWidth: 1200, Soft: tt.soft["share"]},
+				"full":   {MinWidth: 480, SharpWidth: 992, Soft: tt.soft["full"]},
+			}
+			if diff := cmp.Diff(want, got); diff != "" {
+				t.Errorf("quality (-want +got):\n%s", diff)
+			}
+		})
+	}
 }
 
 func TestAdminPhotoStatus(t *testing.T) {
