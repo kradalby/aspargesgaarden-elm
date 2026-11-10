@@ -18,6 +18,9 @@ SELECT id FROM photos WHERE sha256 = ?;
 -- name: ListPhotos :many
 SELECT * FROM photos ORDER BY id;
 
+-- name: ListPhotosByID :many
+SELECT * FROM photos WHERE id IN (sqlc.slice('ids'));
+
 -- name: UpdatePhotoMeta :execrows
 UPDATE photos
 SET alt = ?, photographer_id = ?, updated_at = ?
@@ -43,6 +46,9 @@ SELECT * FROM photo_crops WHERE photo_id = ? ORDER BY kind;
 
 -- name: ListAllPhotoCrops :many
 SELECT * FROM photo_crops ORDER BY photo_id, kind;
+
+-- name: ListPhotoCropsByPhotoID :many
+SELECT * FROM photo_crops WHERE photo_id IN (sqlc.slice('photo_ids'));
 
 -- name: ListGalleryPhotoIDs :many
 SELECT photo_id FROM gallery_photos ORDER BY position;
