@@ -85,6 +85,10 @@ func TestE2EHooks(t *testing.T) {
 		photographers, err := store.Photographers(t.Context())
 		require.NoError(t, err)
 		require.Len(t, photographers, 1)
+
+		broken, err := store.Photo(t.Context(), seed.Broken)
+		require.NoError(t, err)
+		require.Equal(t, e2eBrokenSHA, broken.SHA256)
 	}
 
 	course := strconv.FormatInt(seed.Course, 10)

@@ -46,6 +46,18 @@ suite =
                 D.decodeString Api.photoDecoder photoJson
                     |> Result.map (\p -> ( p.status.done, p.status.previewReady, Dict.get "card" p.crops |> Maybe.map .w ))
                     |> Expect.equal (Ok ( 12, True, Just 2419 ))
+        , test "a failed photo carries its reason; an unknown state is followed" <|
+            \_ ->
+                let
+                    stateOf st reason =
+                        photoJson
+                            |> String.replace "\"state\": \"preparing\"" ("\"state\": \"" ++ st ++ "\"")
+                            |> String.replace "\"reason\": \"\"" ("\"reason\": \"" ++ reason ++ "\"")
+                            |> D.decodeString Api.photoDecoder
+                            |> Result.map (.status >> .state)
+                in
+                [ stateOf "failed" "damaged", stateOf "ready" "", stateOf "later" "" ]
+                    |> Expect.equal [ Ok (Api.Failed "damaged"), Ok Api.Ready, Ok Api.Preparing ]
         , test "decodes each kind's widths from the server" <|
             \_ ->
                 D.decodeString Api.photoDecoder photoJson

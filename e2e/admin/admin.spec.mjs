@@ -10,12 +10,15 @@ const fixture = (name) => join(import.meta.dirname, "fixtures", name);
 // fails on any console error: a CSP violation, a script error, or a file
 // that did not load.
 const test = base.extend({
+  // A test that shows a photo the server cannot prepare expects its images
+  // to fail to load.
+  brokenImages: [false, { option: true }],
   seed: async ({ request }, use) => {
     const res = await request.post("/__reset");
     expect(res.ok()).toBe(true);
     await use(await res.json());
   },
-  page: async ({ page, seed }, use) => {
+  page: async ({ page, seed, brokenImages }, use) => {
     expect(seed.course).toBeGreaterThan(0);
     const problems = [];
     page.on("console", (m) => {
@@ -24,7 +27,8 @@ const test = base.extend({
       // logged by the browser too; the app's handling of it is what counts.
       if (
         /^Failed to load resource/.test(m.text()) &&
-        m.location().url.includes("/admin/api/")
+        (m.location().url.includes("/admin/api/") ||
+          (brokenImages && m.location().url.includes("/img/")))
       )
         return;
       // Playwright reading the preview frame tries to run its own script in
@@ -1096,4 +1100,63 @@ test("every text in the admin is readable against what is behind it", async ({
   await page.goto(`/admin/arrangementer/${seed.course}`);
   await expect(page.getByLabel("Tittel")).toHaveValue("Takkebakstkurs");
   expect(await lowContrast(page)).toEqual([]);
+});
+
+test.describe(() => {
+  test.use({ brokenImages: true });
+  test("a photo the server cannot prepare says so, and can be tried again", async ({
+    page,
+    request,
+    seed,
+  }) => {
+    // broken's original is missing, so every attempt fails.
+    const draft = await (
+      await request.post("/admin/api/events", {
+        data: draftInput(seed, {
+          mainPhoto: { id: seed.broken, alt: "Låven", photographerId: null },
+        }),
+      })
+    ).json();
+    await request.post(`/admin/api/photos/${seed.broken}/prepare`);
+    await expect
+      .poll(async () => {
+        const res = await request.get(
+          `/admin/api/photos/status?ids=${seed.broken}`,
+        );
+        return (await res.json()).statuses[seed.broken].state;
+      })
+      .toBe("failed");
+
+    await page.goto(`/admin/arrangementer/${draft.id}`);
+    const photo = page.locator("#bilde");
+    await expect(photo.locator('[data-photo-status="failed"]')).toContainText(
+      "Bildet kunne ikke klargjøres. Trykk «Prøv igjen».",
+    );
+    await expect(photo.getByText("Ingen forhåndsvisning")).toBeVisible();
+    await expect(photo.getByRole("button", { name: "Beskjær" })).toBeDisabled();
+
+    const retried = page.waitForRequest((r) => r.url().endsWith("/prepare"));
+    await photo.getByRole("button", { name: "Prøv igjen" }).click();
+    await retried;
+    await expect(photo.locator('[data-photo-status="failed"]')).toBeVisible({
+      timeout: 30_000,
+    });
+    await expect(
+      live(page).filter({ hasText: "Bildet kunne ikke klargjøres" }),
+    ).toHaveCount(1);
+    // Publishing is never blocked by a photo's state.
+    await page.getByRole("button", { name: "Publiser" }).click();
+    await expect(
+      page.getByText("Publisert! Arrangementet er nå på nettsiden.").first(),
+    ).toBeVisible();
+
+    // In the gallery it is counted among the photos that need help.
+    await request.put("/admin/api/gallery", {
+      data: { photoIds: [seed.landskap, seed.portrett, seed.broken] },
+    });
+    await page.goto("/admin/galleri");
+    await expect(page.locator("#galleri-status")).toContainText(
+      "1 bilde trenger hjelp",
+    );
+  });
 });

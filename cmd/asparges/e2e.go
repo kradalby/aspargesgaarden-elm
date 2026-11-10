@@ -141,14 +141,20 @@ func e2eHooks(store *site.Store, imgs *images.Store, srv *server.Server, fixture
 type e2eSeed struct {
 	Landskap     int64 `json:"landskap"`
 	Portrett     int64 `json:"portrett"`
+	Broken       int64 `json:"broken"`
 	Photographer int64 `json:"photographer"`
 	Course       int64 `json:"course"`
 }
 
+// e2eBrokenSHA names an original that was never stored, so the photo store
+// really fails to prepare that photo, every time it is asked to.
+const e2eBrokenSHA = "0000000000000000000000000000000000000000000000000000000000000000"
+
 // e2eReset deletes every event, photo and photographer and puts in the
 // browser tests' seed: landskap and portrett (both in the gallery),
-// photographer Ola Nordmann on landskap, and a published course over on
-// 31 October with portrett.
+// photographer Ola Nordmann on landskap, a published course over on
+// 31 October with portrett, and broken, a photo nothing uses whose original
+// is missing.
 func e2eReset(ctx context.Context, store *site.Store, imgs *images.Store, fixtures string) (e2eSeed, []string, error) {
 	if err := e2eWipe(ctx, store); err != nil {
 		return e2eSeed{}, nil, fmt.Errorf("wipe: %w", err)
@@ -160,6 +166,11 @@ func e2eReset(ctx context.Context, store *site.Store, imgs *images.Store, fixtur
 	}
 
 	portrett, err := e2ePhoto(ctx, store, imgs, filepath.Join(fixtures, "portrett.jpg"), "Kursholder ved kjøkkenbenken")
+	if err != nil {
+		return e2eSeed{}, nil, err
+	}
+
+	broken, _, err := store.AddPhoto(ctx, site.Photo{SHA256: e2eBrokenSHA, MIME: "image/jpeg", Width: 1200, Height: 800, Alt: "Et bilde som ikke kan leses"})
 	if err != nil {
 		return e2eSeed{}, nil, err
 	}
@@ -191,9 +202,9 @@ func e2eReset(ctx context.Context, store *site.Store, imgs *images.Store, fixtur
 		return e2eSeed{}, nil, err
 	}
 
-	seed := e2eSeed{Landskap: landskap.ID, Portrett: portrett.ID, Photographer: ola.ID, Course: course.ID}
+	seed := e2eSeed{Landskap: landskap.ID, Portrett: portrett.ID, Broken: broken.ID, Photographer: ola.ID, Course: course.ID}
 
-	return seed, []string{landskap.SHA256, portrett.SHA256}, nil
+	return seed, []string{landskap.SHA256, portrett.SHA256, broken.SHA256}, nil
 }
 
 func e2eWipe(ctx context.Context, store *site.Store) error {
