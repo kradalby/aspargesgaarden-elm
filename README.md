@@ -18,7 +18,7 @@ go run ./cmd/asparges serve --dev --listen-addr 127.0.0.1:8090 \
 ```
 
 - Changed Go markup or classes: rerun `go generate ./static` (Tailwind only
-  emits classes it finds in `ui/`, `pages/`, `markdown/`; fonts are skipped
+  emits classes it finds in `ui/`, `pages/`, `markdown/`, `elm/`; fonts are skipped
   unless their source is newer, photo variants unless missing), then restart
   `go run`.
 - Fixed-page photos: one master per photo in `static/photos-src/`
@@ -39,6 +39,34 @@ go run ./cmd/asparges serve --dev --listen-addr 127.0.0.1:8090 \
   `ui/external.go` (Umami, the Google calendar frame). Tests check the
   rendered pages and the stylesheet; every public response carries the
   matching Content-Security-Policy.
+
+### Elm apps and the gallery
+
+Each Elm app lives in `elm/<app>/` with its own `elm.json`, its packages
+pinned for the offline Nix build in `elm-srcs.nix` and `registry.dat`, and
+main module `src/<App>.elm`. `go generate ./static` builds every app
+(`elm make --optimize`, then esbuild minifies) into `static/dist/<app>.js`,
+with `elm/<app>/boot.js` appended when present; pages run no inline script.
+
+```bash
+go generate ./static                    # or, Elm only: cd static && ./build.sh dist gallery
+cd elm/gallery && elm-test-rs           # lightbox logic; also `nix flake check`
+cd elm/gallery && elm2nix convert > elm-srcs.nix && elm2nix snapshot   # after editing elm.json
+nix develop -c e2e/gallery/run.sh       # browser tests: Chromium, Firefox, WebKit
+```
+
+A new app: add `elm/<app>/` and its name to `elmApps` in `flake.nix`; the
+build, the `elm-test-<app>` check and the Tailwind scan of its classes
+follow.
+
+The gallery is `ui.Gallery(layout, photos...)` (`GalleryPage` on
+`/galleri`, `GalleryColumn` at the end of an event page): a grid of links to
+the large photos that works without JavaScript. `ui.Page` adds
+`/static/gallery.js` to any page holding one, and the lightbox opens over
+every gallery on the page. `e2e/gallery/run.sh` imports this checkout into
+`~/.cache/asparges-e2e/data` (kept with its variants; the first run takes a
+few minutes), serves it with `serve`'s wiring and the site's CSP, and writes
+screenshots to `e2e/gallery/out/`.
 
 ## elm-pages version (pinned to v2)
 

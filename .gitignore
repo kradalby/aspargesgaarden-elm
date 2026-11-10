@@ -29,3 +29,7 @@ result-*
 
 # Built by static/build.sh (go generate ./static)
 /static/dist/
+
+# Gallery browser test screenshots (e2e/gallery/run.sh)
+/e2e/gallery/out/
+__pycache__/
