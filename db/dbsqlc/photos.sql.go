@@ -147,27 +147,6 @@ func (q *Queries) GetPhoto(ctx context.Context, id int64) (Photo, error) {
 	return i, err
 }
 
-const getPhotoBySha256 = `-- name: GetPhotoBySha256 :one
-SELECT id, sha256, mime, width, height, alt, photographer_id, created_at, updated_at FROM photos WHERE sha256 = ?
-`
-
-func (q *Queries) GetPhotoBySha256(ctx context.Context, sha256 string) (Photo, error) {
-	row := q.db.QueryRowContext(ctx, getPhotoBySha256, sha256)
-	var i Photo
-	err := row.Scan(
-		&i.ID,
-		&i.Sha256,
-		&i.Mime,
-		&i.Width,
-		&i.Height,
-		&i.Alt,
-		&i.PhotographerID,
-		&i.CreatedAt,
-		&i.UpdatedAt,
-	)
-	return i, err
-}
-
 const getPhotoIDBySha256 = `-- name: GetPhotoIDBySha256 :one
 SELECT id FROM photos WHERE sha256 = ?
 `

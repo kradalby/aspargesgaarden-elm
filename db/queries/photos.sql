@@ -59,9 +59,6 @@ SELECT CAST(coalesce(max(max(gallery_photos.updated_at), max(photos.updated_at))
 FROM gallery_photos
 JOIN photos ON photos.id = gallery_photos.photo_id;
 
--- name: GetPhotoBySha256 :one
-SELECT * FROM photos WHERE sha256 = ?;
-
 -- name: ListPhotoEvents :many
 -- The events that show a photo, which keep it from being deleted.
 SELECT events.id, events.title FROM events
