@@ -303,6 +303,8 @@
               common
               // {
                 goRace = true;
+                # Tests that lean on each other's leftovers fail here, not later.
+                testFlags = [ "-shuffle=on" ];
                 # The images tests run the real vips on testdata/.
                 nativeCheckInputs = [ (lib.getBin vips) ];
               }
