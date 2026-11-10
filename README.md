@@ -68,6 +68,32 @@ every gallery on the page. `e2e/gallery/run.sh` imports this checkout into
 few minutes), serves it with `serve`'s wiring and the site's CSP, and writes
 screenshots to `e2e/gallery/out/`.
 
+### Admin
+
+The admin (`/admin/`, its JSON API under `/admin/api/`, see
+`docs/admin-api.md`) is served only on the service's tsnet node, to tailnet
+users the policy file grants the app capability `kradalby.no/cap/asparges`
+with `{"admin": true}`. Reaching the node is not enough (Prometheus does):
+
+```json
+{
+  "grants": [
+    {
+      "src": ["group:asparges-admin"],
+      "dst": ["tag:asparges"],
+      "ip": ["tcp:80", "tcp:443"],
+      "app": { "kradalby.no/cap/asparges": [{ "admin": true }] }
+    }
+  ]
+}
+```
+
+In `--dev` the loopback listener carries the admin and everyone is
+"Utvikler". `--e2e-fixtures <the front end's e2e/admin/fixtures>` adds the
+browser tests' hooks (`POST /__reset` deletes everything and seeds their
+data; `POST /__touch/{id}`), so they run against the real server; it is
+refused without `--dev`.
+
 ## elm-pages version (pinned to v2)
 
 This site is intentionally pinned to **elm-pages 2** (`elm-pages@2.1.12` on npm,
