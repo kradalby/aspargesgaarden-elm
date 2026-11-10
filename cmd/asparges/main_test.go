@@ -133,3 +133,20 @@ func TestServeConfigValidate(t *testing.T) {
 		})
 	}
 }
+
+// The browser tests' hooks delete everything; a served admin folder skips
+// the built-in app. Neither may reach a real deploy.
+func TestServeDevOnlyFlags(t *testing.T) {
+	prod := serveConfig{baseURL: "https://aspargesgaarden.no", listenAddr: "127.0.0.1:8090"}
+
+	for _, c := range []serveConfig{
+		{adminDir: "/tmp/admin"},
+		{e2eFixtures: "/tmp/fixtures"},
+	} {
+		c.baseURL, c.listenAddr = prod.baseURL, prod.listenAddr
+		require.ErrorIs(t, c.validate(), errDevOnly)
+
+		c.dev = true
+		require.NoError(t, c.validate())
+	}
+}

@@ -1,5 +1,5 @@
 // Command asparges serves aspargesgaarden.no. Public pages go out on a local
-// listener that nginx exposes to the internet; metrics, debug and (later) the
+// listener that nginx exposes to the internet; metrics, debug and the
 // admin app are served only on the service's own tsnet node.
 //
 // Flags may also be set through ASPARGES_-prefixed environment variables
@@ -78,6 +78,8 @@ type serveConfig struct {
 	authKeyPath string
 	dev         bool
 	noindex     bool
+	adminDir    string
+	e2eFixtures string
 }
 
 func newRootCmd(a *app) *ff.Command {
@@ -100,8 +102,10 @@ func newServeCmd(a *app, parent *ff.FlagSet) *ff.Command {
 	fs.StringVar(&cfg.hostname, 0, "hostname", "asparges", "tailnet hostname of the admin node")
 	fs.StringVar(&cfg.baseURL, 0, "base-url", "https://aspargesgaarden.no", "public origin used for absolute links, without a trailing slash")
 	fs.StringVar(&cfg.authKeyPath, 0, "tailscale-auth-key-path", "", "file holding the Tailscale auth key (TS_AUTHKEY takes precedence)")
-	fs.BoolVar(&cfg.dev, 0, "dev", "local development: no Tailscale, metrics on the loopback-only local listener")
+	fs.BoolVar(&cfg.dev, 0, "dev", "local development: no Tailscale, metrics and admin on the loopback-only local listener")
 	fs.BoolVar(&cfg.noindex, 0, "noindex", "keep the site out of search engines (beta): noindex on every response, robots.txt disallows all, no IndexNow")
+	fs.StringVar(&cfg.adminDir, 0, "admin-dir", "", "with --dev: serve the admin app from this folder (index.html, static/) instead of the built-in one")
+	fs.StringVar(&cfg.e2eFixtures, 0, "e2e-fixtures", "", "with --dev: the admin browser tests' photo folder; mounts their hooks POST /__reset (deletes everything) and /__touch/{id}")
 
 	return &ff.Command{
 		Name:      "serve",
@@ -122,6 +126,7 @@ func newServeCmd(a *app, parent *ff.FlagSet) *ff.Command {
 var (
 	errBaseURL     = errors.New("--base-url must be an http(s) origin without path, query or trailing slash")
 	errDevLoopback = errors.New("--dev serves metrics on the local listener, so --listen-addr must be a loopback address")
+	errDevOnly     = errors.New("--admin-dir and --e2e-fixtures need --dev")
 )
 
 func (c serveConfig) validate() error {
@@ -133,6 +138,10 @@ func (c serveConfig) validate() error {
 
 	if c.dev && !isLoopback(c.listenAddr) {
 		return fmt.Errorf("%w: %q", errDevLoopback, c.listenAddr)
+	}
+
+	if !c.dev && (c.adminDir != "" || c.e2eFixtures != "") {
+		return errDevOnly
 	}
 
 	return nil
@@ -189,9 +198,18 @@ func serve(ctx context.Context, log *slog.Logger, cfg serveConfig) error {
 	}
 	defer d.Close()
 
-	store := site.NewStore(d, time.Now)
+	now := time.Now
 
-	imgs, err := images.New(cfg.dataDir, store.Catalog(), images.WithLogger(log))
+	var e2eClk *e2eClock
+	if cfg.e2eFixtures != "" {
+		e2eClk = &e2eClock{}
+		now = e2eClk.now
+	}
+
+	store := site.NewStore(d, now)
+
+	imgs, err := images.New(cfg.dataDir, store.Catalog(), images.WithLogger(log),
+		images.WithSweep(func(ctx context.Context) error { return sweepUnusedPhotos(ctx, log, store) }))
 	if err != nil {
 		return fmt.Errorf("photo store: %w", err)
 	}
@@ -201,18 +219,44 @@ func serve(ctx context.Context, log *slog.Logger, cfg serveConfig) error {
 		return err
 	}
 
+	admin := server.AdminConfig{Photos: imgs}
+	if cfg.adminDir != "" {
+		admin.App = os.DirFS(cfg.adminDir)
+	}
+
+	if !cfg.dev {
+		lc := srv.TailscaleLocalClient()
+		if lc == nil {
+			return errors.New("tailscale local client unavailable: the admin cannot identify callers")
+		}
+
+		admin.Tailnet = lc
+	}
+
 	public := server.New(server.Config{
 		BaseURL:          cfg.baseURL,
 		Dev:              cfg.dev,
 		Store:            store,
 		Images:           imgs,
-		Now:              time.Now,
+		Now:              now,
 		Log:              log,
 		NoIndex:          cfg.noindex,
 		IndexNowKey:      key,
 		IndexNowEndpoint: cfg.indexNowEndpoint(),
+		Admin:            admin,
 	})
 	srv.Handle("/", public.Public())
+
+	// In --dev, Public carries the admin on the loopback listener.
+	if !cfg.dev {
+		srv.HandleTSOnly("/admin/", public.Admin())
+	}
+
+	if e2eClk != nil {
+		hooks := e2eHooks(store, imgs, public, cfg.e2eFixtures, e2eClk)
+		srv.Handle("POST /__reset", hooks)
+		srv.Handle("POST /__touch/{id}", hooks)
+	}
 
 	g, ctx := errgroup.WithContext(ctx)
 	g.Go(func() error { return srv.ListenAndServe(ctx) })
@@ -220,6 +264,26 @@ func serve(ctx context.Context, log *slog.Logger, cfg serveConfig) error {
 	g.Go(func() error { return public.Run(ctx) })
 
 	return g.Wait()
+}
+
+// unusedPhotoAge is how long a photo no event or gallery uses is kept after
+// its last upload, crop or description: a form left unsaved over a week's
+// break still finds its photos.
+const unusedPhotoAge = 7 * 24 * time.Hour
+
+// sweepUnusedPhotos runs before each reconcile, so the photo store removes
+// the deleted photos' files in the same pass.
+func sweepUnusedPhotos(ctx context.Context, log *slog.Logger, store *site.Store) error {
+	gone, err := store.DeleteUnusedPhotos(ctx, unusedPhotoAge)
+	if err != nil {
+		return err
+	}
+
+	if len(gone) > 0 {
+		log.InfoContext(ctx, "deleted unused photos", "count", len(gone), "sha256", gone)
+	}
+
+	return nil
 }
 
 // openData opens the database in the state directory, creating both.
