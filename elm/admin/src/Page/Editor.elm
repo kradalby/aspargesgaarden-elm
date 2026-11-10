@@ -1421,7 +1421,6 @@ cropDialog model =
                                     []
                               )
                             ]
-                        , div [ A.id "beskjaer-skarphet", attribute "aria-live" "polite", attribute "role" "status" ] [ sharpnessLine ]
                         , div [ class "flex flex-wrap gap-2 items-center", attribute "role" "group", attribute "aria-label" "Flytt eller endre rammen" ]
                             [ navButton "←" "Flytt rammen til venstre" (CropNudge -1 0)
                             , navButton "→" "Flytt rammen til høyre" (CropNudge 1 0)
@@ -1430,6 +1429,10 @@ cropDialog model =
                             , Ui.secondaryButton [] (CropResize 1.1) "Større"
                             , Ui.secondaryButton [] (CropResize (1 / 1.1)) "Mindre"
                             ]
+
+                        -- Below the buttons, which stay where the cropper
+                        -- leaves room for them.
+                        , div [ A.id "beskjaer-skarphet", attribute "aria-live" "polite", attribute "role" "status" ] [ sharpnessLine ]
                         ]
                     , div [ class "flex-[1_1_14rem] flex flex-col gap-4", attribute "role" "group", attribute "aria-label" "Utsnitt" ]
                         (List.map (cropChoice photo c) (Crop.kinds photo.quality))
@@ -1516,7 +1519,11 @@ cropChoice photo c kind =
     else
         div [ class "flex flex-col gap-2 items-start p-2", attribute "data-crop-unusable" kind.key ]
             [ span [ class "font-bold" ] [ text kind.usedFor ]
-            , Ui.help [] (fallbackText kind)
+            , if kind.quality.soft then
+                Ui.verdict "soft" [] [ fallbackText kind ++ " " ++ Text.softWhole, Text.askForOriginal ]
+
+              else
+                Ui.help [] (fallbackText kind)
             ]
 
 

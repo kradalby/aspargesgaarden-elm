@@ -270,11 +270,9 @@ verdict kind attrs lines =
     in
     div (class "flex gap-2 items-start" :: A.attribute "data-verdict" kind :: attrs)
         [ span [ A.attribute "aria-hidden" "true", class "shrink-0 inline-flex items-center justify-center w-6 h-6 rounded-full text-sm font-bold", class iconClass ] [ text icon ]
-        , div
-            [ class "flex flex-col gap-1 [overflow-wrap:anywhere]"
-            , A.classList [ ( "font-bold", kind == "soft" || kind == "error" ), ( "text-rust", kind == "error" ) ]
-            ]
-            (List.map (\l -> p [] [ text l ]) lines)
+        , div [ class "flex flex-col gap-1 [overflow-wrap:anywhere]", A.classList [ ( "text-rust", kind == "error" ) ] ]
+            -- A warning's verdict stands out; the advice after it does not.
+            (List.indexedMap (\i l -> p [ A.classList [ ( "font-bold", i == 0 && (kind == "soft" || kind == "error") ) ] ] [ text l ]) lines)
         ]
 
 
