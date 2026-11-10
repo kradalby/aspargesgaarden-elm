@@ -16,7 +16,7 @@ numbers.
 
 ```
 visitor ──▶ nginx vhost (TLS, ACME) ──▶ 127.0.0.1:<listenAddr>   public site
-admin   ──▶ tailnet ──▶ tsnet node <hostname>:80/443            /admin/, /metrics, /debug
+admin   ──▶ tailnet ──▶ tsnet node <hostname>:80/443            /admin/, /static/, /img/, kra's /metrics, /debug, …
 state: /var/lib/asparges/{asparges.db, originals/, variants/, tmp/, tsnet/}
 ```
 
@@ -33,7 +33,9 @@ state: /var/lib/asparges/{asparges.db, originals/, variants/, tmp/, tsnet/}
   body-size setting.
 - The admin answers only on the tsnet node, and only to callers with the app
   capability `kradalby.no/cap/asparges` = `{"admin": true}`. Reaching the
-  node is not enough.
+  node is not enough. Beside the admin, the node serves only `/static/` and
+  `/img/` (what the app loads) and kra's own routes (`/metrics`, `/debug`,
+  `/who`, `/quitquitquit`); every other path is `404` there.
 - The service makes no backups and schedules no snapshots. litestream and
   restic, configured on the host, do.
 
