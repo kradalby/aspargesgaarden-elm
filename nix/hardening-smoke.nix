@@ -1,4 +1,4 @@
-# The service's own sandbox on a real kernel: import, then serve --dev building
+# The service's own sandbox on a real kernel: import, then serve building
 # every variant, under systemd-run with the module's hardening, so a syscall,
 # W^X mapping or decoder path that only one architecture takes fails here and
 # not on deploy. It needs root and a running systemd, so it is a program CI
@@ -99,8 +99,10 @@ pkgs.writeShellApplication {
     run() { systemd-run --wait --pipe --collect ${props} -- "$@"; }
     run ${asparges} import --data-dir=${data} ${tree}
 
-    systemd-run --unit=asparges-smoke --collect --quiet ${props} -- \
-      ${asparges} serve --dev --data-dir=${data} --listen-addr=127.0.0.1:8099
+    # Not --dev: tsnet starts under the sandbox too (and, with no key, waits
+    # for a login it never gets).
+    systemd-run --unit=asparges-smoke --collect --quiet ${props} --setenv=TS_NO_LOGS_NO_SUPPORT=1 -- \
+      ${asparges} serve --data-dir=${data} --listen-addr=127.0.0.1:8099
     trap 'systemctl stop asparges-smoke.service; journalctl -u asparges-smoke.service --no-pager | tail -n 50' EXIT
     curl -fsS --retry 30 --retry-delay 1 --retry-all-errors -o /dev/null http://127.0.0.1:8099/
     # serve builds every size at start; each gallery picture answers once built.

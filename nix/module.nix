@@ -213,6 +213,17 @@ in
         RestrictNamespaces = true;
         LockPersonality = true;
         MemoryDenyWriteExecute = true;
+        # vips decodes uploads: give a compromised decoder as little as the
+        # server needs. Not ProcSubset=pid: tsnet reads /proc/net.
+        ProtectKernelLogs = true;
+        ProtectClock = true;
+        ProtectHostname = true;
+        ProtectProc = "invisible";
+        RestrictRealtime = true;
+        RestrictSUIDSGID = true;
+        PrivateIPC = true;
+        RemoveIPC = true;
+        SystemCallArchitectures = "native";
         SystemCallFilter = [ "@system-service" ];
         SystemCallErrorNumber = "EPERM";
       }
