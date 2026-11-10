@@ -10,6 +10,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"syscall"
 	"time"
 )
 
@@ -85,6 +86,10 @@ func (v *vips) run(ctx context.Context, untrusted bool, bin string, args ...stri
 			err = fmt.Errorf("%w (%w)", err, ctx.Err())
 		}
 
+		if !refused(ctx, err) {
+			err = fmt.Errorf("%w: %w", errInterrupted, err)
+		}
+
 		msg := stderr.Bytes()
 		if len(msg) > 1024 {
 			msg = msg[len(msg)-1024:]
@@ -94,6 +99,25 @@ func (v *vips) run(ctx context.Context, untrusted bool, bin string, args ...stri
 	}
 
 	return stdout.String(), nil
+}
+
+// errInterrupted marks a vips process that did not finish by itself: killed
+// by the OOM killer under the unit's MemoryMax, timed out, stopped with the
+// service, or never started. It says nothing about the photo, so it must not
+// become ErrBroken or ErrUnsupported.
+var errInterrupted = errors.New("vips did not finish")
+
+// refused reports whether vips ended by itself with an error: its verdict
+// on the file. SIGKILL is the OOM killer's and the context's signal.
+func refused(ctx context.Context, err error) bool {
+	var ee *exec.ExitError
+	if ctx.Err() != nil || !errors.As(err, &ee) {
+		return false
+	}
+
+	ws, ok := ee.Sys().(syscall.WaitStatus)
+
+	return !ok || !ws.Signaled() || ws.Signal() != syscall.SIGKILL
 }
 
 // header is what preflight learns about an original. Width and Height are
@@ -108,7 +132,7 @@ type header struct {
 func (v *vips) preflight(ctx context.Context, path, mime string) (header, error) {
 	out, err := v.run(ctx, true, v.header, "-f", "vips-loader", "-f", "width", "-f", "height", path)
 	if err != nil {
-		return header{}, fmt.Errorf("%w: %w", ErrUnsupported, err)
+		return header{}, verdict(ErrUnsupported, err)
 	}
 
 	f := strings.Split(strings.TrimSpace(out), "\n")
@@ -172,7 +196,7 @@ func (v *vips) intField(ctx context.Context, path, field string) (int, error) {
 			return 0, nil
 		}
 
-		return 0, fmt.Errorf("%w: %w", ErrBroken, err)
+		return 0, verdict(ErrBroken, err)
 	}
 
 	n, err := strconv.Atoi(strings.TrimSpace(out))
@@ -190,10 +214,20 @@ func (v *vips) decode(ctx context.Context, orig, out string, width int) error {
 	_, err := v.run(ctx, true, v.vips, "thumbnail", orig, out, strconv.Itoa(width),
 		"--height", noHeight, "--size", "down", "--output-profile", "srgb", "--fail-on", "error")
 	if err != nil {
-		return fmt.Errorf("%w: %w", ErrBroken, err)
+		return verdict(ErrBroken, err)
 	}
 
 	return nil
+}
+
+// verdict wraps err in what it says about the file, unless vips was
+// interrupted and so said nothing.
+func verdict(about, err error) error {
+	if errors.Is(err, errInterrupted) {
+		return err
+	}
+
+	return fmt.Errorf("%w: %w", about, err)
 }
 
 // crop is stage 2, on our own intermediate.

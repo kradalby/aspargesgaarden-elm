@@ -2,6 +2,8 @@ package images
 
 import (
 	"context"
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -88,6 +90,39 @@ func TestDecodeFails(t *testing.T) {
 	err := v.decode(context.Background(), fixture(t, "truncated.jpg"), out, 480)
 	require.ErrorIs(t, err, ErrBroken)
 	require.ErrorContains(t, err, "premature end of JPEG")
+}
+
+// A vips the machine killed, or one stopped with its context, says nothing
+// about the photo: never "damaged" or "not a photo".
+func TestInterruptedIsNoVerdict(t *testing.T) {
+	t.Parallel()
+	ctx := t.Context()
+	upright := fixture(t, "upright.jpg")
+
+	killed := filepath.Join(t.TempDir(), "killed")
+	require.NoError(t, os.WriteFile(killed, []byte("#!/bin/sh\nkill -KILL $$\n"), 0o700)) //nolint:gosec // a test's own script
+
+	v := newTestVips(t)
+	v.vips, v.header = killed, killed
+
+	err := v.decode(ctx, upright, filepath.Join(t.TempDir(), "out.v"), 480)
+	require.ErrorIs(t, err, errInterrupted)
+	require.Equal(t, ReasonInternal, ReasonOf(err))
+
+	_, err = v.preflight(ctx, upright, "image/jpeg")
+	require.ErrorIs(t, err, errInterrupted)
+	require.Equal(t, ReasonInternal, ReasonOf(err))
+
+	stopped, cancel := context.WithCancel(ctx)
+	cancel()
+
+	err = newTestVips(t).decode(stopped, fixture(t, "truncated.jpg"), filepath.Join(t.TempDir(), "out.v"), 480)
+	require.NotErrorIs(t, err, ErrBroken)
+
+	// The file's own fault still is one.
+	err = newTestVips(t).decode(ctx, fixture(t, "truncated.jpg"), filepath.Join(t.TempDir(), "out.v"), 480)
+	require.ErrorIs(t, err, ErrBroken)
+	require.NotErrorIs(t, err, errInterrupted)
 }
 
 func TestRunEnvironment(t *testing.T) {
