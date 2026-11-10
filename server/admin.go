@@ -191,6 +191,9 @@ func requestHost(r *http.Request) string {
 	host := r.Host
 	if h, _, err := net.SplitHostPort(host); err == nil {
 		host = h
+	} else {
+		// An IPv6 address without a port keeps its brackets in Host.
+		host = strings.TrimSuffix(strings.TrimPrefix(host, "["), "]")
 	}
 
 	return strings.ToLower(strings.TrimSuffix(host, "."))

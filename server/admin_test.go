@@ -260,6 +260,9 @@ func TestAdminAccess(t *testing.T) {
 		{"admin user", kristine, "", true},
 		{"admin user by short name", kristine, "asparges", true},
 		{"admin user by address", kristine, "100.64.0.100:80", true},
+		// What a browser sends for http://[fd7a:115c:a1e0::100]/admin/.
+		{"admin user by IPv6 address", kristine, "[fd7a:115c:a1e0::100]", true},
+		{"admin user by IPv6 address and port", kristine, "[fd7a:115c:a1e0::100]:80", true},
 		{"tailnet user without the grant", anders, "", false},
 		{"monitoring node", monitor, "", false},
 		{"no identity", stranger, "", false},
