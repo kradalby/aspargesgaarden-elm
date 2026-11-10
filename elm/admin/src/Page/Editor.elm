@@ -794,7 +794,7 @@ actionBar model =
               else
                 Ui.badge "draft" "Kladd – vises ikke på nettsiden"
             , if isDirty model then
-                span [ class "text-brown-text" ] [ text "Ikke lagret" ]
+                span [ class "text-sort/70" ] [ text "Ikke lagret" ]
 
               else
                 text ""
@@ -1004,7 +1004,7 @@ formView siteUrl model =
                     "text-rust font-bold"
 
                  else
-                    "text-brown-text"
+                    "text-sort/70"
                 )
             ]
             [ text

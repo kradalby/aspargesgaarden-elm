@@ -309,7 +309,7 @@ view : Model -> Browser.Document Msg
 view model =
     { title = title model.page ++ " – " ++ Venue.name ++ " admin"
     , body =
-        [ div [ class "min-h-screen bg-brown/20 text-sort font-sans text-lg leading-normal" ]
+        [ div [ class "min-h-screen bg-brown/10 text-sort font-sans text-lg leading-normal" ]
             [ a [ A.href "#innhold", class "sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-50 focus:bg-white focus:p-3 focus:rounded-lg" ] [ text "Hopp til innholdet" ]
             , siteHeader model
             , main_ [ A.id "innhold", A.tabindex -1, class "max-w-7xl mx-auto px-4 md:px-8 py-6 md:py-10 focus:outline-none" ]
@@ -405,7 +405,7 @@ siteHeader model =
         [ div [ class "max-w-7xl mx-auto px-4 md:px-8 py-3 flex flex-wrap gap-x-8 gap-y-2 items-center justify-between" ]
             [ div [ class "flex flex-wrap items-baseline gap-x-3" ]
                 [ span [ class "font-display text-3xl text-sort" ] [ text Venue.name ]
-                , span [ class "text-brown-text text-base" ] [ text "Administrasjon" ]
+                , span [ class "text-sort/70 text-base" ] [ text "Administrasjon" ]
                 ]
             , nav [ attribute "aria-label" "Hovedmeny", class "flex flex-wrap gap-2" ]
                 [ navLink Route.Overview "Arrangementer" onEvents
@@ -414,7 +414,7 @@ siteHeader model =
             , div [ class "flex flex-wrap gap-x-5 gap-y-1 items-center text-base" ]
                 [ case model.me of
                     Just me ->
-                        p [ class "text-brown-text" ] [ text ("Logget inn som " ++ me.name) ]
+                        p [ class "text-sort/70" ] [ text ("Logget inn som " ++ me.name) ]
 
                     Nothing ->
                         text ""

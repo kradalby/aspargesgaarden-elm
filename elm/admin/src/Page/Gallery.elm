@@ -399,7 +399,7 @@ view model =
 
             Ready ->
                 if List.isEmpty photos then
-                    p [ class "text-brown-text italic" ] [ text "Galleriet er tomt. Trykk «Legg til bilder» for å legge inn bilder." ]
+                    p [ class "text-sort/70 italic" ] [ text "Galleriet er tomt. Trykk «Legg til bilder» for å legge inn bilder." ]
 
                 else
                     ul [ class "grid gap-5 sm:grid-cols-2 xl:grid-cols-3" ] (List.indexedMap (photoCard model (List.length photos)) photos)

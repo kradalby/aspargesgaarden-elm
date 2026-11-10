@@ -233,7 +233,7 @@ listSection model s =
             , Ui.help [] s.help
             ]
         , if List.isEmpty s.events then
-            p [ class "text-brown-text italic" ] [ text s.empty ]
+            p [ class "text-sort/70 italic" ] [ text s.empty ]
 
           else
             div [ class "flex flex-col gap-3" ] (List.map (eventRow model) s.events)
@@ -270,7 +270,7 @@ eventRow model e =
                     text ""
                 ]
             , h3 [ class "font-display text-tre text-2xl leading-tight" ] [ text (titleOf e) ]
-            , p [ class "text-brown-text" ]
+            , p [ class "text-sort/70" ]
                 [ text
                     (if e.dateText == "" then
                         "Dato er ikke satt"

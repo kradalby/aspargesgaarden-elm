@@ -162,7 +162,7 @@ field f =
 
 help : List (Attribute msg) -> String -> Html msg
 help attrs s =
-    p (class "text-brown-text text-base [overflow-wrap:anywhere]" :: attrs) [ text s ]
+    p (class "text-sort/70 text-base [overflow-wrap:anywhere]" :: attrs) [ text s ]
 
 
 errorText : String -> List String -> Html msg

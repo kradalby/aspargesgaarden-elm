@@ -1026,3 +1026,74 @@ test("the page's address is on this site, not a fixed domain", async ({
   );
   await expect(page.getByText("aspargesgaarden.no")).toHaveCount(0);
 });
+
+// Text on the page whose colour, laid over what is behind it, is under
+// WCAG AA: 4.5:1, or 3:1 for large text. Disabled controls are exempt.
+async function lowContrast(page) {
+  return page.evaluate(() => {
+    const ctx = document
+      .createElement("canvas")
+      .getContext("2d", { willReadFrequently: true });
+    const rgba = (css) => {
+      ctx.clearRect(0, 0, 1, 1);
+      ctx.fillStyle = css;
+      ctx.fillRect(0, 0, 1, 1);
+      const d = ctx.getImageData(0, 0, 1, 1).data;
+      return [d[0], d[1], d[2], d[3] / 255];
+    };
+    const over = (top, under) =>
+      under.map((u, i) => (i < 3 ? top[i] * top[3] + u * (1 - top[3]) : 1));
+    const lum = ([r, g, b]) => {
+      const ch = (v) => {
+        v /= 255;
+        return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4;
+      };
+      return 0.2126 * ch(r) + 0.7152 * ch(g) + 0.0722 * ch(b);
+    };
+    const backdrop = (el) => {
+      const chain = [];
+      for (let e = el; e; e = e.parentElement) chain.unshift(e);
+      return chain.reduce(
+        (bg, e) => over(rgba(getComputedStyle(e).backgroundColor), bg),
+        [255, 255, 255, 1],
+      );
+    };
+    const bad = [];
+    for (const el of document.querySelectorAll("body *")) {
+      const own = [...el.childNodes].some(
+        (n) => n.nodeType === 3 && n.textContent.trim(),
+      );
+      if (!own || el.closest("[disabled], .sr-only, iframe")) continue;
+      const r = el.getBoundingClientRect();
+      if (!r.width || !r.height) continue;
+      const cs = getComputedStyle(el);
+      const bg = backdrop(el);
+      const fg = over(rgba(cs.color), bg);
+      const [hi, lo] = [lum(fg), lum(bg)].sort((a, b) => b - a);
+      const ratio = (hi + 0.05) / (lo + 0.05);
+      const size = parseFloat(cs.fontSize);
+      const large =
+        size >= 24 || (size >= 18.66 && Number(cs.fontWeight) >= 700);
+      if (ratio < (large ? 3 : 4.5))
+        bad.push(`${ratio.toFixed(2)} ${el.textContent.trim().slice(0, 50)}`);
+    }
+    return bad;
+  });
+}
+
+test("every text in the admin is readable against what is behind it", async ({
+  page,
+  seed,
+}) => {
+  await page.goto("/admin/");
+  await expect(
+    page.getByRole("heading", { name: "Takkebakstkurs" }),
+  ).toBeVisible();
+  expect(await lowContrast(page)).toEqual([]);
+  await page.goto("/admin/galleri");
+  await expect(page.getByText("Bilde 2 av 2")).toBeVisible();
+  expect(await lowContrast(page)).toEqual([]);
+  await page.goto(`/admin/arrangementer/${seed.course}`);
+  await expect(page.getByLabel("Tittel")).toHaveValue("Takkebakstkurs");
+  expect(await lowContrast(page)).toEqual([]);
+});
