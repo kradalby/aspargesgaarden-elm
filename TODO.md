@@ -78,6 +78,9 @@ yet.
       poster strip) is refused as `unsupported_type`: WebP and AVIF stop at
       16383 px a side, and even its 480 px wide size is taller. Give it a
       reason code and a text of its own if it ever happens.
+- [ ] `images.Store.Status` loads its photo from the database again, though
+      every caller in `server/` already has it: about a fifth of the time of
+      `GET /admin/api/events`. Pass the photo in (`Status(images.Photo)`).
 
 ## Content for the owners to check
 
