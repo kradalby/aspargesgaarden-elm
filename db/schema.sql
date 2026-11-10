@@ -115,3 +115,10 @@ CREATE TABLE gallery_photos (
     position   INTEGER NOT NULL UNIQUE CHECK (position >= 0),
     updated_at INTEGER NOT NULL
 );
+
+-- settings holds values the service makes once and then keeps, such as the
+-- IndexNow key search engines check the site's pings against.
+CREATE TABLE settings (
+    name  TEXT PRIMARY KEY,
+    value TEXT NOT NULL
+) WITHOUT ROWID;

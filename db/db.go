@@ -33,6 +33,16 @@ var dbSchema string
 var schema = &squibble.Schema{
 	Current:      dbSchema,
 	IgnoreTables: []string{"_litestream_seq", "_litestream_lock"},
+	Updates: []squibble.UpdateRule{
+		{
+			Source: "db50b8097147ab6b24a06f3c5535ef7e4351cf2324754ef6469294668d924a61",
+			Target: "7a8d1b74975279810b002c7c1a615cbe118ecfecc88f90ae57ac7662c373661f",
+			Apply: squibble.Exec(`CREATE TABLE settings (
+    name  TEXT PRIMARY KEY,
+    value TEXT NOT NULL
+) WITHOUT ROWID;`),
+		},
+	},
 }
 
 // DB is the asparges store.
