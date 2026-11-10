@@ -55,6 +55,13 @@ yet.
 - [ ] The first deploy on `core.oracldn` (aarch64): the checklist in
       [docs/deploy.md](docs/deploy.md#7-verify--the-first-real-arm-deploy).
 
+## Known limits
+
+- [ ] A photo over about 34 times taller than wide (a long screenshot, a
+      poster strip) is refused as `unsupported_type`: WebP and AVIF stop at
+      16383 px a side, and even its 480 px wide size is taller. Give it a
+      reason code and a text of its own if it ever happens.
+
 ## Content for the owners to check
 
 - [ ] "Vårkonsert med Black & Lekker" (2026) is a draft: its only photo is
