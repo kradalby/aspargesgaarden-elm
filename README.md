@@ -1,92 +1,125 @@
-# Aspargesgaarden
+# asparges
 
-Elm/elm-pages 2 static site for [aspargesgaarden.no](https://aspargesgaarden.no).
+The web server for [aspargesgaarden.no](https://aspargesgaarden.no): one Go
+binary that renders the public site and serves a small admin app to the
+farm's owners over Tailscale.
 
-## asparges (the Go rewrite on this branch)
+- **Public pages** are HTML rendered in Go with
+  [elem-go](https://github.com/chasefleming/elem-go) components, kept in
+  memory after the first request and thrown away on any change. They work
+  without JavaScript; the only script is the gallery lightbox (Elm), on pages
+  that show a gallery.
+- **Content** (events, the Christmas market, the gallery, photographers)
+  lives in SQLite. Photos are uploaded originals, cropped and resized by
+  [libvips](https://www.libvips.org/) into AVIF, WebP and JPEG.
+- **The admin** (`/admin/`, an Elm app and its JSON API) is reachable only on
+  the service's own tsnet node, for tailnet users granted the app capability
+  `kradalby.no/cap/asparges`.
+- **Deployment** is a NixOS module, `services.asparges`; see
+  [docs/deploy.md](docs/deploy.md).
 
-The new site is one Go binary. Its stylesheet, fonts and fixed-page photos
-are built by `static/build.sh` into `static/dist/` (git-ignored) and embedded
-with `go:embed`. The Nix build runs the same script, so nothing here differs
-from what ships.
+Open work is in [TODO.md](TODO.md). Rules for changing the code are in
+[AGENTS.md](AGENTS.md).
+
+## Layout
+
+| Path                       | What                                                                                                                         |
+| -------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| `cmd/asparges`             | The binary: `serve`, `import`, `images check\|gc\|warm`. Flags also read `ASPARGES_*` environment variables.                 |
+| `cmd/imagesbuild`          | Builds the embedded photos' variants at build time, with the same `images` code.                                             |
+| `cmd/vendorhash`           | Keeps `flakehashes.json` in step with `go.mod`.                                                                              |
+| `ui/`                      | The component kit: one file per component, typed props, golden tests.                                                        |
+| `pages/`                   | Pages composed from `ui/`, and the admin's HTML document.                                                                    |
+| `markdown/`                | Event text (Markdown) to elem-go nodes. Raw HTML is off.                                                                     |
+| `seo/`                     | Head tags, JSON-LD, sitemap, robots, IndexNow, `llms.txt`, crawler metrics.                                                  |
+| `render/`                  | The lazy page store: render once, keep bytes, gzip and ETag.                                                                 |
+| `server/`                  | Routes, redirects from the old addresses, the admin API and its capability check.                                            |
+| `site/`                    | Domain logic: events, gallery, slugs, Oslo dates, publish rules.                                                             |
+| `db/`                      | `schema.sql`, `queries/`, sqlc output in `dbsqlc/`.                                                                          |
+| `images/`                  | Every image file: originals, crops, variants, URLs, the vips pipeline, cleanup.                                              |
+| `static/`                  | Embedded assets: Tailwind input, font sources, logo and icons, fixed-page photo masters, and `build.sh` that builds `dist/`. |
+| `elm/admin`, `elm/gallery` | The two Elm apps.                                                                                                            |
+| `golden/`                  | The golden-file helper.                                                                                                      |
+| `nix/`                     | The NixOS module, its eval test, two VM tests, the hardening smoke, the slim vips.                                           |
+| `e2e/admin`, `e2e/gallery` | Browser suites.                                                                                                              |
+| `docs/`                    | [Admin API contract](docs/admin-api.md), [deploy runbook](docs/deploy.md).                                                   |
+
+## Build
+
+```bash
+nix build              # ./result/bin/asparges, vips on its PATH
+nix flake check        # every check below, including two NixOS VM tests (need KVM)
+```
+
+The Nix build is offline: Go modules, Elm packages and the admin's npm
+packages are pinned (`flakehashes.json`, `elm/<app>/elm-srcs.nix`,
+`elm/admin/yarn.lock`) and everything the pages use is embedded in the binary.
+
+## Local loop
 
 ```bash
 nix develop
-go generate ./static        # CSS, WOFF2 fonts, photo variants into static/dist
-go test ./...               # needs static/dist; the first generate takes ~45 s
-go run ./cmd/asparges serve --dev --listen-addr 127.0.0.1:8090 \
-  --base-url http://127.0.0.1:8090 --data-dir /tmp/asparges
+go generate ./static   # static/dist: CSS, WOFF2 fonts, photo variants, Elm apps
+go test ./...          # needs static/dist and vips (the dev shell has it)
+go run ./cmd/asparges import --data-dir /tmp/asparges cmd/asparges/testdata/oldsite
+go run ./cmd/asparges serve --dev --data-dir /tmp/asparges \
+  --listen-addr 127.0.0.1:8090 --base-url http://127.0.0.1:8090
 ```
 
-- Changed Go markup or classes: rerun `go generate ./static` (Tailwind only
-  emits classes it finds in `ui/`, `pages/`, `markdown/`, `elm/`; fonts are skipped
-  unless their source is newer, photo variants unless missing), then restart
-  `go run`.
-- Fixed-page photos: one master per photo in `static/photos-src/`
-  (`<name>.jpg`, at most ~2400 px and under 1 MB). The photo step runs
-  `go run ./cmd/imagesbuild`, the same `images` pipeline that builds uploaded
-  photos, into `static/dist/photos/` with a `manifest.json`; pages ask for
-  `static.Photo("<name>")`. A replaced master gets new variant names, and the
-  old ones are removed on the next generate.
-- Events and gallery from the old site: `go run ./cmd/asparges import
-  --data-dir /tmp/asparges .` (this checkout; about a minute, mostly the
-  gallery photos). Run it before `serve`: a running server keeps its
-  rendered pages until the next change. Running it again changes nothing.
-- Changed markup on purpose: `UPDATE_GOLDEN=1 go test ./...`, then review
-  the diff of the `testdata/*.html` golden files.
-- Avenir's 400 weight is Medium; switch to Roman by changing the one
-  `@font-face` line in `static/theme.css`.
-- Pages may load nothing from outside the binary except the origins in
-  `ui/external.go` (Umami, the Google calendar frame). Tests check the
-  rendered pages and the stylesheet; every public response carries the
-  matching Content-Security-Policy.
-- Settings beside `--base-url`: `--noindex` (beta: kept out of search
-  engines) and `--umami-site-id` (`ASPARGES_UMAMI_SITE_ID`, module option
-  `services.asparges.umamiSiteId`): the site's id on umami.kradalby.no.
-  Unset, pages carry no tracker and the CSP no Umami origin; set, the
-  tracker reports only from the host of `--base-url`.
-- Every `serve` setting is also a `services.asparges` option in
-  `nix/module.nix` (`dataDir`, `listenAddr`, `hostname`, `baseURL`,
-  `tailscaleKeyPath`, `noindex`, `umamiSiteId`, `logLevel`); a test in
-  `cmd/asparges` fails on a flag the module does not pass. Only the
-  dev-only `--dev` and `--e2e-fixtures` are left out on purpose.
+Open <http://127.0.0.1:8090/> and the admin at
+<http://127.0.0.1:8090/admin/>. `--dev` runs without Tailscale: the admin and
+metrics share the loopback listener and everyone is "Utvikler". The import
+fills an empty data directory with the test fixture (five events, a
+gallery); without it the site starts empty and the admin fills it.
 
-### Elm apps and the gallery
+- `go generate ./static` again after changing classes in Go or Elm code
+  (Tailwind emits only the classes it finds), a font, a photo master or an
+  Elm app; then restart `serve`. Fonts and photo variants are rebuilt only
+  when their source changed. `cd static && ./build.sh dist admin` builds one
+  step.
+- Changed markup on purpose: `UPDATE_GOLDEN=1 go test ./...`, then review the
+  diff of the `testdata/*.html` golden files.
+- Changed `db/schema.sql` or `db/queries/`: `sqlc generate`.
+- Changed `go.mod`: `go run ./cmd/vendorhash update`.
+- Changed an Elm app's `elm.json`: `cd elm/<app> && elm2nix convert > elm-srcs.nix && elm2nix snapshot`.
+- Changed `elm/admin/yarn.lock`: put the new hash under `yarn.admin` in
+  `flakehashes.json` (the build's error prints it).
 
-Each Elm app lives in `elm/<app>/` with its own `elm.json`, its packages
-pinned for the offline Nix build in `elm-srcs.nix` and `registry.dat`, and
-main module `src/<App>.elm`. `go generate ./static` builds every app
-(`elm make --optimize`, then esbuild minifies) into `static/dist/<app>.js`,
-with `elm/<app>/boot.js` appended when present; pages run no inline script.
+`nix fmt` formats everything; the pre-commit hooks (`prek install`) run it,
+golangci-lint and `go test`.
 
-```bash
-go generate ./static                    # or, Elm only: cd static && ./build.sh dist gallery
-cd elm/gallery && elm-test-rs           # lightbox logic; also `nix flake check`
-cd elm/gallery && elm2nix convert > elm-srcs.nix && elm2nix snapshot   # after editing elm.json
-nix develop -c e2e/gallery/run.sh       # browser tests: Chromium, Firefox, WebKit
-```
+## Running it
 
-A new app: add `elm/<app>/` and its name to `elmApps` in `flake.nix`; the
-build, the `elm-test-<app>` check and the Tailwind scan of its classes
-follow. An app whose `boot.js` imports npm packages (the admin: Cropper.js,
-the Markdown toolbar) pins them in its own `package.json` and `yarn.lock`;
-build.sh bundles `boot.js` with esbuild, and Nix fetches the packages with
-`fetchYarnDeps` (hash under `yarn.<app>` in `flakehashes.json`).
+`asparges serve` takes these settings (flag, `ASPARGES_*` variable, and
+`services.asparges` option are the same setting):
 
-The gallery is `ui.Gallery(layout, photos...)` (`GalleryPage` on
-`/galleri`, `GalleryColumn` at the end of an event page): a grid of links to
-the large photos that works without JavaScript. `ui.Page` adds
-`/static/gallery.js` to any page holding one, and the lightbox opens over
-every gallery on the page. `e2e/gallery/run.sh` imports this checkout into
-`~/.cache/asparges-e2e/data` (kept with its variants; the first run takes a
-few minutes), serves it with `serve`'s wiring and the site's CSP, and writes
-screenshots to `e2e/gallery/out/`.
+| Flag                        | Module option      | Default                      |                                                                                 |
+| --------------------------- | ------------------ | ---------------------------- | ------------------------------------------------------------------------------- |
+| `--data-dir`                | `dataDir`          | `/var/lib/asparges`          | Database, photos, tsnet identity.                                               |
+| `--listen-addr`             | `listenAddr`       | `127.0.0.1:8090`             | Public site; nginx proxies to it.                                               |
+| `--base-url`                | `baseURL`          | `https://aspargesgaarden.no` | Origin for canonical and absolute links.                                        |
+| `--hostname`                | `hostname`         | `asparges`                   | The admin's tsnet node name.                                                    |
+| `--tailscale-auth-key-path` | `tailscaleKeyPath` | none                         | Auth key file for the first start; `TS_AUTHKEY` also works.                     |
+| `--noindex`                 | `noindex`          | off                          | Beta: `X-Robots-Tag: noindex`, `robots.txt` disallows all, no IndexNow.         |
+| `--umami-site-id`           | `umamiSiteId`      | none                         | Umami site on umami.kradalby.no. Unset: no tracker, no Umami origin in the CSP. |
+| `--log-level`               | `logLevel`         | `info`                       |                                                                                 |
 
-### Admin
+`--dev` and `--e2e-fixtures` are for local work and tests only and have no
+module option.
 
-The admin (`/admin/`, its JSON API under `/admin/api/`, see
-`docs/admin-api.md`) is served only on the service's tsnet node, to tailnet
-users the policy file grants the app capability `kradalby.no/cap/asparges`
-with `{"admin": true}`. Reaching the node is not enough (Prometheus does):
+State lives in the data directory: `asparges.db` (WAL mode),
+`originals/` (uploads as received), `variants/` (built sizes), `tmp/`, and
+`tsnet/`. A restore needs only the database and `originals/`; variants are
+rebuilt on request or with `asparges images warm`. `asparges images check`
+reports what `gc` would delete.
+
+Old addresses (`/events`, `/christmas/2026`, `/gallery`, …) redirect to the
+Norwegian ones; a table test in `server/` covers every row.
+
+### Admin access
+
+The admin and its API answer only on the tsnet node, and only to callers
+whose tailnet policy grants:
 
 ```json
 {
@@ -101,95 +134,44 @@ with `{"admin": true}`. Reaching the node is not enough (Prometheus does):
 }
 ```
 
-The app is `elm/admin`: `/static/admin.js` and its own stylesheet
-`/static/admin.css` (`static/admin-input.css`, sharing `static/theme.css`
-with `site.css`, so public pages carry no admin classes). The document it
-runs in is `pages.AdminHandler()`, under `ui.AdminCSP()`.
+Reaching the node is not enough: Prometheus reaches it for `/metrics` and
+gets `403` on `/admin/`. The API contract is
+[docs/admin-api.md](docs/admin-api.md).
 
-In `--dev` the loopback listener carries the admin and everyone is
-"Utvikler": `go run ./cmd/asparges serve --dev …` as above gives a working
-admin at `/admin/`. `--e2e-fixtures e2e/admin/fixtures` adds the browser
-tests' hooks (`POST /__reset` deletes everything and seeds their data;
-`POST /__touch/{id}`; `POST /__crop/{id}` stores crops unchecked); it is
-refused without `--dev`.
+## Tests
 
-```bash
-cd elm/admin && elm-test-rs              # decoders, form rules, crop arithmetic
-nix develop -c e2e/admin/run.sh         # Chromium at 1280 and 390 px, against serve --dev
-FAKE=1 nix develop -c e2e/admin/run.sh  # the same specs against the fake API, faster
-```
+- `go test ./...` runs the unit, golden and HTTP tests, and the image tests
+  against the real vips.
+- `nix flake check` runs every check: `build`, `gotest` (race),
+  `golangci-lint`, `formatting`, `generate` (sqlc drift), `photo-variants`,
+  `elm-test-admin`, `elm-test-gallery`, `module-eval`, and on x86_64-linux
+  the VM tests `vm-basic` (the unit, import, restore) and `vm-tsnet` (the
+  grant against headscale). CI runs each as its own job, the list read from
+  the flake; on aarch64 it runs `build`, `gotest` and the unit's sandbox on a
+  real kernel (`nix build .#hardening-smoke`, run as root).
+- `cd elm/<app> && elm-test-rs` runs one Elm app's tests.
 
-`e2e/admin/run.sh` runs the specs against a fresh `serve --dev
---e2e-fixtures`, checking the public pages the admin changes too. `FAKE=1`
-puts `e2e/admin/fake-server.mjs` (an in-memory stand-in for the API) behind
-the real admin document and files instead. Screenshots of every screen go to
-`e2e/admin/out/`.
+### Browser suites
 
-## elm-pages version (pinned to v2)
-
-This site is intentionally pinned to **elm-pages 2** (`elm-pages@2.1.12` on npm,
-`dillonkearns/elm-pages@9.0.0` on the Elm side). Do **not** upgrade to elm-pages 3+:
-v3 is a ground-up rewrite (different routing, data-fetching and build model) that
-would require rewriting the site. Dependency sweeps must keep these two pins; only
-the surrounding tooling (Nix inputs, CI actions) and v2-compatible packages are
-bumped.
-
-## Getting started
-
-Enter the Nix development shell (provides Elm, Node.js, Yarn, and all build tools):
-
-```
-nix develop
-```
-
-## Development
+Two Playwright suites, from the pinned nixpkgs, against a local server.
+Neither touches the network once its tools are built.
 
 ```bash
-# Start dev server with hot reload
-elm-pages dev
-
-# Build production site (outputs to dist/)
-elm-pages build
-
-# Format Elm code
-elm-format src/ --yes
+nix develop -c e2e/admin/run.sh         # admin in Chromium at 1280 and 390 px, against serve --dev
+FAKE=1 nix develop -c e2e/admin/run.sh  # the same specs against an in-memory fake API, faster
+nix develop -c e2e/gallery/run.sh       # gallery and lightbox in Chromium, Firefox and WebKit
 ```
 
-## Images
+The admin suite starts `serve --dev --e2e-fixtures e2e/admin/fixtures` on a
+fresh data directory and also checks the public pages the admin changes.
+The gallery suite imports `cmd/asparges/testdata/oldsite` and serves it with
+the server's wiring. Both write screenshots to `e2e/<suite>/out/`;
+`[playwright or pytest args]` narrow them (`-g crop`, `-k swipe`).
 
-After adding or replacing images in `public/`, generate resized and optimized versions:
-
-```bash
-# Process images (resize + WebP/AVIF conversion, incremental)
-process-images
-
-# Verbose output (shows which images are processed/skipped)
-process-images -v
-```
-
-Images are resized to multiple widths (320-2048px) and converted to WebP and AVIF formats.
-Generated files (`*_*w_resize.jpeg`, `*.webp`, `*.avif`) are excluded from git.
-
-Nix builds the variants for each original JPEG separately. Adding or replacing a
-photo rebuilds only that photo's variants; unchanged photos reuse their existing
-Nix store outputs or the CI binary cache. A lightweight build collects the results
-into `processedImages`. Changes to the image processing script or its pinned
-toolchain rebuild the affected image outputs.
-
-## Tailwind CSS
-
-Regenerate Tailwind CSS Elm modules after changing `tailwind.config.js`:
-
-```
-yarn elm-tailwind-modules --tailwind-config tailwind.config.js --dir ./src
-```
-
-## Build with Nix
-
-```bash
-# Build the full site as a Nix package
-nix build
-
-# Only process images
-nix build .#processedImages
-```
+Run them after changing the admin (`elm/admin`, `server/admin*`,
+`docs/admin-api.md`) or the gallery (`ui/gallery.go`, `elm/gallery`), and both
+before a deploy. They are not in CI: they run the local loop, whose first
+`go generate` downloads Elm and npm packages that the offline Nix build
+pins, and the gallery suite needs three browser engines and software GL.
+That is a lot of setup on every push for checks that only matter when those
+parts change.

@@ -1,29 +1,59 @@
-# Website maintenance
+# Agents
 
-- Keep elm-pages pinned to v2.
-- Follow existing layouts, typography, and formatting.
-- Preserve historical pages and events. Add year-specific routes for recurring pages and update menu links.
+`asparges` is one Go binary serving aspargesgaarden.no; see
+[README.md](README.md) for layout, build, the local loop and tests. House
+conventions (Go, Nix, Elm, git, services, secrets) are in
+`/home/kradalby/git/dotfiles/docs/conventions`.
 
-## Events
+## Rules the code holds you to
 
-- Add Markdown files to `content/events/`, following existing frontmatter.
-- Set `title`, `eventDate`, `publishedFrom`, and `photo`. Use `YYYY-MM-DD` dates and `HH:mm` times; publication must precede the first event date.
-- Use end-date/time fields for continuous events. Use `eventDates` for separate dates of the same course, keeping one listing.
-- Preserve supplied programme, price, venue, and registration details. Make phone and SMS registration clickable.
-- Check publication visibility, ordering, and upcoming/past placement before, between, and after event dates.
+- **HTML is elem-go, nothing else.** Pages compose components from `ui/`
+  (one file per component, typed props); no template language, no HTML
+  strings. A new piece of markup is a component, with a golden test.
+- **One image API.** Every photo on a page is `ui.Picture`, fed an
+  `images.ImageRef` that only `images/` makes. `TestPagesBuildNoRawImages`
+  fails on a raw `<img>`. Each photo kind has one widest-box constant in
+  `images/`; `TestLayoutsWithinSharpWidth` fails when a layout draws a kind
+  wider.
+- **Nothing is fetched at runtime.** Pages, CSS and JS load only from the
+  binary, plus the origins in `ui/external.go` (Umami, the Google calendar
+  frame), which also build the CSP header. Tests over the rendered pages,
+  `site.css`, `gallery.js` and the admin's files fail on any other address.
+  New JS libraries are pinned in the app's `yarn.lock` and bundled at build
+  time, never linked from a CDN.
+- **Every serve flag has a module option.** `TestEveryServeFlagIsInTheModule`
+  fails when a flag of `asparges serve` is not passed by `nix/module.nix`;
+  only `--dev` and `--e2e-fixtures` stay out. Document new options in
+  `docs/deploy.md`.
+- **Goldens are reviewed output.** `testdata/*.html` holds rendered markup,
+  one tag per line. Change on purpose with `UPDATE_GOLDEN=1 go test ./...`
+  and read the diff before committing.
+- **Old addresses keep working.** `TestAddresses` in `server/` lists every
+  redirect; never remove a row.
+- **Generated files stay in step.** `sqlc generate` after `db/` changes (the
+  `generate` check catches drift), `go run ./cmd/vendorhash update` after
+  `go.mod`, `elm2nix` after an `elm.json`, the `yarn.<app>` hash in
+  `flakehashes.json` after a `yarn.lock`.
+- **The admin API is a contract.** `docs/admin-api.md` describes it; change
+  both together. The fake in `e2e/admin/fake-server.mjs` follows it too.
 
-## Images
+## Elm apps
 
-- Preserve untouched, full-resolution originals in `grafikk/`. Put website JPEG masters in `public/`.
-- Inspect subjects before cropping; preserve faces, hands, and useful context.
-- Target approximately 4:5 for new event portrait crops, matching the course images. Reused photos may retain their original ratio.
-- Preserve aspect ratios when resizing and displaying images; never stretch them.
-- Use `process-images` locally and cached per-image Nix builds in CI. Never commit generated variants or force unnecessary regeneration.
+Each app is `elm/<app>/` with its own `elm.json`, `src/<App>.elm`,
+`elm-srcs.nix` and `registry.dat`, and optional `boot.js` (and
+`package.json`/`yarn.lock` if it bundles npm packages). Adding one is adding
+its name to `elmApps` in `flake.nix`: the build, the `elm-test-<app>` check
+and the Tailwind class scan follow. Pages load it from `/static/<app>.js`;
+no inline script (CSP `script-src 'self'`).
 
-## Validation and publishing
+## Checks before you hand work back
 
-- Use the Nix development shell. Run a local server and capture desktop/mobile screenshots.
-- Check dates, registration links, image proportions, broken images, and overflow.
-- Run the Nix build and formatting check. Avoid bulk formatting event Markdown with JSON frontmatter.
-- Use the commit skill and mandatory hooks. Push only when authorized.
-- Follow both CI and GitHub Pages deployment. Verify updated content and images on the public site before reporting it live.
+- `go test ./...` (after `go generate ./static`), golangci-lint at zero
+  findings, `nix fmt`. Never hand-edit Go imports: `goimports -w`.
+- `nix flake check` for anything touching Nix, the module or the build.
+- The browser suites when you touched what they cover (README, "Browser
+  suites"): `nix develop -c e2e/admin/run.sh`, `nix develop -c e2e/gallery/run.sh`.
+- Commits: `area: imperative summary`, lowercase, no trailing period; hooks
+  on, never `--no-verify`. No push unless asked.
+- Comments say why, never data that ages. Documents state facts and
+  commands, not history.
