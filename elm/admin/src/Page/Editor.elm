@@ -129,11 +129,11 @@ eventId =
     .id
 
 
-{-| Unsaved typing, or a photo still on its way up.
+{-| Unsaved typing, or a photo that leaving would lose.
 -}
 isDirty : Model -> Bool
 isDirty model =
-    model.form /= model.saved || List.any (\_ -> True) model.photos.uploads
+    model.form /= model.saved || Photos.unsaved model.photos
 
 
 status : Model -> String

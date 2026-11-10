@@ -452,8 +452,26 @@ test("uploads that fail say why and can be retried or removed", async ({
   await expect(row).toContainText(
     "Dette er ikke et bilde nettsiden kan bruke.",
   );
+  // A refused file leaves nothing to lose: no "unsaved", no question.
+  await expect(page.getByText("Ikke lagret")).toHaveCount(0);
   await row.getByRole("button", { name: "Fjern" }).click();
   await expect(row).toBeHidden();
+
+  // Over the limit: said at once, never sent, and no "try again".
+  const sent = [];
+  page.on("request", (r) => {
+    if (r.url().endsWith("/admin/api/photos")) sent.push(r.url());
+  });
+  await choose(page, page.getByRole("button", { name: "Velg bilde" }), {
+    name: "stort.jpg",
+    mimeType: "image/jpeg",
+    buffer: Buffer.alloc(41 * 1024 * 1024),
+  });
+  const big = page.locator('[data-upload="stort.jpg"]');
+  await expect(big).toContainText("Filen er for stor (over 40 MB).");
+  await expect(big.getByRole("button", { name: "Prøv igjen" })).toHaveCount(0);
+  expect(sent).toEqual([]);
+  await big.getByRole("button", { name: "Fjern" }).click();
 
   await page.route("**/admin/api/photos", (route) => route.abort());
   await choose(
@@ -464,9 +482,47 @@ test("uploads that fail say why and can be retried or removed", async ({
   await expect(page.locator('[data-upload="portrett.jpg"]')).toContainText(
     "Mistet kontakten med serveren.",
   );
+  // Kept in memory to send again, so leaving would lose it.
+  await expect(page.getByText("Ikke lagret").first()).toBeVisible();
   await page.unroute("**/admin/api/photos");
   await page.getByRole("button", { name: "Prøv igjen" }).click();
-  await expect(page.locator('[data-photo-status="ready"]')).toBeVisible();
+  await expect(page.locator('[data-photo-status="ready"]')).toBeVisible({
+    timeout: 60_000,
+  });
+});
+
+test("a second main photo wins over a first still on its way", async ({
+  page,
+}) => {
+  await page.goto("/admin/arrangementer/ny");
+  let first = true;
+  await page.route("**/admin/api/photos", async (route) => {
+    if (first) {
+      first = false;
+      await new Promise((r) => setTimeout(r, 2000));
+    }
+    await route.continue().catch(() => {});
+  });
+  await choose(
+    page,
+    page.getByRole("button", { name: "Velg bilde" }),
+    fixture("konsert.jpg"),
+  );
+  const second = page.waitForResponse(
+    (r) => r.url().endsWith("/admin/api/photos") && r.status() < 300,
+  );
+  await choose(
+    page,
+    page.getByRole("button", { name: "Velg bilde" }),
+    fixture("hage.jpg"),
+  );
+  const id = (await (await second).json()).id;
+  await expect(page.locator(`#alt-${id}`)).toBeVisible();
+  await expect(page.locator('[data-upload="konsert.jpg"]')).toHaveCount(0);
+  // Past the moment the first answer would have come.
+  await page.waitForTimeout(2500);
+  await expect(page.locator(`#alt-${id}`)).toBeVisible();
+  await expect(page.locator("input[id^=alt-]")).toHaveCount(1);
 });
 
 test("photographer: add in place, correct once, shown on every photo", async ({

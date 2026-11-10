@@ -204,6 +204,15 @@ unsaved model =
         model.uploads
 
 
+{-| The server's limit (images.MaxUpload). A bigger file is refused before
+it is sent: the server answers before reading it, which a browser often
+reports as a lost connection, inviting her to send it again.
+-}
+maxUpload : Int
+maxUpload =
+    40 * 1024 * 1024
+
+
 
 -- UPDATE
 
@@ -269,21 +278,51 @@ update msg model =
                 new =
                     List.indexedMap
                         (\i file ->
-                            { key = model.next + i, slot = slot, file = file, sent = 0, size = File.size file, state = Sending }
+                            { key = model.next + i
+                            , slot = slot
+                            , file = file
+                            , sent = 0
+                            , size = File.size file
+                            , state =
+                                if File.size file > maxUpload then
+                                    UploadFailed (Api.Problems [ { code = "too_large", field = Nothing, photoId = Nothing } ])
+
+                                else
+                                    Sending
+                            }
                         )
                         files
-            in
-            ( { model
-                | uploads = model.uploads ++ new
-                , next = model.next + List.length new
-                , announce =
-                    if List.length new == 1 then
-                        "Laster opp " ++ File.name f ++ " …"
+
+                sending =
+                    List.filter (\u -> u.state == Sending) new
+
+                -- One main photo: the newest choice wins, so an earlier one
+                -- still on its way must not land after it.
+                replaced =
+                    if slot == Main then
+                        uploadsFor Main model
 
                     else
-                        "Laster opp " ++ String.fromInt (List.length new) ++ " bilder …"
+                        []
+            in
+            ( { model
+                | uploads = List.filter (\u -> not (List.member u.key (List.map .key replaced))) model.uploads ++ new
+                , next = model.next + List.length new
+                , announce =
+                    case ( new, sending ) of
+                        ( [ u ], [] ) ->
+                            File.name u.file ++ ": " ++ Text.uploadFailure "too_large"
+
+                        ( _, [] ) ->
+                            Text.uploadFailure "too_large"
+
+                        ( [ _ ], _ ) ->
+                            "Laster opp " ++ File.name f ++ " …"
+
+                        _ ->
+                            "Laster opp " ++ String.fromInt (List.length sending) ++ " bilder …"
               }
-            , Cmd.batch (List.map send new)
+            , Cmd.batch (List.map (\u -> Http.cancel (tracker u.key)) replaced ++ List.map send sending)
             , []
             )
 
