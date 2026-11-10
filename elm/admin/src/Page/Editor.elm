@@ -1429,18 +1429,18 @@ cropDialog model =
                             , Ui.secondaryButton [] (CropResize 1.1) "Større"
                             , Ui.secondaryButton [] (CropResize (1 / 1.1)) "Mindre"
                             ]
-
-                        -- Below the buttons, which stay where the cropper
-                        -- leaves room for them.
-                        , div [ A.id "beskjaer-skarphet", attribute "aria-live" "polite", attribute "role" "status" ] [ sharpnessLine ]
                         ]
                     , div [ class "flex-[1_1_14rem] flex flex-col gap-4", attribute "role" "group", attribute "aria-label" "Utsnitt" ]
                         (List.map (cropChoice photo c) (Crop.kinds photo.quality))
                     ]
                 , Ui.errorText "beskjaer-feil" cropErrors
                 , Ui.help [] "Beskjæringen gjelder med en gang du trykker «Bruk», også hvis arrangementet allerede er publisert."
-                , div [ class "sticky bottom-0 -mx-4 md:-mx-8 -mb-4 md:-mb-8 px-4 md:px-8 py-4 bg-white flex flex-wrap gap-3 justify-end border-t border-brown" ]
-                    [ Ui.secondaryButton [] CloseCrop "Avbryt"
+                , div [ class "sticky bottom-0 -mx-4 md:-mx-8 -mb-4 md:-mb-8 px-4 md:px-8 py-4 bg-white flex flex-wrap gap-3 justify-end items-center border-t border-brown" ]
+                    -- In the sticky footer, beside Bruk: in sight on any
+                    -- screen, and its changing length never moves the frame
+                    -- she is dragging.
+                    [ div [ A.id "beskjaer-skarphet", attribute "aria-live" "polite", attribute "role" "status", class "flex-[1_1_18rem] min-w-0" ] [ sharpnessLine ]
+                    , Ui.secondaryButton [] CloseCrop "Avbryt"
                     , Ui.primaryButton [ A.disabled c.saving, A.autofocus True ]
                         SaveCrop
                         (if c.saving then

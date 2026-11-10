@@ -601,7 +601,10 @@ test("the crop dialog works from the keyboard and gives focus back", async ({
 // is 896), one step smaller is not, and the floor of 800 stops Mindre.
 test("the crop dialog says, as she goes, when a crop will look soft", async ({
   page,
-}) => {
+}, testInfo) => {
+  // A short laptop screen: the line must be in sight without scrolling.
+  const { width, height } = page.viewportSize();
+  await page.setViewportSize({ width, height: Math.min(height, 720) });
   await page.goto("/admin/arrangementer/4");
   await expect(page.locator("#bilde-uskarpt")).toHaveCount(0);
   await page.getByRole("button", { name: "Beskjær" }).click();
@@ -613,6 +616,16 @@ test("the crop dialog says, as she goes, when a crop will look soft", async ({
 
   await crop.getByRole("button", { name: "Mindre" }).click();
   await expect(line.locator("[data-verdict=soft]")).toBeVisible();
+  // As she sees it when she drags the frame: the dialog at its top, not
+  // scrolled down to the buttons as a click here does.
+  await crop.evaluate((d) => (d.scrollTop = 0));
+  await expect(line).toBeInViewport({ ratio: 1 });
+  await page.screenshot({
+    path: join(
+      process.env.OUT || "out",
+      `${testInfo.project.name}-uskarpt.png`,
+    ),
+  });
   await expect(line).toContainText(
     "Dette utsnittet blir uskarpt på nettsiden. Gjør rammen større, eller bruk et større bilde om du har det.",
   );
