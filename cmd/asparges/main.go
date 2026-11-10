@@ -86,7 +86,7 @@ func newRootCmd(a *app) *ff.Command {
 		Name:        "asparges",
 		Usage:       "asparges <SUBCOMMAND> [FLAGS]",
 		Flags:       fs,
-		Subcommands: []*ff.Command{newServeCmd(a, fs), newImagesCmd(a, fs)},
+		Subcommands: []*ff.Command{newServeCmd(a, fs), newImagesCmd(a, fs), newImportCmd(a, fs)},
 	}
 }
 

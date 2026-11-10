@@ -12,6 +12,7 @@ require (
 	github.com/stretchr/testify v1.12.1
 	github.com/tailscale/squibble v0.0.0-20260831233316-9a4c8961e6f5
 	github.com/yuin/goldmark v1.8.7
+	go.yaml.in/yaml/v3 v3.0.5
 	golang.org/x/net v0.60.0
 	golang.org/x/sync v0.25.0
 	golang.org/x/text v0.43.0
@@ -62,7 +63,6 @@ require (
 	github.com/tailscale/web-client-prebuilt v0.0.0-20260917222731-e0ed2d0d0fea // indirect
 	github.com/tailscale/wireguard-go v0.0.0-20260928213032-417aef361226 // indirect
 	github.com/x448/float16 v0.8.4 // indirect
-	go.yaml.in/yaml/v3 v3.0.5 // indirect
 	go4.org/mem v0.0.0-20240501181205-ae6ca9944745 // indirect
 	go4.org/netipx v0.0.0-20260823151212-3075585bcbeb // indirect
 	golang.org/x/crypto v0.58.0 // indirect
