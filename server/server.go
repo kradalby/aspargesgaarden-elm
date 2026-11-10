@@ -59,6 +59,8 @@ type Config struct {
 	// IndexNowEndpoint receives the addresses Changed affects; empty sends
 	// nothing (--dev, --noindex, tests).
 	IndexNowEndpoint string
+	// Admin is what Admin needs; see AdminConfig.
+	Admin AdminConfig
 }
 
 // Images is the photo store (images.Store) as the server uses it.
@@ -122,12 +124,21 @@ func (s *Server) Public() http.Handler {
 	mux.HandleFunc("GET /", s.route)
 
 	// --dev runs without tsnet, so its loopback-only listener stands in for
-	// the tailnet one to keep metrics reachable during local work.
+	// the tailnet one to keep metrics and the admin reachable during local
+	// work.
+	var admin http.Handler
 	if s.cfg.Dev {
 		mux.Handle("GET /metrics", promhttp.Handler())
+		admin = s.Admin()
 	}
 
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Every method, beside the pages' GET /: the mux cannot hold both.
+		if admin != nil && strings.HasPrefix(r.URL.Path, "/admin/") {
+			admin.ServeHTTP(w, r)
+			return
+		}
+
 		w.Header().Set("Content-Security-Policy", ui.CSP())
 		w.Header().Set("X-Content-Type-Options", "nosniff")
 		if s.cfg.NoIndex {
