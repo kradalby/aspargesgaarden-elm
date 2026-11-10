@@ -39,6 +39,11 @@ go run ./cmd/asparges serve --dev --listen-addr 127.0.0.1:8090 \
   `ui/external.go` (Umami, the Google calendar frame). Tests check the
   rendered pages and the stylesheet; every public response carries the
   matching Content-Security-Policy.
+- Settings beside `--base-url`: `--noindex` (beta: kept out of search
+  engines) and `--umami-site-id` (`ASPARGES_UMAMI_SITE_ID`, module option
+  `services.asparges.umamiSiteId`): the site's id on umami.kradalby.no.
+  Unset, pages carry no tracker and the CSP no Umami origin; set, the
+  tracker reports only from the host of `--base-url`.
 
 ### Elm apps and the gallery
 

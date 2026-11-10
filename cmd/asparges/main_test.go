@@ -71,6 +71,12 @@ func TestServeFlags(t *testing.T) {
 			env:  map[string]string{"ASPARGES_NOINDEX": "true"},
 			want: func(c *serveConfig) { c.noindex = true },
 		},
+		{
+			name: "umami",
+			args: []string{"serve"},
+			env:  map[string]string{"ASPARGES_UMAMI_SITE_ID": "11111111-2222-4333-8444-555555555555"},
+			want: func(c *serveConfig) { c.umamiSiteID = "11111111-2222-4333-8444-555555555555" },
+		},
 	}
 
 	for _, tt := range tests {

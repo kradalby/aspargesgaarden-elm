@@ -78,6 +78,7 @@ type serveConfig struct {
 	authKeyPath string
 	dev         bool
 	noindex     bool
+	umamiSiteID string
 	e2eFixtures string
 }
 
@@ -103,6 +104,7 @@ func newServeCmd(a *app, parent *ff.FlagSet) *ff.Command {
 	fs.StringVar(&cfg.authKeyPath, 0, "tailscale-auth-key-path", "", "file holding the Tailscale auth key (TS_AUTHKEY takes precedence)")
 	fs.BoolVar(&cfg.dev, 0, "dev", "local development: no Tailscale, metrics and admin on the loopback-only local listener")
 	fs.BoolVar(&cfg.noindex, 0, "noindex", "keep the site out of search engines (beta): noindex on every response, robots.txt disallows all, no IndexNow")
+	fs.StringVar(&cfg.umamiSiteID, 0, "umami-site-id", "", "the site's id on the Umami server; empty puts no tracker on the pages")
 	fs.StringVar(&cfg.e2eFixtures, 0, "e2e-fixtures", "", "with --dev: the admin browser tests' photo folder; mounts their hooks POST /__reset (deletes everything) and /__touch/{id}")
 
 	return &ff.Command{
@@ -239,6 +241,7 @@ func serve(ctx context.Context, log *slog.Logger, cfg serveConfig) error {
 		IndexNowKey:      key,
 		IndexNowEndpoint: cfg.indexNowEndpoint(),
 		Admin:            admin,
+		UmamiSiteID:      cfg.umamiSiteID,
 	})
 	srv.Handle("/", public.Public())
 

@@ -42,6 +42,7 @@ let
     listenAddr = "127.0.0.1:9000";
     baseURL = "https://beta.aspargesgaarden.no";
     noindex = true;
+    umamiSiteId = "11111111-2222-4333-8444-555555555555";
     tailscaleKeyPath = "/run/agenix/asparges-tskey";
     environmentFile = "/run/agenix/asparges-env";
   };
@@ -61,6 +62,11 @@ assert check (
 assert check (
   !lib.hasInfix "--noindex" default.ExecStart
 ) "the default must be indexable: ${default.ExecStart}";
+assert check (
+  !lib.hasInfix "--umami-site-id" default.ExecStart
+) "the default must load no tracker: ${default.ExecStart}";
+assert check (lib.hasInfix "--umami-site-id=11111111-2222-4333-8444-555555555555" custom.ExecStart)
+  "custom ExecStart missing umami-site-id: ${custom.ExecStart}";
 assert check (lib.hasInfix "--noindex" custom.ExecStart)
   "custom ExecStart missing noindex: ${custom.ExecStart}";
 assert check (lib.hasInfix "--hostname=asparges-beta" custom.ExecStart)

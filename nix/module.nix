@@ -73,6 +73,17 @@ in
       '';
     };
 
+    umamiSiteId = lib.mkOption {
+      type = lib.types.nullOr lib.types.str;
+      default = null;
+      example = "168bd9f6-fec6-40dc-95b5-b0e4082c7a98";
+      description = ''
+        The site's id on the Umami server (umami.kradalby.no). Null puts no
+        tracker on the pages and keeps Umami out of the CSP. The tracker
+        reports only from the host of baseURL, so beta can have its own site.
+      '';
+    };
+
     tailscaleKeyPath = lib.mkOption {
       type = lib.types.nullOr lib.types.str;
       default = null;
@@ -140,6 +151,7 @@ in
           # systemd expands %d inside the quoted argument.
           ++ lib.optional (cfg.tailscaleKeyPath != null) "--tailscale-auth-key-path=%d/tskey"
           ++ lib.optional cfg.noindex "--noindex"
+          ++ lib.optional (cfg.umamiSiteId != null) "--umami-site-id=${cfg.umamiSiteId}"
         );
 
         User = cfg.user;
