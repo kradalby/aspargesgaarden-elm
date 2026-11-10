@@ -375,16 +375,18 @@ func (s *Store) AddPhoto(ctx context.Context, p Photo) (Photo, error) {
 	now := s.now().Unix()
 
 	id, err := s.db.Queries().CreatePhoto(ctx, dbsqlc.CreatePhotoParams{
-		Sha256:           p.SHA256,
-		Mime:             p.MIME,
-		Width:            int64(p.Width),
-		Height:           int64(p.Height),
-		Alt:              p.Alt,
-		PhotographerName: p.PhotographerName,
-		PhotographerUrl:  p.PhotographerURL,
-		CreatedAt:        now,
-		UpdatedAt:        now,
+		Sha256:         p.SHA256,
+		Mime:           p.MIME,
+		Width:          int64(p.Width),
+		Height:         int64(p.Height),
+		Alt:            p.Alt,
+		PhotographerID: photographerRef(p.Photographer),
+		CreatedAt:      now,
+		UpdatedAt:      now,
 	})
+	if db.IsForeignKeyViolation(err) {
+		return Photo{}, fmt.Errorf("photographer %d: %w", p.Photographer.ID, ErrNotFound)
+	}
 	if err != nil {
 		return Photo{}, fmt.Errorf("adding photo %s: %w", p.SHA256, err)
 	}
@@ -414,6 +416,14 @@ func (s *Store) Photo(ctx context.Context, id int64) (Photo, error) {
 		p.Crops[CropKind(c.Kind)] = rectFromRow(c)
 	}
 
+	if row.PhotographerID.Valid {
+		ph, err := q.GetPhotographer(ctx, row.PhotographerID.Int64)
+		if err != nil {
+			return Photo{}, fmt.Errorf("loading photographer of photo %d: %w", id, err)
+		}
+		p.Photographer = new(photographerFromRow(ph))
+	}
+
 	return p, nil
 }
 
@@ -424,15 +434,18 @@ func (s *Store) Photos(ctx context.Context) ([]Photo, error) {
 	return list, err
 }
 
-// UpdatePhoto saves the editable fields of p: alt text and photographer.
+// UpdatePhoto saves the editable fields of p: alt text and photographer, which
+// a nil Photographer clears.
 func (s *Store) UpdatePhoto(ctx context.Context, p Photo) (Photo, error) {
 	n, err := s.db.Queries().UpdatePhotoMeta(ctx, dbsqlc.UpdatePhotoMetaParams{
-		Alt:              p.Alt,
-		PhotographerName: p.PhotographerName,
-		PhotographerUrl:  p.PhotographerURL,
-		UpdatedAt:        s.now().Unix(),
-		ID:               p.ID,
+		Alt:            p.Alt,
+		PhotographerID: photographerRef(p.Photographer),
+		UpdatedAt:      s.now().Unix(),
+		ID:             p.ID,
 	})
+	if db.IsForeignKeyViolation(err) {
+		return Photo{}, fmt.Errorf("photographer %d: %w", p.Photographer.ID, ErrNotFound)
+	}
 	if err != nil {
 		return Photo{}, fmt.Errorf("updating photo %d: %w", p.ID, err)
 	}
@@ -555,11 +568,145 @@ func (s *Store) GalleryUpdatedAt(ctx context.Context) (time.Time, error) {
 	return fromUnix(ts), nil
 }
 
-// allPhotos loads every photo with its crops, by id order and by id.
+// Photographers lists every photographer for the admin's picker,
+// alphabetically whatever the case.
+func (s *Store) Photographers(ctx context.Context) ([]Photographer, error) {
+	rows, err := s.db.Queries().ListPhotographers(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("listing photographers: %w", err)
+	}
+
+	out := make([]Photographer, 0, len(rows))
+	for _, r := range rows {
+		out = append(out, photographerFromRow(r))
+	}
+
+	return out, nil
+}
+
+// Photographer loads one photographer.
+func (s *Store) Photographer(ctx context.Context, id int64) (Photographer, error) {
+	r, err := s.db.Queries().GetPhotographer(ctx, id)
+	if errors.Is(err, sql.ErrNoRows) {
+		return Photographer{}, fmt.Errorf("photographer %d: %w", id, ErrNotFound)
+	}
+	if err != nil {
+		return Photographer{}, fmt.Errorf("loading photographer %d: %w", id, err)
+	}
+
+	return photographerFromRow(r), nil
+}
+
+// CreatePhotographer stores a new photographer; see Photographer.Normalize.
+// A name already used, whatever its case or spacing, is ErrPhotographerTaken.
+func (s *Store) CreatePhotographer(ctx context.Context, p Photographer) (Photographer, error) {
+	p, err := p.Normalize()
+	if err != nil {
+		return Photographer{}, err
+	}
+
+	id, err := s.db.Queries().CreatePhotographer(ctx, dbsqlc.CreatePhotographerParams{
+		Name: p.Name, NameKey: nameKey(p.Name), Url: p.URL,
+	})
+	if db.IsUniqueViolation(err) {
+		return Photographer{}, fmt.Errorf("%w: %q", ErrPhotographerTaken, p.Name)
+	}
+	if err != nil {
+		return Photographer{}, fmt.Errorf("creating photographer %q: %w", p.Name, err)
+	}
+
+	return s.Photographer(ctx, id)
+}
+
+// FindOrCreatePhotographer returns the photographer named p.Name, creating it
+// from p if there is none. A found one keeps its link, so an import never
+// undoes a correction made in the admin.
+func (s *Store) FindOrCreatePhotographer(ctx context.Context, p Photographer) (Photographer, error) {
+	p, err := p.Normalize()
+	if err != nil {
+		return Photographer{}, err
+	}
+
+	id, err := s.db.Queries().EnsurePhotographer(ctx, dbsqlc.EnsurePhotographerParams{
+		Name: p.Name, NameKey: nameKey(p.Name), Url: p.URL,
+	})
+	if err != nil {
+		return Photographer{}, fmt.Errorf("ensuring photographer %q: %w", p.Name, err)
+	}
+
+	return s.Photographer(ctx, id)
+}
+
+// UpdatePhotographer saves p's name and link. The photos crediting p count as
+// changed, since every page showing them does.
+func (s *Store) UpdatePhotographer(ctx context.Context, p Photographer) (Photographer, error) {
+	p, err := p.Normalize()
+	if err != nil {
+		return Photographer{}, err
+	}
+
+	err = s.db.InTx(ctx, func(q *dbsqlc.Queries) error {
+		n, err := q.UpdatePhotographer(ctx, dbsqlc.UpdatePhotographerParams{
+			Name: p.Name, NameKey: nameKey(p.Name), Url: p.URL, ID: p.ID,
+		})
+		switch {
+		case db.IsUniqueViolation(err):
+			return fmt.Errorf("%w: %q", ErrPhotographerTaken, p.Name)
+		case err != nil:
+			return fmt.Errorf("updating photographer %d: %w", p.ID, err)
+		case n == 0:
+			return fmt.Errorf("photographer %d: %w", p.ID, ErrNotFound)
+		}
+
+		err = q.TouchPhotographerPhotos(ctx, dbsqlc.TouchPhotographerPhotosParams{
+			UpdatedAt: s.now().Unix(), PhotographerID: photographerRef(&p),
+		})
+		if err != nil {
+			return fmt.Errorf("touching photos of photographer %d: %w", p.ID, err)
+		}
+
+		return nil
+	})
+	if err != nil {
+		return Photographer{}, err
+	}
+
+	return s.Photographer(ctx, p.ID)
+}
+
+// DeletePhotographer removes a photographer no photo credits.
+func (s *Store) DeletePhotographer(ctx context.Context, id int64) error {
+	n, err := s.db.Queries().DeletePhotographer(ctx, id)
+	if db.IsForeignKeyViolation(err) {
+		return fmt.Errorf("photographer %d: %w", id, ErrPhotographerInUse)
+	}
+	if err != nil {
+		return fmt.Errorf("deleting photographer %d: %w", id, err)
+	}
+
+	if n == 0 {
+		return fmt.Errorf("photographer %d: %w", id, ErrNotFound)
+	}
+
+	return nil
+}
+
+// allPhotos loads every photo with its crops and photographer, by id order
+// and by id.
 func allPhotos(ctx context.Context, q *dbsqlc.Queries) ([]Photo, map[int64]Photo, error) {
 	rows, err := q.ListPhotos(ctx)
 	if err != nil {
 		return nil, nil, fmt.Errorf("listing photos: %w", err)
+	}
+
+	photographerRows, err := q.ListPhotographers(ctx)
+	if err != nil {
+		return nil, nil, fmt.Errorf("listing photographers: %w", err)
+	}
+
+	photographers := make(map[int64]Photographer, len(photographerRows))
+	for _, r := range photographerRows {
+		photographers[r.ID] = photographerFromRow(r)
 	}
 
 	crops, err := q.ListAllPhotoCrops(ctx)
@@ -571,6 +718,9 @@ func allPhotos(ctx context.Context, q *dbsqlc.Queries) ([]Photo, map[int64]Photo
 	byID := make(map[int64]Photo, len(rows))
 	for _, r := range rows {
 		p := photoFromRow(r)
+		if r.PhotographerID.Valid {
+			p.Photographer = new(photographers[r.PhotographerID.Int64])
+		}
 		list = append(list, p)
 		byID[p.ID] = p
 	}
@@ -585,18 +735,28 @@ func allPhotos(ctx context.Context, q *dbsqlc.Queries) ([]Photo, map[int64]Photo
 
 func photoFromRow(r dbsqlc.Photo) Photo {
 	return Photo{
-		ID:               r.ID,
-		SHA256:           r.Sha256,
-		MIME:             r.Mime,
-		Width:            int(r.Width),
-		Height:           int(r.Height),
-		Alt:              r.Alt,
-		PhotographerName: r.PhotographerName,
-		PhotographerURL:  r.PhotographerUrl,
-		Crops:            map[CropKind]Rect{},
-		CreatedAt:        fromUnix(r.CreatedAt),
-		UpdatedAt:        fromUnix(r.UpdatedAt),
+		ID:        r.ID,
+		SHA256:    r.Sha256,
+		MIME:      r.Mime,
+		Width:     int(r.Width),
+		Height:    int(r.Height),
+		Alt:       r.Alt,
+		Crops:     map[CropKind]Rect{},
+		CreatedAt: fromUnix(r.CreatedAt),
+		UpdatedAt: fromUnix(r.UpdatedAt),
 	}
+}
+
+func photographerFromRow(r dbsqlc.Photographer) Photographer {
+	return Photographer{ID: r.ID, Name: r.Name, URL: r.Url}
+}
+
+func photographerRef(p *Photographer) sql.NullInt64 {
+	if p == nil {
+		return sql.NullInt64{}
+	}
+
+	return sql.NullInt64{Int64: p.ID, Valid: true}
 }
 
 func rectFromRow(c dbsqlc.PhotoCrop) Rect {

@@ -1,7 +1,9 @@
 package site
 
 import (
+	"errors"
 	"fmt"
+	"strings"
 	"time"
 )
 
@@ -23,15 +25,48 @@ type Rect struct {
 	X, Y, W, H int
 }
 
+// Photographer is a person credited on photos. One value serves every photo
+// they took, so the admin picks rather than retypes, and a corrected link
+// fixes every credit.
+type Photographer struct {
+	ID   int64
+	Name string
+	URL  string // optional
+}
+
+// Normalize returns p with the name's spaces collapsed and the link trimmed,
+// and what is wrong with it.
+func (p Photographer) Normalize() (Photographer, error) {
+	p.Name = strings.Join(strings.Fields(p.Name), " ")
+	p.URL = strings.TrimSpace(p.URL)
+
+	var errs []error
+	if p.Name == "" {
+		errs = append(errs, ErrPhotographerName)
+	}
+
+	if p.URL != "" && !validLink(p.URL) {
+		errs = append(errs, fmt.Errorf("%w: %q", ErrPhotographerURL, p.URL))
+	}
+
+	return p, errors.Join(errs...)
+}
+
+// nameKey is what makes two names one photographer: case and spacing are
+// typing accidents, not different people.
+func nameKey(name string) string {
+	return strings.ToLower(strings.Join(strings.Fields(name), " "))
+}
+
 // Photo is one uploaded original and what is known about it.
 type Photo struct {
-	ID               int64
-	SHA256           string
-	MIME             string
-	Width, Height    int
-	Alt              string
-	PhotographerName string
-	PhotographerURL  string
+	ID            int64
+	SHA256        string
+	MIME          string
+	Width, Height int
+	Alt           string
+	// Photographer is the credit, nil for none; only its ID is read on writes.
+	Photographer *Photographer
 	// Crops holds the rectangles set so far; a missing kind means images/
 	// falls back to a centred crop.
 	Crops     map[CropKind]Rect

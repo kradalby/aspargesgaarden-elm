@@ -265,16 +265,20 @@ func TestStorePhotos(t *testing.T) {
 	}, a.Crops)
 	require.Equal(t, clock.t.UTC(), a.UpdatedAt, "a crop change is a change of the photo")
 
+	lucky, err := s.CreatePhotographer(ctx, Photographer{Name: "Lucky Thirteen", URL: "https://luckythirteen.no/"})
+	require.NoError(t, err)
+
 	a.Alt = "Låven en vinterkveld"
-	a.PhotographerName = "Lucky Thirteen"
-	a.PhotographerURL = "https://luckythirteen.no/"
+	a.Photographer = &lucky
 	updated, err := s.UpdatePhoto(ctx, a)
 	require.NoError(t, err)
 	require.Equal(t, "Låven en vinterkveld", updated.Alt)
-	require.Equal(t, "Lucky Thirteen", updated.PhotographerName)
+	require.Equal(t, &lucky, updated.Photographer)
 
 	_, err = s.UpdatePhoto(ctx, Photo{ID: 999})
 	require.ErrorIs(t, err, ErrNotFound)
+	_, err = s.UpdatePhoto(ctx, Photo{ID: a.ID, Photographer: &Photographer{ID: 999}})
+	require.ErrorIs(t, err, ErrNotFound, "unknown photographer")
 
 	photos, err := s.Photos(ctx)
 	require.NoError(t, err)
@@ -339,6 +343,93 @@ func TestStoreGallery(t *testing.T) {
 	gallery, err = s.Gallery(ctx)
 	require.NoError(t, err)
 	require.Equal(t, []int64{b.ID}, photoIDs(gallery))
+}
+
+func TestStorePhotographers(t *testing.T) {
+	start := oslo("2026-10-10 12:00")
+	s, clock := newTestStore(t, start)
+	ctx := t.Context()
+
+	anita, err := s.CreatePhotographer(ctx, Photographer{Name: " Anita  Saga "})
+	require.NoError(t, err)
+	require.Equal(t, Photographer{ID: anita.ID, Name: "Anita Saga"}, anita)
+
+	_, err = s.CreatePhotographer(ctx, Photographer{Name: "anita SAGA"})
+	require.ErrorIs(t, err, ErrPhotographerTaken)
+	_, err = s.CreatePhotographer(ctx, Photographer{Name: ""})
+	require.ErrorIs(t, err, ErrPhotographerName)
+	_, err = s.CreatePhotographer(ctx, Photographer{Name: "Ola", URL: "javascript:alert(1)"})
+	require.ErrorIs(t, err, ErrPhotographerURL)
+
+	oyvind, err := s.FindOrCreatePhotographer(ctx, Photographer{Name: "Øyvind Ås", URL: "https://example.com/"})
+	require.NoError(t, err)
+	again, err := s.FindOrCreatePhotographer(ctx, Photographer{Name: "øyvind ås", URL: "https://other.example/"})
+	require.NoError(t, err)
+	require.Equal(t, oyvind, again, "a known name is returned unchanged")
+	_, err = s.FindOrCreatePhotographer(ctx, Photographer{Name: " "})
+	require.ErrorIs(t, err, ErrPhotographerName)
+
+	lucky, err := s.CreatePhotographer(ctx, Photographer{Name: "Lucky Thirteen"})
+	require.NoError(t, err)
+
+	list, err := s.Photographers(ctx)
+	require.NoError(t, err)
+	require.Equal(t, []Photographer{anita, lucky, oyvind}, list, "alphabetical, whatever the case")
+
+	// Credited on a gallery photo and an event photo, the credit comes back on
+	// the public read paths.
+	p := addPhoto(t, s, 'a', "Låven")
+	p.Photographer = &anita
+	p, err = s.UpdatePhoto(ctx, p)
+	require.NoError(t, err)
+	require.NoError(t, s.SetGallery(ctx, []int64{p.ID}))
+	e, err := s.CreateEvent(ctx, Event{Title: "Kurs", MainPhoto: &p})
+	require.NoError(t, err)
+	require.Equal(t, &anita, e.MainPhoto.Photographer)
+
+	// One correction fixes every credit, and moves the gallery's lastmod.
+	clock.t = start.Add(time.Hour)
+	anita.URL = "https://anitasaga.no/"
+	anita, err = s.UpdatePhotographer(ctx, anita)
+	require.NoError(t, err)
+
+	gallery, err := s.Gallery(ctx)
+	require.NoError(t, err)
+	require.Equal(t, &anita, gallery[0].Photographer)
+	e, err = s.Event(ctx, e.ID)
+	require.NoError(t, err)
+	require.Equal(t, &anita, e.MainPhoto.Photographer)
+	at, err := s.GalleryUpdatedAt(ctx)
+	require.NoError(t, err)
+	require.Equal(t, clock.t.UTC(), at)
+
+	_, err = s.UpdatePhotographer(ctx, Photographer{ID: anita.ID, Name: "LUCKY thirteen"})
+	require.ErrorIs(t, err, ErrPhotographerTaken)
+	_, err = s.UpdatePhotographer(ctx, Photographer{ID: anita.ID, Name: "Anita", URL: "ftp://x"})
+	require.ErrorIs(t, err, ErrPhotographerURL)
+	_, err = s.UpdatePhotographer(ctx, Photographer{ID: 999, Name: "Ola"})
+	require.ErrorIs(t, err, ErrNotFound)
+
+	got, err := s.Photographer(ctx, anita.ID)
+	require.NoError(t, err)
+	require.Equal(t, anita, got, "failed updates change nothing")
+	_, err = s.Photographer(ctx, 999)
+	require.ErrorIs(t, err, ErrNotFound)
+
+	require.ErrorIs(t, s.DeletePhotographer(ctx, anita.ID), ErrPhotographerInUse)
+	p.Photographer = nil
+	p, err = s.UpdatePhoto(ctx, p)
+	require.NoError(t, err)
+	require.Nil(t, p.Photographer)
+	require.NoError(t, s.DeletePhotographer(ctx, anita.ID))
+	require.ErrorIs(t, s.DeletePhotographer(ctx, anita.ID), ErrNotFound)
+
+	// A photo can be credited from the start.
+	b, err := s.AddPhoto(ctx, Photo{SHA256: sha('b'), MIME: "image/jpeg", Width: 10, Height: 10, Photographer: &lucky})
+	require.NoError(t, err)
+	require.Equal(t, &lucky, b.Photographer)
+	_, err = s.AddPhoto(ctx, Photo{SHA256: sha('c'), MIME: "image/jpeg", Width: 10, Height: 10, Photographer: &Photographer{ID: 999}})
+	require.ErrorIs(t, err, ErrNotFound)
 }
 
 func photoIDs(photos []Photo) []int64 {

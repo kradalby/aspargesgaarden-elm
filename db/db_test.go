@@ -228,6 +228,61 @@ func TestCropKinds(t *testing.T) {
 	require.Equal(t, dbsqlc.PhotoCrop{PhotoID: id, Kind: "card", X: 5, W: 20, H: 25}, crops[1])
 }
 
+func TestPhotographers(t *testing.T) {
+	d := openTest(t)
+	q := d.Queries()
+	ctx := t.Context()
+
+	anita := dbsqlc.CreatePhotographerParams{Name: "Anita Saga", NameKey: "anita saga"}
+	id, err := q.CreatePhotographer(ctx, anita)
+	require.NoError(t, err)
+
+	_, err = q.CreatePhotographer(ctx, dbsqlc.CreatePhotographerParams{Name: "ANITA SAGA", NameKey: "anita saga"})
+	require.True(t, IsUniqueViolation(err), "same key: got %v", err)
+
+	again, err := q.EnsurePhotographer(ctx, dbsqlc.EnsurePhotographerParams{
+		Name: "Anita Saga", NameKey: "anita saga", Url: "https://ignored.example",
+	})
+	require.NoError(t, err)
+	require.Equal(t, id, again)
+	got, err := q.GetPhotographer(ctx, id)
+	require.NoError(t, err)
+	require.Empty(t, got.Url, "ensuring a known name must not overwrite it")
+
+	for _, p := range []dbsqlc.CreatePhotographerParams{
+		{Name: "", NameKey: "x"},
+		{Name: " Lucky", NameKey: "lucky"},
+		{Name: "Lucky", NameKey: ""},
+		{Name: "Lucky", NameKey: "lucky", Url: "javascript:alert(1)"},
+		{Name: "Lucky", NameKey: "lucky", Url: "https://"},
+	} {
+		_, err := q.CreatePhotographer(ctx, p)
+		require.ErrorContains(t, err, "CHECK constraint failed", "%+v", p)
+	}
+
+	_, err = q.CreatePhotographer(ctx, dbsqlc.CreatePhotographerParams{Name: "Lucky", NameKey: "lucky", Url: "HTTPS://lucky.example"})
+	require.NoError(t, err, "scheme case does not matter")
+
+	p := photo(1)
+	p.PhotographerID = sql.NullInt64{Int64: id, Valid: true}
+	photoID, err := q.CreatePhoto(ctx, p)
+	require.NoError(t, err)
+
+	_, err = q.DeletePhotographer(ctx, id)
+	require.True(t, IsForeignKeyViolation(err), "credited photographer: got %v", err)
+
+	p = photo(2)
+	p.PhotographerID = sql.NullInt64{Int64: 999, Valid: true}
+	_, err = q.CreatePhoto(ctx, p)
+	require.True(t, IsForeignKeyViolation(err), "missing photographer: got %v", err)
+
+	_, err = q.DeletePhoto(ctx, photoID)
+	require.NoError(t, err)
+	n, err := q.DeletePhotographer(ctx, id)
+	require.NoError(t, err)
+	require.EqualValues(t, 1, n)
+}
+
 func TestInTxRollsBack(t *testing.T) {
 	d := openTest(t)
 	boom := errors.New("boom")

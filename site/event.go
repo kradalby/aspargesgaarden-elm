@@ -124,11 +124,8 @@ func (e Event) Validate() error {
 		}
 	}
 
-	if e.TicketURL != "" {
-		u, err := url.Parse(e.TicketURL)
-		if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" {
-			errs = append(errs, fmt.Errorf("%w: %q", ErrTicketURL, e.TicketURL))
-		}
+	if e.TicketURL != "" && !validLink(e.TicketURL) {
+		errs = append(errs, fmt.Errorf("%w: %q", ErrTicketURL, e.TicketURL))
 	}
 
 	seen := map[int64]bool{}
@@ -144,6 +141,13 @@ func (e Event) Validate() error {
 	}
 
 	return errors.Join(errs...)
+}
+
+// validLink reports whether s is an absolute http or https address: links the
+// pages put in an href must not run script or point nowhere.
+func validLink(s string) bool {
+	u, err := url.Parse(s)
+	return err == nil && (u.Scheme == "http" || u.Scheme == "https") && u.Host != ""
 }
 
 // Publishable lists what is missing before the event can go public: a title,
