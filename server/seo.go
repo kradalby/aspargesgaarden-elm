@@ -9,6 +9,8 @@ import (
 	"slices"
 	"time"
 
+	"github.com/chasefleming/elem-go"
+
 	"github.com/kradalby/asparges/pages"
 	"github.com/kradalby/asparges/seo"
 	"github.com/kradalby/asparges/site"
@@ -66,44 +68,54 @@ func text(w http.ResponseWriter, ctype string, body []byte) {
 	_, _ = w.Write(body)
 }
 
+// serveKept answers with what build makes, kept with the pages under key,
+// its path: it is made from the same data on the same day, so the same
+// Invalidate and midnight drop it.
+func (s *Server) serveKept(w http.ResponseWriter, r *http.Request, key, ctype string, build func(context.Context) ([]byte, error)) {
+	p, err := s.pages.Get(r.Context(), key, func(ctx context.Context) (*elem.Element, error) {
+		b, err := build(ctx)
+		return elem.Fragment(elem.Raw(string(b))), err
+	})
+	if err != nil {
+		s.fail(w, r, err)
+		return
+	}
+
+	text(w, ctype, p.HTML())
+}
+
 func (s *Server) sitemap(w http.ResponseWriter, r *http.Request) {
-	list, err := s.indexable(r.Context())
-	if err != nil {
-		s.fail(w, r, err)
-		return
-	}
+	s.serveKept(w, r, "/sitemap.xml", "application/xml; charset=utf-8", func(ctx context.Context) ([]byte, error) {
+		list, err := s.indexable(ctx)
+		if err != nil {
+			return nil, err
+		}
 
-	b, err := seo.Sitemap(s.cfg.BaseURL, list)
-	if err != nil {
-		s.fail(w, r, err)
-		return
-	}
-
-	text(w, "application/xml; charset=utf-8", b)
+		return seo.Sitemap(s.cfg.BaseURL, list)
+	})
 }
 
 func (s *Server) llms(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
+	s.serveKept(w, r, "/llms.txt", "text/plain; charset=utf-8", func(ctx context.Context) ([]byte, error) {
+		st, err := s.site(ctx)
+		if err != nil {
+			return nil, err
+		}
 
-	st, err := s.site(ctx)
-	if err != nil {
-		s.fail(w, r, err)
-		return
-	}
+		events, err := s.cfg.Store.PublishedEvents(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("llms.txt: %w", err)
+		}
 
-	events, err := s.cfg.Store.PublishedEvents(ctx)
-	if err != nil {
-		s.fail(w, r, fmt.Errorf("llms.txt: %w", err))
-		return
-	}
+		links := make([]seo.Link, len(st.Menu))
+		for i, m := range st.Menu {
+			links[i] = seo.Link{Title: cmp.Or(pages.Titles[m.Href], m.Label), Path: m.Href}
+		}
 
-	links := make([]seo.Link, len(st.Menu))
-	for i, m := range st.Menu {
-		links[i] = seo.Link{Title: cmp.Or(pages.Titles[m.Href], m.Label), Path: m.Href}
-	}
+		upcoming, _ := site.Split(events, s.cfg.Now())
 
-	upcoming, _ := site.Split(events, s.cfg.Now())
-	text(w, "text/plain; charset=utf-8", []byte(seo.LLMs(s.cfg.BaseURL, links, upcoming)))
+		return []byte(seo.LLMs(s.cfg.BaseURL, links, upcoming)), nil
+	})
 }
 
 // indexable lists every page search engines should know, as routing

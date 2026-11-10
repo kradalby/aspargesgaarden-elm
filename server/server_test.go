@@ -305,7 +305,7 @@ func TestFixedPagesAreKept(t *testing.T) {
 	require.Equal(t, http.StatusNotModified, f.get(t, "/kontakt", "Accept-Encoding", "gzip", "If-None-Match", rec.Header().Get("ETag")).Code)
 }
 
-func TestNotFoundIsNotKept(t *testing.T) {
+func TestMissingPageIsNotKept(t *testing.T) {
 	f := withMarkets(t)
 
 	rec := f.get(t, "/arrangementer/2027/varkonsert")
@@ -314,7 +314,51 @@ func TestNotFoundIsNotKept(t *testing.T) {
 
 	e := f.publish(t, site.Event{Title: "Vårkonsert", Start: date("2027-05-19")})
 	require.Equal(t, "/arrangementer/2027/varkonsert", e.Path())
-	require.Equal(t, http.StatusOK, f.get(t, e.Path()).Code, "a 404 is never kept, even without Changed")
+	require.Equal(t, http.StatusOK, f.get(t, e.Path()).Code, "a missing page is not kept under its address, even without Changed")
+}
+
+// The 404 page, the sitemap and llms.txt are kept like pages, so endless
+// junk addresses and crawlers cost no database work, and Changed drops them.
+func TestNotFoundSitemapAndLLMsAreKept(t *testing.T) {
+	f := withMarkets(t)
+
+	targets := []string{"/finnes-ikke", "/sitemap.xml", "/llms.txt"}
+	first := map[string]string{}
+
+	for _, target := range targets {
+		first[target] = f.get(t, target).Body.String()
+	}
+
+	f.publish(t, site.Event{Title: "Vårkonsert", Start: date("2027-05-19"), ShowInMenu: true})
+
+	for _, target := range targets {
+		require.Equal(t, first[target], f.get(t, target).Body.String(), "kept until Changed: %s", target)
+	}
+
+	junk := f.get(t, "/wp-login.php")
+	require.Equal(t, http.StatusNotFound, junk.Code)
+	require.Empty(t, junk.Header().Get("ETag"), "a 304 must never answer for a 404")
+	require.Equal(t, first["/finnes-ikke"], junk.Body.String(), "one 404 page for every address")
+
+	f.srv.Changed()
+
+	for _, target := range targets {
+		require.Contains(t, f.get(t, target).Body.String(), "varkonsert", target)
+	}
+}
+
+// Without the database the 404 page is still a 404 page, and not kept.
+func TestNotFoundDatabaseFailure(t *testing.T) {
+	f := newFixture(t, false)
+	require.NoError(t, f.db.Close())
+
+	for range 2 {
+		rec := f.get(t, "/finnes-ikke")
+		require.Equal(t, http.StatusNotFound, rec.Code)
+		require.Contains(t, rec.Body.String(), ">Fant ikke siden</h1>")
+	}
+
+	require.Equal(t, http.StatusInternalServerError, f.get(t, "/sitemap.xml").Code)
 }
 
 // The gallery is kept like any page, shows the admin's order once Changed,

@@ -2,7 +2,7 @@
 // request and then served from memory, with gzip and a strong ETag, until
 // anything changes: the admin calls Invalidate after every write, and a new
 // day in Oslo (which moves events from upcoming to past) drops every page
-// by itself. Error pages and the admin preview never go through it.
+// by itself. The admin preview never goes through it.
 package render
 
 import (

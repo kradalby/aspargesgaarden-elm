@@ -326,10 +326,9 @@ func (s *Server) gallery(ctx context.Context) (*elem.Element, error) {
 	return pages.Galleri(st, photos), nil
 }
 
-// site is what pages need, with today's menu. On error the menu lacks the
-// events' entries but is still usable, for the 404 page.
+// site is what pages need, with today's menu.
 func (s *Server) site(ctx context.Context) (pages.Site, error) {
-	st := pages.Site{BaseURL: s.cfg.BaseURL, Menu: pages.Menu(), Umami: s.umami, NoIndex: s.cfg.NoIndex}
+	st := s.base()
 
 	entries, err := s.cfg.Store.Menu(ctx)
 	if err != nil {
@@ -339,6 +338,11 @@ func (s *Server) site(ctx context.Context) (pages.Site, error) {
 	st.Menu = pages.Menu(entries...)
 
 	return st, nil
+}
+
+// base is site without the events' menu entries, which need the database.
+func (s *Server) base() pages.Site {
+	return pages.Site{BaseURL: s.cfg.BaseURL, Menu: pages.Menu(), Umami: s.umami, NoIndex: s.cfg.NoIndex}
 }
 
 func (s *Server) servePage(w http.ResponseWriter, r *http.Request, key string, build render.Builder) {
@@ -360,18 +364,35 @@ func (s *Server) pageErr(w http.ResponseWriter, r *http.Request, err error) {
 	s.fail(w, r, err)
 }
 
-// notFound is rendered each time and never kept: unknown addresses are
-// endless, and the store holds only real pages.
+// notFoundKey keeps one 404 page for every unknown address, which are
+// endless; no path is without its leading slash.
+const notFoundKey = "404"
+
+// notFound sends the kept 404 page as it is: no ETag, so a 304 can never
+// stand in for it.
 func (s *Server) notFound(w http.ResponseWriter, r *http.Request) {
-	st, err := s.site(r.Context())
+	var body []byte
+
+	p, err := s.pages.Get(r.Context(), notFoundKey, func(ctx context.Context) (*elem.Element, error) {
+		st, err := s.site(ctx)
+		if err != nil {
+			return nil, err
+		}
+
+		return pages.NotFound(st), nil
+	})
 	if err != nil {
+		// Without the events' menu entries, the visitor still gets the page.
 		s.cfg.Log.ErrorContext(r.Context(), "rendering 404", "err", err)
+		body = []byte(pages.NotFound(s.base()).Render())
+	} else {
+		body = p.HTML()
 	}
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.Header().Set("Cache-Control", "no-cache")
 	w.WriteHeader(http.StatusNotFound)
-	_, _ = w.Write([]byte(pages.NotFound(st).Render()))
+	_, _ = w.Write(body)
 }
 
 func (s *Server) fail(w http.ResponseWriter, r *http.Request, err error) {
