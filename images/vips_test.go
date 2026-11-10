@@ -92,6 +92,35 @@ func TestDecodeFails(t *testing.T) {
 	require.ErrorContains(t, err, "premature end of JPEG")
 }
 
+// intField reads an absent field as 0 by vips's error text; this pins that
+// text to the vips the service ships, which these tests run.
+func TestIntField(t *testing.T) {
+	t.Parallel()
+	v := newTestVips(t)
+
+	tests := []struct {
+		file, field string
+		want        int
+	}{
+		{"orient6.jpg", "orientation", 6},
+		{"gps.png", "orientation", 0}, // absent
+		{"rotated.heic", "orientation", 0},
+		{"upright.jpg", "n-pages", 0},
+		{"animated.gif", "n-pages", 3},
+	}
+	for _, tt := range tests {
+		n, err := v.intField(t.Context(), fixture(t, tt.file), tt.field)
+		require.NoError(t, err, "%s %s", tt.file, tt.field)
+		require.Equal(t, tt.want, n, "%s %s", tt.file, tt.field)
+	}
+
+	_, err := v.intField(t.Context(), fixture(t, "upright.jpg"), "width-in-furlongs")
+	require.NoError(t, err, "any absent field")
+
+	_, err = v.intField(t.Context(), fixture(t, "text.jpg"), "orientation")
+	require.ErrorIs(t, err, ErrBroken, "an unreadable file is no absent field")
+}
+
 // A vips the machine killed, or one stopped with its context, says nothing
 // about the photo: never "damaged" or "not a photo".
 func TestInterruptedIsNoVerdict(t *testing.T) {
