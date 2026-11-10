@@ -9,6 +9,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/kradalby/asparges/images"
 	"github.com/kradalby/asparges/site"
 )
 
@@ -261,9 +262,9 @@ func TestAdminPublishRules(t *testing.T) {
 func TestAdminPhotoQualityNeverBlocks(t *testing.T) {
 	a := newAdmin(t, false)
 	main := a.storedPhoto(t, 'a')
-	require.NoError(t, a.store.SetCrops(t.Context(), main.ID, map[site.CropKind]site.Rect{
-		site.CropCard:   {X: 0, Y: 0, W: 500, H: 625},
-		site.CropBanner: {X: 0, Y: 0, W: 700, H: 394},
+	require.NoError(t, a.store.SetCrops(t.Context(), main.ID, map[images.Kind]images.Rect{
+		images.Card:   {X: 0, Y: 0, W: 500, H: 625},
+		images.Banner: {X: 0, Y: 0, W: 700, H: 394},
 	}))
 
 	e := decode[eventJSON](t, a.do(t, "POST", "/admin/api/events", req{body: julemarked(main)}))
@@ -279,7 +280,7 @@ func TestAdminPhotoQualityNeverBlocks(t *testing.T) {
 
 	stored, err := a.store.Photo(t.Context(), main.ID)
 	require.NoError(t, err)
-	require.Equal(t, site.Rect{X: 0, Y: 0, W: 700, H: 394}, stored.Crops[site.CropBanner], "a text edit leaves the crops alone")
+	require.Equal(t, images.Rect{X: 0, Y: 0, W: 700, H: 394}, stored.Crops[images.Banner], "a text edit leaves the crops alone")
 
 	page := a.get(t, e.Path)
 	require.Equal(t, http.StatusOK, page.Code)

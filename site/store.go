@@ -9,6 +9,7 @@ import (
 
 	"github.com/kradalby/asparges/db"
 	"github.com/kradalby/asparges/db/dbsqlc"
+	"github.com/kradalby/asparges/images"
 )
 
 // Store reads and writes the domain types through the database, applying the
@@ -443,7 +444,7 @@ func (s *Store) Photo(ctx context.Context, id int64) (Photo, error) {
 
 	p := photoFromRow(row)
 	for _, c := range crops {
-		p.Crops[CropKind(c.Kind)] = rectFromRow(c)
+		p.Crops[images.Kind(c.Kind)] = rectFromRow(c)
 	}
 
 	if row.PhotographerID.Valid {
@@ -488,8 +489,8 @@ func (s *Store) UpdatePhoto(ctx context.Context, p Photo) (Photo, error) {
 }
 
 // SetCrop sets the crop of one kind on a photo.
-func (s *Store) SetCrop(ctx context.Context, photoID int64, kind CropKind, r Rect) error {
-	return s.SetCrops(ctx, photoID, map[CropKind]Rect{kind: r})
+func (s *Store) SetCrop(ctx context.Context, photoID int64, kind images.Kind, r images.Rect) error {
+	return s.SetCrops(ctx, photoID, map[images.Kind]images.Rect{kind: r})
 }
 
 // DeletePhoto removes a photo that no event or gallery uses; its crops go with
@@ -731,7 +732,7 @@ func allPhotos(ctx context.Context, q *dbsqlc.Queries) ([]Photo, map[int64]Photo
 
 	// Crops is a map, so the list and byID share each photo's crops.
 	for _, c := range crops {
-		byID[c.PhotoID].Crops[CropKind(c.Kind)] = rectFromRow(c)
+		byID[c.PhotoID].Crops[images.Kind(c.Kind)] = rectFromRow(c)
 	}
 
 	return list, byID, nil
@@ -745,7 +746,7 @@ func photoFromRow(r dbsqlc.Photo) Photo {
 		Width:     int(r.Width),
 		Height:    int(r.Height),
 		Alt:       r.Alt,
-		Crops:     map[CropKind]Rect{},
+		Crops:     map[images.Kind]images.Rect{},
 		CreatedAt: fromUnix(r.CreatedAt),
 		UpdatedAt: fromUnix(r.UpdatedAt),
 	}
@@ -763,8 +764,8 @@ func photographerRef(p *Photographer) sql.NullInt64 {
 	return sql.NullInt64{Int64: p.ID, Valid: true}
 }
 
-func rectFromRow(c dbsqlc.PhotoCrop) Rect {
-	return Rect{X: int(c.X), Y: int(c.Y), W: int(c.W), H: int(c.H)}
+func rectFromRow(c dbsqlc.PhotoCrop) images.Rect {
+	return images.Rect{X: int(c.X), Y: int(c.Y), W: int(c.W), H: int(c.H)}
 }
 
 func parseOptionalDate(s string) (Date, error) {

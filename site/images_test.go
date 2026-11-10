@@ -16,7 +16,7 @@ func TestCatalog(t *testing.T) {
 
 	p := addPhoto(t, s, 'a', "Låven")
 	addPhoto(t, s, 'b', "")
-	require.NoError(t, s.SetCrop(ctx, p.ID, CropCard, Rect{X: 100, Y: 0, W: 2400, H: 3000}))
+	require.NoError(t, s.SetCrop(ctx, p.ID, images.Card, images.Rect{X: 100, Y: 0, W: 2400, H: 3000}))
 
 	want := images.Photo{
 		SHA256: sha('a'), MIME: "image/jpeg", Width: 4000, Height: 3000,

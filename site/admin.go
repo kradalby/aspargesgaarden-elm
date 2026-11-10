@@ -11,6 +11,7 @@ import (
 
 	"github.com/kradalby/asparges/db"
 	"github.com/kradalby/asparges/db/dbsqlc"
+	"github.com/kradalby/asparges/images"
 )
 
 // UpdateEventSeen is UpdateEvent for an editor who loaded the event when it
@@ -79,7 +80,7 @@ func (s *Store) RenewPhoto(ctx context.Context, id int64) error {
 
 // SetCrops sets several crops of a photo at once: all of them or, if one is
 // refused, none.
-func (s *Store) SetCrops(ctx context.Context, photoID int64, crops map[CropKind]Rect) error {
+func (s *Store) SetCrops(ctx context.Context, photoID int64, crops map[images.Kind]images.Rect) error {
 	return s.db.InTx(ctx, func(q *dbsqlc.Queries) error {
 		row, err := q.GetPhoto(ctx, photoID)
 		if errors.Is(err, sql.ErrNoRows) {
@@ -94,7 +95,7 @@ func (s *Store) SetCrops(ctx context.Context, photoID int64, crops map[CropKind]
 		var errs []error
 		for _, kind := range slices.Sorted(maps.Keys(crops)) {
 			// A crop's field is its kind: the admin shows the error there.
-			errs = append(errs, fieldErr(Field(kind), p.CheckCrop(kind, crops[kind])))
+			errs = append(errs, fieldErr(Field(kind), p.checkCrop(kind, crops[kind])))
 		}
 
 		if err := errors.Join(errs...); err != nil {

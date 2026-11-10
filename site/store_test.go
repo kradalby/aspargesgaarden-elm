@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/kradalby/asparges/db"
+	"github.com/kradalby/asparges/images"
 )
 
 type fakeClock struct{ t time.Time }
@@ -251,17 +252,17 @@ func TestStorePhotos(t *testing.T) {
 	b := addPhoto(t, s, 'b', "")
 
 	clock.t = start.Add(time.Hour)
-	require.ErrorIs(t, s.SetCrop(ctx, a.ID, CropCard, Rect{X: 3000, W: 2400, H: 3000}), ErrCropOutside)
-	require.ErrorIs(t, s.SetCrop(ctx, a.ID, "full", Rect{W: 1, H: 1}), ErrCropKind)
-	require.ErrorIs(t, s.SetCrop(ctx, 999, CropCard, Rect{W: 1, H: 1}), ErrNotFound)
-	require.NoError(t, s.SetCrop(ctx, a.ID, CropCard, Rect{X: 800, W: 2400, H: 3000}))
-	require.NoError(t, s.SetCrop(ctx, a.ID, CropShare, Rect{Y: 450, W: 4000, H: 2100}))
+	require.ErrorIs(t, s.SetCrop(ctx, a.ID, images.Card, images.Rect{X: 3000, W: 2400, H: 3000}), images.ErrCropOutside)
+	require.ErrorIs(t, s.SetCrop(ctx, a.ID, "full", images.Rect{W: 1, H: 1}), images.ErrKind)
+	require.ErrorIs(t, s.SetCrop(ctx, 999, images.Card, images.Rect{W: 1, H: 1}), ErrNotFound)
+	require.NoError(t, s.SetCrop(ctx, a.ID, images.Card, images.Rect{X: 800, W: 2400, H: 3000}))
+	require.NoError(t, s.SetCrop(ctx, a.ID, images.Share, images.Rect{Y: 450, W: 4000, H: 2100}))
 
 	a, err := s.Photo(ctx, a.ID)
 	require.NoError(t, err)
-	require.Equal(t, map[CropKind]Rect{
-		CropCard:  {X: 800, W: 2400, H: 3000},
-		CropShare: {Y: 450, W: 4000, H: 2100},
+	require.Equal(t, map[images.Kind]images.Rect{
+		images.Card:  {X: 800, W: 2400, H: 3000},
+		images.Share: {Y: 450, W: 4000, H: 2100},
 	}, a.Crops)
 	require.Equal(t, clock.t.UTC(), a.UpdatedAt, "a crop change is a change of the photo")
 

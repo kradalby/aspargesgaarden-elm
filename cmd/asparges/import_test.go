@@ -137,11 +137,11 @@ func TestImport(t *testing.T) {
 
 	// Centred crops of every kind the photo is large enough for; the narrow
 	// one gets a card only and is shown whole elsewhere.
-	require.Equal(t, map[site.CropKind]site.Rect{site.CropCard: {X: 0, Y: 75, W: 600, H: 750}}, gallery[0].Crops)
-	require.Equal(t, map[site.CropKind]site.Rect{
-		site.CropCard:   {X: 330, Y: 0, W: 640, H: 800},
-		site.CropBanner: {X: 0, Y: 34, W: 1300, H: 731},
-		site.CropShare:  {X: 0, Y: 59, W: 1300, H: 682},
+	require.Equal(t, map[images.Kind]images.Rect{images.Card: {X: 0, Y: 75, W: 600, H: 750}}, gallery[0].Crops)
+	require.Equal(t, map[images.Kind]images.Rect{
+		images.Card:   {X: 330, Y: 0, W: 640, H: 800},
+		images.Banner: {X: 0, Y: 34, W: 1300, H: 731},
+		images.Share:  {X: 0, Y: 59, W: 1300, H: 682},
 	}, gallery[2].Crops)
 
 	photographers, err := store.Photographers(t.Context())

@@ -91,5 +91,5 @@ func TestE2EHooks(t *testing.T) {
 
 	p, err := store.Photo(t.Context(), 2)
 	require.NoError(t, err)
-	require.Equal(t, site.Rect{X: 0, Y: 0, W: 700, H: 394}, p.Crops[site.CropBanner])
+	require.Equal(t, images.Rect{X: 0, Y: 0, W: 700, H: 394}, p.Crops[images.Banner])
 }

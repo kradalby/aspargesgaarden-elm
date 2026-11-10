@@ -5,6 +5,8 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
+
+	"github.com/kradalby/asparges/images"
 )
 
 func TestStoreSeenPreconditions(t *testing.T) {
@@ -81,9 +83,9 @@ func TestStoreSetCrops(t *testing.T) {
 	ctx := t.Context()
 	p := addPhoto(t, s, 'a', "x")
 
-	good := Rect{X: 0, Y: 0, W: 2400, H: 3000}
-	err := s.SetCrops(ctx, p.ID, map[CropKind]Rect{CropCard: good, CropBanner: {X: 0, Y: 0, W: 5000, H: 100}})
-	require.ErrorIs(t, err, ErrCropOutside)
+	good := images.Rect{X: 0, Y: 0, W: 2400, H: 3000}
+	err := s.SetCrops(ctx, p.ID, map[images.Kind]images.Rect{images.Card: good, images.Banner: {X: 0, Y: 0, W: 5000, H: 100}})
+	require.ErrorIs(t, err, images.ErrCropOutside)
 
 	var fe *FieldError
 	require.ErrorAs(t, err, &fe)
@@ -93,12 +95,12 @@ func TestStoreSetCrops(t *testing.T) {
 	require.NoError(t, err)
 	require.Empty(t, got.Crops, "one bad crop writes none")
 
-	require.NoError(t, s.SetCrops(ctx, p.ID, map[CropKind]Rect{CropCard: good}))
+	require.NoError(t, s.SetCrops(ctx, p.ID, map[images.Kind]images.Rect{images.Card: good}))
 	got, err = s.Photo(ctx, p.ID)
 	require.NoError(t, err)
-	require.Equal(t, map[CropKind]Rect{CropCard: good}, got.Crops)
+	require.Equal(t, map[images.Kind]images.Rect{images.Card: good}, got.Crops)
 
-	require.ErrorIs(t, s.SetCrops(ctx, 999, map[CropKind]Rect{CropCard: good}), ErrNotFound)
+	require.ErrorIs(t, s.SetCrops(ctx, 999, map[images.Kind]images.Rect{images.Card: good}), ErrNotFound)
 }
 
 func TestStoreRemovePhoto(t *testing.T) {

@@ -11,12 +11,7 @@ import (
 
 // Image is p as the images package sees it: the original and its crops.
 func (p Photo) Image() images.Photo {
-	crops := make(map[images.Kind]images.Rect, len(p.Crops))
-	for k, r := range p.Crops {
-		crops[images.Kind(k)] = images.Rect{X: r.X, Y: r.Y, W: r.W, H: r.H}
-	}
-
-	return images.Photo{SHA256: p.SHA256, MIME: p.MIME, Width: p.Width, Height: p.Height, Crops: crops}
+	return images.Photo{SHA256: p.SHA256, MIME: p.MIME, Width: p.Width, Height: p.Height, Crops: p.Crops}
 }
 
 // Catalog is the store as the images package's source of truth: which

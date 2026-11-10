@@ -103,11 +103,10 @@ func (s *Server) photoJSON(ctx context.Context, p site.Photo) photoJSON {
 
 	// A kind never set shows where the crop tool starts, so the app never
 	// computes a default itself.
-	for _, k := range site.CropKinds {
+	for _, k := range images.CropKinds {
 		r, ok := p.Crops[k]
 		if !ok {
-			c := images.CentredCrop(images.Kind(k), p.Width, p.Height)
-			r = site.Rect{X: c.X, Y: c.Y, W: c.W, H: c.H}
+			r = images.CentredCrop(k, p.Width, p.Height)
 		}
 
 		out.Crops[string(k)] = rectJSON{X: r.X, Y: r.Y, W: r.W, H: r.H}
@@ -261,11 +260,11 @@ func (s *Server) addPhoto(ctx context.Context, o images.Original) (site.Photo, e
 		return site.Photo{}, err
 	}
 
-	crops := map[site.CropKind]site.Rect{}
+	crops := map[images.Kind]images.Rect{}
 	for _, k := range images.CropKinds {
 		r, err := images.DefaultCrop(k, p.Width, p.Height)
 		if err == nil {
-			crops[site.CropKind(k)] = site.Rect{X: r.X, Y: r.Y, W: r.W, H: r.H}
+			crops[k] = r
 		}
 	}
 
@@ -417,7 +416,7 @@ func (s *Server) setCrops(w http.ResponseWriter, r *http.Request, p site.Photo) 
 		return
 	}
 
-	crops := map[site.CropKind]site.Rect{}
+	crops := map[images.Kind]images.Rect{}
 
 	var errs []error
 
@@ -428,7 +427,7 @@ func (s *Server) setCrops(w http.ResponseWriter, r *http.Request, p site.Photo) 
 		// The crop the photo has, sent back as the app got it, stays as it
 		// is: an old photo's crop may predate today's rules, and refusing it
 		// would block every other change in the dialog.
-		if stored, ok := p.Crops[site.CropKind(k)]; ok && stored == (site.Rect{X: c.X, Y: c.Y, W: c.W, H: c.H}) {
+		if stored, ok := p.Crops[kind]; ok && stored == rect {
 			continue
 		}
 
@@ -440,7 +439,7 @@ func (s *Server) setCrops(w http.ResponseWriter, r *http.Request, p site.Photo) 
 		}
 
 		err := images.ValidateCrop(kind, p.Width, p.Height, rect)
-		if images.Kind(k) == images.Full {
+		if kind == images.Full {
 			err = fmt.Errorf("%w: %q", images.ErrKind, k)
 		}
 
@@ -449,7 +448,7 @@ func (s *Server) setCrops(w http.ResponseWriter, r *http.Request, p site.Photo) 
 			continue
 		}
 
-		crops[site.CropKind(k)] = site.Rect{X: c.X, Y: c.Y, W: c.W, H: c.H}
+		crops[kind] = rect
 	}
 
 	if err := errors.Join(errs...); err != nil {

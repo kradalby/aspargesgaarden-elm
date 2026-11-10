@@ -313,7 +313,7 @@ func (im importer) photo(ctx context.Context, op oldPhoto, alt string) (site.Pho
 	}
 
 	for _, k := range images.CropKinds {
-		if _, set := p.Crops[site.CropKind(k)]; set {
+		if _, set := p.Crops[k]; set {
 			continue
 		}
 
@@ -326,7 +326,7 @@ func (im importer) photo(ctx context.Context, op oldPhoto, alt string) (site.Pho
 		}
 
 		if err == nil {
-			err = im.store.SetCrop(ctx, p.ID, site.CropKind(k), site.Rect{X: r.X, Y: r.Y, W: r.W, H: r.H})
+			err = im.store.SetCrop(ctx, p.ID, k, r)
 		}
 
 		if err != nil {

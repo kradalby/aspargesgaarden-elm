@@ -55,9 +55,7 @@ var codes = []struct {
 	{site.ErrPhotographerTaken, "photographer_name_taken", http.StatusConflict, "name"},
 	{site.ErrPhotographerURL, "photographer_url", http.StatusUnprocessableEntity, "url"},
 	{site.ErrPhotoInUse, "photo_in_use", http.StatusConflict, ""},
-	{site.ErrCropKind, "crop_kind", http.StatusUnprocessableEntity, ""},
 	{images.ErrKind, "crop_kind", http.StatusUnprocessableEntity, ""},
-	{site.ErrCropOutside, "crop_outside", http.StatusUnprocessableEntity, ""},
 	{images.ErrCropOutside, "crop_outside", http.StatusUnprocessableEntity, ""},
 	{images.ErrCropAspect, "crop_aspect", http.StatusUnprocessableEntity, ""},
 	// Uploads map their own errors (uploadProblem); here it is a crop.

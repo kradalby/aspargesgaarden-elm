@@ -19,7 +19,7 @@ const testBase = "https://aspargesgaarden.no"
 func testPhoto(c byte, w, h int) site.Photo {
 	p := site.Photo{
 		ID: int64(c), SHA256: strings.Repeat(string(c), 64), MIME: "image/jpeg", Width: w, Height: h,
-		Alt: "Bålfat på tunet", Crops: map[site.CropKind]site.Rect{},
+		Alt: "Bålfat på tunet", Crops: map[images.Kind]images.Rect{},
 	}
 
 	for _, k := range images.CropKinds {
@@ -28,7 +28,7 @@ func testPhoto(c byte, w, h int) site.Photo {
 			continue // too small for that use, as the import leaves it
 		}
 
-		p.Crops[site.CropKind(k)] = site.Rect{X: r.X, Y: r.Y, W: r.W, H: r.H}
+		p.Crops[k] = r
 	}
 
 	return p

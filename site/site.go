@@ -24,8 +24,6 @@ var (
 	ErrAltRequired       = errors.New("photo needs alt text")
 	ErrDuplicatePhoto    = errors.New("photo used twice in one event")
 	ErrPhotoInUse        = errors.New("photo is used by an event or the gallery")
-	ErrCropOutside       = errors.New("crop is outside the photo")
-	ErrCropKind          = errors.New("unknown crop kind")
 	ErrPhotographerName  = errors.New("photographer needs a name")
 	ErrPhotographerURL   = errors.New("photographer link must be an http or https address")
 	ErrPhotographerTaken = errors.New("a photographer with that name exists")

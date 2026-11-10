@@ -3,27 +3,12 @@ package site
 import (
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 	"time"
+
+	"github.com/kradalby/asparges/images"
 )
-
-// CropKind names one of the fixed crops every photo can carry. The full,
-// uncropped photo is not a kind: it needs no rectangle.
-type CropKind string
-
-const (
-	CropCard   CropKind = "card"   // 4:5, event list
-	CropBanner CropKind = "banner" // 16:9, event page
-	CropShare  CropKind = "share"  // 1200:630, Open Graph
-)
-
-// CropKinds lists every kind, in a fixed order.
-var CropKinds = []CropKind{CropCard, CropBanner, CropShare}
-
-// Rect is a crop rectangle in source pixels.
-type Rect struct {
-	X, Y, W, H int
-}
 
 // Photographer is a person credited on photos. One value serves every photo
 // they took, so the admin picks rather than retypes, and a corrected link
@@ -69,22 +54,21 @@ type Photo struct {
 	Photographer *Photographer
 	// Crops holds the rectangles set so far; a missing kind means images/
 	// falls back to a centred crop.
-	Crops     map[CropKind]Rect
+	Crops     map[images.Kind]images.Rect
 	CreatedAt time.Time
 	UpdatedAt time.Time
 }
 
-// CheckCrop checks that r is a known kind and lies inside the photo. Aspect
-// ratio and minimum size are images/' rules, which know the output sizes.
-func (p Photo) CheckCrop(kind CropKind, r Rect) error {
-	switch kind {
-	case CropCard, CropBanner, CropShare:
-	default:
-		return fmt.Errorf("%w: %q", ErrCropKind, kind)
+// checkCrop is the rule every stored crop keeps, whoever writes it: a kind
+// that takes a crop, inside the photo. Aspect ratio and minimum size are
+// images.ValidateCrop's, for the crops the admin sends.
+func (p Photo) checkCrop(kind images.Kind, r images.Rect) error {
+	if !slices.Contains(images.CropKinds, kind) {
+		return fmt.Errorf("%w: %q", images.ErrKind, kind)
 	}
 
 	if r.X < 0 || r.Y < 0 || r.W <= 0 || r.H <= 0 || r.X+r.W > p.Width || r.Y+r.H > p.Height {
-		return fmt.Errorf("%w: %+v in %dx%d", ErrCropOutside, r, p.Width, p.Height)
+		return fmt.Errorf("%w: %+v in %dx%d", images.ErrCropOutside, r, p.Width, p.Height)
 	}
 
 	return nil

@@ -28,7 +28,7 @@ func date(s string) site.Date {
 func testPhoto(c byte, alt string) site.Photo {
 	p := site.Photo{
 		ID: int64(c), SHA256: strings.Repeat(string(c), 64), MIME: "image/jpeg", Width: 1600, Height: 1200, Alt: alt,
-		Crops: map[site.CropKind]site.Rect{},
+		Crops: map[images.Kind]images.Rect{},
 	}
 
 	for _, k := range []images.Kind{images.Card, images.Banner} {
@@ -37,7 +37,7 @@ func testPhoto(c byte, alt string) site.Photo {
 			panic(err)
 		}
 
-		p.Crops[site.CropKind(k)] = site.Rect{X: r.X, Y: r.Y, W: r.W, H: r.H}
+		p.Crops[k] = r
 	}
 
 	return p

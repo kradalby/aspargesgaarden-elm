@@ -89,7 +89,7 @@ func e2eHooks(store *site.Store, imgs *images.Store, srv *server.Server, fixture
 			return
 		}
 
-		var crops map[site.CropKind]site.Rect
+		var crops map[images.Kind]images.Rect
 		if err := json.NewDecoder(r.Body).Decode(&crops); err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
@@ -257,10 +257,10 @@ func e2ePhoto(ctx context.Context, store *site.Store, imgs *images.Store, path, 
 		return site.Photo{}, err
 	}
 
-	crops := map[site.CropKind]site.Rect{}
+	crops := map[images.Kind]images.Rect{}
 	for _, k := range images.CropKinds {
 		if r, err := images.DefaultCrop(k, p.Width, p.Height); err == nil {
-			crops[site.CropKind(k)] = site.Rect{X: r.X, Y: r.Y, W: r.W, H: r.H}
+			crops[k] = r
 		}
 	}
 
