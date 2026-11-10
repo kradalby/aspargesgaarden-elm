@@ -24,6 +24,20 @@ func TestEvent(t *testing.T) {
 	require.NotContains(t, got, "Arrangementet er")
 }
 
+// Further photos are a gallery with its lightbox; an event without them
+// loads no script.
+func TestEventGallery(t *testing.T) {
+	events := testEvents()
+	require.NotEmpty(t, events[0].ExtraPhotos)
+
+	got := Event(testSite, events[0], testNow).Render()
+	require.Contains(t, got, `data-gallery="`)
+	require.Contains(t, got, "/static/gallery.js")
+
+	events[0].ExtraPhotos = nil
+	require.NotContains(t, Event(testSite, events[0], testNow).Render(), "gallery.js")
+}
+
 func TestEventWithoutSummaryHasNoLead(t *testing.T) {
 	got := Event(testSite, testEvents()[1], testNow).Render()
 

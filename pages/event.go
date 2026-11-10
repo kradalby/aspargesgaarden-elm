@@ -4,7 +4,6 @@ import (
 	"time"
 
 	"github.com/chasefleming/elem-go"
-	"github.com/chasefleming/elem-go/attrs"
 
 	"github.com/kradalby/asparges/images"
 	"github.com/kradalby/asparges/markdown"
@@ -44,24 +43,9 @@ func Event(s Site, e site.Event, now time.Time) *elem.Element {
 
 	kids = append(kids, markdown.RenderEvent(e.BodyMD)...)
 
-	if len(e.ExtraPhotos) > 0 {
-		kids = append(kids, extraPhotos(e.ExtraPhotos))
-	}
+	// The further photos, whole, with the lightbox over them; nothing
+	// when there are none.
+	kids = append(kids, ui.Gallery(ui.GalleryColumn, galleryPhotos(e.ExtraPhotos)...))
 
 	return s.page(ui.Meta{Title: e.Title, Description: teaser(e), Path: e.Path()}, ui.EventColumn(kids...))
-}
-
-// extraPhotos shows an event's further photos, whole and uncropped.
-//
-// shortcut: a plain grid until the gallery component (grid and lightbox)
-// lands; then this returns ui.Gallery for the same photos.
-func extraPhotos(photos []site.Photo) elem.Node {
-	cells := make([]elem.Node, len(photos))
-	for i, p := range photos {
-		cells[i] = ui.PhotoCredit(credit(p.Photographer), ui.Picture(ui.PictureProps{
-			Photo: photoRef(p, images.Full), Alt: p.Alt, Layout: ui.LayoutHalfColumn, Class: "w-full h-auto",
-		}))
-	}
-
-	return elem.Div(attrs.Props{attrs.Class: "grid grid-cols-2 gap-4 my-12 md:gap-6"}, cells...)
 }
