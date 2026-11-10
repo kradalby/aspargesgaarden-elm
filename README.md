@@ -34,7 +34,7 @@ go run ./cmd/asparges serve --dev --listen-addr 127.0.0.1:8090 \
 - Changed markup on purpose: `UPDATE_GOLDEN=1 go test ./...`, then review
   the diff of the `testdata/*.html` golden files.
 - Avenir's 400 weight is Medium; switch to Roman by changing the one
-  `@font-face` line in `static/input.css`.
+  `@font-face` line in `static/theme.css`.
 - Pages may load nothing from outside the binary except the origins in
   `ui/external.go` (Umami, the Google calendar frame). Tests check the
   rendered pages and the stylesheet; every public response carries the
@@ -67,7 +67,29 @@ nix develop -c e2e/gallery/run.sh       # browser tests: Chromium, Firefox, WebK
 
 A new app: add `elm/<app>/` and its name to `elmApps` in `flake.nix`; the
 build, the `elm-test-<app>` check and the Tailwind scan of its classes
-follow.
+follow. An app whose `boot.js` imports npm packages (the admin: Cropper.js,
+the Markdown toolbar) pins them in its own `package.json` and `yarn.lock`;
+build.sh bundles `boot.js` with esbuild, and Nix fetches the packages with
+`fetchYarnDeps` (hash under `yarn.<app>` in `flakehashes.json`).
+
+### Admin
+
+`elm/admin` is the admin app: `/static/admin.js` and its own stylesheet
+`/static/admin.css` (`static/admin-input.css`, sharing `static/theme.css`
+with `site.css`, so public pages carry no admin classes).
+`pages.AdminHandler()` serves the document it runs in, under
+`ui.AdminCSP()`. The API it talks to is `docs/admin-api.md`.
+
+```bash
+cd elm/admin && elm-test-rs              # decoders, form rules, crop arithmetic
+nix develop -c e2e/admin/run.sh         # Chromium at 1280 and 390 px, against the fake API
+```
+
+`e2e/admin/run.sh` serves the real admin document and files from Go in
+front of `e2e/admin/fake-server.mjs` (an in-memory stand-in for the API)
+and writes screenshots of every screen to `e2e/admin/out/`. `BASE=<url>`
+points the specs at another server, such as `serve --dev`, which must then
+answer the test hooks `POST /__reset` and `POST /__touch/<id>`.
 
 The gallery is `ui.Gallery(layout, photos...)` (`GalleryPage` on
 `/galleri`, `GalleryColumn` at the end of an event page): a grid of links to

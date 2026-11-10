@@ -3,7 +3,7 @@
 The JSON API the admin app (`elm/admin`) uses. It lives on the tsnet listener
 only, behind the `kradalby.no/cap/asparges` capability (or loopback in
 `--dev`). The app is the only client; it is written against this file, and
-`e2e/fake-server.mjs` implements the same contract for the browser tests, so a
+`e2e/admin/fake-server.mjs` implements the same contract for the browser tests, so a
 change here means a change in all three places.
 
 ## Conventions
@@ -456,14 +456,17 @@ for a list of photos.
 
 ## The admin page
 
-Every address under `/admin/` that is not `/admin/api/` or `/admin/static/`
-answers `200` with the same HTML shell (`elm/admin/index.html`); the Elm app
-reads the address itself. The shell loads `/admin/static/admin.css`,
-`/admin/static/app.js` (Elm) and `/admin/static/elements.js` (custom elements
-and start-up), in that order, all `defer`. It has no inline script or style.
+`pages.AdminHandler()` serves the document the app runs in (built with
+elem-go in `pages/admin.go`). Mount it at `/admin/` on the tailnet listener:
+it answers `GET` and `HEAD` of every path under it with the same document,
+so a deep link such as `/admin/arrangementer/12` loads the app, which reads
+the address itself; other methods get `405`. The pattern carries no method,
+because `GET /admin/` would conflict with a method-less `/admin/api/`.
 
-The app works under this policy, which the fake server sends in the browser
-tests:
+The document names `/static/admin.css` and `/static/admin.js` (with the
+site's fonts) by their content-hashed URLs, so the admin listener also
+serves `static.Handler()` under `/static/`. It has no inline script or
+style, and the handler sends `ui.AdminCSP()`:
 
 ```
 default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self';
@@ -474,7 +477,8 @@ base-uri 'none'; form-action 'none'; frame-ancestors 'none'
 No `'unsafe-inline'` or `'unsafe-eval'`: Elm and Cropper.js set styles only
 through the CSSOM, and the cropper's stylesheet is a constructed sheet. The
 preview `iframe srcdoc` inherits this policy, so the preview HTML must load
-everything from `'self'` too (the public pages already do).
+everything from `'self'`, and must leave out the Umami script: it would be
+refused (and a preview is not a visit).
 
 ## Open questions
 
