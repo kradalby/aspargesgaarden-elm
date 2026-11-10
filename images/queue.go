@@ -7,6 +7,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"runtime/debug"
 	"slices"
 	"time"
 )
@@ -104,7 +105,7 @@ func (s *Store) step(ctx context.Context) bool {
 		return false
 	}
 
-	err := s.prepare(ctx, sha)
+	err := s.prepareSafe(ctx, sha)
 
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -122,6 +123,18 @@ func (s *Store) step(ctx context.Context) bool {
 	}
 
 	return true
+}
+
+// prepareSafe is prepare with a panic turned into that photo's failure: a
+// bug one photo trips must not stop every later build.
+func (s *Store) prepareSafe(ctx context.Context, sha string) (err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			err = fmt.Errorf("prepare %s panicked: %v\n%s", sha, r, debug.Stack())
+		}
+	}()
+
+	return s.prepare(ctx, sha)
 }
 
 // Run works the queue until ctx ends, one photo at a time. At start it

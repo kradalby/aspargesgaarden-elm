@@ -224,6 +224,37 @@ func TestStatusMissingIsFailed(t *testing.T) {
 	require.Equal(t, ReasonInternal, st.Reason)
 }
 
+// A panic while preparing one photo fails that photo; the worker goes on
+// with the next.
+func TestPanicFailsOnlyItsPhoto(t *testing.T) {
+	t.Parallel()
+	cat := newFakeCatalog()
+	s := newTestStore(t, cat)
+	ctx := t.Context()
+
+	bad := photoOf(intake(t, s, "upright.jpg"))
+	good := photoOf(intake(t, s, "p3.jpg"))
+	cat.put(bad)
+	cat.put(good)
+
+	cat.onPhoto = func(string) { panic("a bug") }
+
+	s.Enqueue(bad.SHA256)
+	s.Enqueue(good.SHA256)
+	require.True(t, s.step(ctx))
+
+	st, err := s.Status(ctx, bad.SHA256)
+	require.NoError(t, err)
+	require.Equal(t, StateFailed, st.State)
+	require.Equal(t, ReasonInternal, st.Reason)
+
+	require.True(t, s.step(ctx))
+
+	st, err = s.Status(ctx, good.SHA256)
+	require.NoError(t, err)
+	require.Equal(t, StateReady, st.State)
+}
+
 // A build stopped by shutdown is no failure: not logged as one, and not
 // remembered against the photo.
 func TestStoppedIsNoFailure(t *testing.T) {
