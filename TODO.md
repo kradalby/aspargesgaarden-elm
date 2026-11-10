@@ -81,6 +81,35 @@ yet.
 - [ ] `images.Store.Status` loads its photo from the database again, though
       every caller in `server/` already has it: about a fifth of the time of
       `GET /admin/api/events`. Pass the photo in (`Status(images.Photo)`).
+- [ ] A two-day market (start and end date, start and end time) reads as
+      one event from the first day's start to the last day's end, in the
+      date line and the JSON-LD; the real hours are the same each day. Decide
+      what an end date with an end time means, then render it so.
+- [ ] Crops are not redaction. Every built size of every stored photo, the
+      uncropped one included, is public at its unguessable `/img/` address,
+      drafts and unused photos too. A photo that must not be seen has to be
+      deleted, not cropped.
+- [ ] On iPad, unsaved edits to a published event are lost when the tab is
+      closed; a draft is saved when the tab is hidden, a published event is
+      not (saving would put the edit live). Keep the unsaved form in the
+      browser and offer it back.
+- [ ] Headings in `text-tre` on the tinted public background have a contrast
+      of 3.0, under WCAG AA for text below large size. Darken the colour or
+      the background where headings sit.
+- [ ] A photo that fails before its sizes are built (original missing,
+      unreadable) shows in the log and the admin, but in no metric:
+      `asparges_images_build_errors_total` counts failed builds only. Count
+      failed photos in a gauge and alert on it.
+
+## After the cutover
+
+- [ ] Remove `asparges import` and what only it uses: `cmd/asparges/import.go`
+      and its test and `testdata/oldsite`, `site.ParseLegacyTime`,
+      `FindOrCreatePhotographer` and the `EnsurePhotographer` query, the
+      YAML module. Its users first: the gallery suite, `vm-basic`,
+      `hardening-smoke` and the README's local loop need another way to
+      fill a data directory (`serve --dev --e2e-fixtures` and its
+      `/__reset`, or a script against the admin API).
 
 ## Content for the owners to check
 
