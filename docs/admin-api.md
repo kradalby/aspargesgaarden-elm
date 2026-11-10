@@ -607,10 +607,10 @@ refused (and a preview is not a visit).
 
 ## Open questions
 
-1. **Seconds in `updatedAt`.** `events.updated_at` is stored in whole
-   seconds, so two saves of one event inside the same second pass the
-   precondition. Accepted as rare for four admins; a `version` counter would
-   close it.
+1. **Seconds in `updatedAt`.** `events.updated_at` and `photos.updated_at`
+   are stored in whole seconds, so two changes inside the same second pass
+   the precondition. Accepted as rare for four admins; a `version` counter
+   would close it.
 2. **Crops take effect at once**, also on a published page (see Crops). The
    alternative, crops saved with the event, needs `/img/` to serve variants of
    a crop that is not yet stored, which the strict variant rule forbids.
