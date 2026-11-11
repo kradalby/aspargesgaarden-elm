@@ -16,6 +16,19 @@ func TestDateLineLegacy(t *testing.T) {
 	}
 }
 
+func TestDays(t *testing.T) {
+	for want, e := range map[string]Event{
+		"1. oktober 2024":                    {Start: d("2024-10-01")},
+		"19. mai 2026":                       {Start: d("2026-05-19"), End: d("2026-05-19")},
+		"14.–15. november 2026":              {Start: d("2026-11-14"), End: d("2026-11-15"), StartTime: "12:00", EndTime: "16:00"},
+		"30. november – 1. desember 2026":    {Start: d("2026-11-30"), End: d("2026-12-01")},
+		"31. desember 2026 – 1. januar 2027": {Start: d("2026-12-31"), End: d("2027-01-01")},
+		"31. oktober 2026":                   {Start: d("2026-10-31"), ExtraDates: []Date{d("2026-11-28")}},
+	} {
+		require.Equal(t, want, e.Days())
+	}
+}
+
 func TestDateLine(t *testing.T) {
 	tests := []struct {
 		name  string

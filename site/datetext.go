@@ -21,6 +21,22 @@ func dayMonth(d Date) string {
 	return fmt.Sprintf("%d. %s", d.Day, norwegianMonths[d.Month-1])
 }
 
+// Days names the event's first day, or its run of days when it spans
+// several: "14.–15. november 2026", "30. november – 1. desember 2026". The
+// extra days of a course are separate events and left out.
+func (e Event) Days() string {
+	switch {
+	case e.End.IsZero() || e.End == e.Start:
+		return NorwegianDate(e.Start)
+	case e.Start.Year != e.End.Year:
+		return NorwegianDate(e.Start) + " – " + NorwegianDate(e.End)
+	case e.Start.Month != e.End.Month:
+		return dayMonth(e.Start) + " – " + NorwegianDate(e.End)
+	}
+
+	return strconv.Itoa(e.Start.Day) + ".–" + NorwegianDate(e.End)
+}
+
 // DateLabel is the bold word in front of DateLine.
 func (e Event) DateLabel() string {
 	if len(e.ExtraDates) > 0 {

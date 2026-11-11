@@ -16,7 +16,7 @@ func TestEvent(t *testing.T) {
 
 	golden.HTML(t, "event", got)
 	require.Contains(t, got, `<link href="https://aspargesgaarden.no/arrangementer/2026/julemarked" rel="canonical">`)
-	require.Contains(t, got, `<meta content="14. november 2026 på Aspargesgården i Tjølling, Larvik: Mer enn 30 utstillere, kafé med hjemmebakst og bålfat på tunet." name="description">`)
+	require.Contains(t, got, `<meta content="14.–15. november 2026 på Aspargesgården i Tjølling, Larvik: Mer enn 30 utstillere, kafé med hjemmebakst og bålfat på tunet." name="description">`)
 	require.Contains(t, got, `href="https://fabnite.com/julemarked"`)
 	require.Contains(t, got, "/"+strings.Repeat("a", 64)+"/banner-")
 	require.Contains(t, got, "/"+strings.Repeat("b", 64)+"/full-")
@@ -82,6 +82,6 @@ func TestEventCancelled(t *testing.T) {
 	require.Equal(t, 1, strings.Count(got, "Arrangementet er"))
 
 	// Search results show the head, not the page's notice.
-	require.Contains(t, got, "<title>Avlyst: Julemarked på Aspargesgården – 14. november 2026 | Aspargesgården</title>")
-	require.Contains(t, got, `<meta content="Avlyst. 14. november 2026 på Aspargesgården i Tjølling, Larvik: `)
+	require.Contains(t, got, "<title>Avlyst: Julemarked på Aspargesgården – 14.–15. november 2026 | Aspargesgården</title>")
+	require.Contains(t, got, `<meta content="Avlyst. 14.–15. november 2026 på Aspargesgården i Tjølling, Larvik: `)
 }

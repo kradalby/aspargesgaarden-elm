@@ -55,7 +55,7 @@ func Event(s Site, e site.Event, now time.Time) *elem.Element {
 // descriptionRunes is about what search results show of a description.
 const descriptionRunes = 160
 
-// eventMeta names the event with its first day, since a yearly event keeps
+// eventMeta names the event with its days, since a yearly event keeps
 // its title, and opens the description with when and where. A cancelled
 // event says so first: search results show these, not the page's notice.
 func eventMeta(s Site, e site.Event, ticketURL string) ui.Meta {
@@ -69,7 +69,7 @@ func eventMeta(s Site, e site.Event, ticketURL string) ui.Meta {
 
 	// Only a draft in the admin's preview has no date yet.
 	if !e.Start.IsZero() {
-		day := site.NorwegianDate(e.Start)
+		day := e.Days()
 		m.Title += " – " + day
 		description = fmt.Sprintf("%s på %s i %s, %s: %s",
 			day, seo.Venue.Name, seo.Venue.Area, seo.Venue.Municipality, description)
