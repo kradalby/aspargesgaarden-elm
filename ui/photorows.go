@@ -25,8 +25,7 @@ func (k RowKind) classes() (photo, text string) {
 	case RowFacility:
 		return "object-cover h-48 w-full md:h-auto", "w-full h-full p-12 md:w-1/2 lg:flex-1"
 	case RowEvent:
-		// A teaser is shorter than its photo; centred, it reads as one unit.
-		return "object-cover h-1/2 w-full md:h-auto", "w-full px-12 py-8 break-words md:self-center md:w-1/2 lg:flex-1"
+		return "object-cover h-1/2 w-full md:h-auto", "w-full px-12 py-8 break-words md:w-1/2 lg:flex-1"
 	}
 
 	panic("ui: PhotoRows needs a RowKind")
