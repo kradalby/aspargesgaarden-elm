@@ -149,7 +149,7 @@ func (s *Server) Public() http.Handler {
 		admin = s.Admin()
 	}
 
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	h := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Every method, beside the pages' GET /: the mux cannot hold both.
 		if admin != nil && strings.HasPrefix(r.URL.Path, "/admin/") {
 			admin.ServeHTTP(w, r)
@@ -164,6 +164,9 @@ func (s *Server) Public() http.Handler {
 		seo.CountVisit(r)
 		mux.ServeHTTP(w, r)
 	})
+
+	return promhttp.InstrumentHandlerDuration(metricRequestSeconds,
+		promhttp.InstrumentHandlerCounter(metricRequests, h))
 }
 
 // answer is how the site answers an address: a page kept under it, or a

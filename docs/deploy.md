@@ -472,6 +472,8 @@ Go runtime's:
 | `asparges_bot_requests_total{agent,purpose}`        | Search and AI crawlers.                                         |
 | `asparges_referrals_total{source}`                  | Visits from search engines and AI answers.                      |
 | `asparges_indexnow_submissions_total{result}`       | IndexNow pings (off with `noindex`).                            |
+| `asparges_http_requests_total{code}`                | Public requests answered, by status code.                       |
+| `asparges_http_request_duration_seconds`            | Time to answer a public request.                                |
 
 A photo that fails before any build (its original missing or unreadable)
 counts in no metric; it shows as `images: photo not prepared` in the journal

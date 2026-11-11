@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus/testutil"
 	"github.com/stretchr/testify/require"
 
 	"github.com/kradalby/asparges/db"
@@ -226,6 +227,15 @@ func TestJulemarkedWithoutAMarketIsNotFound(t *testing.T) {
 
 	require.Equal(t, http.StatusNotFound, f.get(t, "/julemarked").Code)
 	require.Equal(t, http.StatusNotFound, f.get(t, "/julemarked/").Code)
+}
+
+// The dashboard's error graph reads the status the visitor got.
+func TestPublicRequestsAreCounted(t *testing.T) {
+	f := newFixture(t, false)
+	notFound := testutil.ToFloat64(metricRequests.WithLabelValues("404"))
+
+	require.Equal(t, http.StatusNotFound, f.get(t, "/julemarked").Code)
+	require.InDelta(t, notFound+1, testutil.ToFloat64(metricRequests.WithLabelValues("404")), 0)
 }
 
 // An empty database is a working site: no events yet, nothing in the menu.
