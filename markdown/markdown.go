@@ -70,7 +70,7 @@ func (r renderer) node(n ast.Node) []elem.Node {
 		if r.event {
 			// A callout, not a quotation: a div keeps screen readers from
 			// announcing a quote.
-			return one(elem.Div(attrs.Props{attrs.Class: "bg-brown/20 p-6 my-8"}, r.children(n)...))
+			return one(elem.Div(attrs.Props{attrs.Class: "bg-brown/20 p-6 my-8"}, r.callout(n)...))
 		}
 
 		return one(elem.Blockquote(nil, r.children(n)...))
@@ -121,6 +121,28 @@ func (r renderer) node(n ast.Node) []elem.Node {
 }
 
 func one(n elem.Node) []elem.Node { return []elem.Node{n} }
+
+// callout is a callout's content; an opening paragraph that is all bold
+// ("> **Velkommen!**") is its title.
+func (r renderer) callout(n *ast.Blockquote) []elem.Node {
+	p, ok := n.FirstChild().(*ast.Paragraph)
+	if !ok || p.ChildCount() != 1 {
+		return r.children(n)
+	}
+
+	if b, ok := p.FirstChild().(*ast.Emphasis); !ok || b.Level != 2 {
+		return r.children(n)
+	}
+
+	title := elem.P(attrs.Props{attrs.Class: "text-lg font-bold mb-2"}, r.children(p.FirstChild())...)
+
+	var rest []elem.Node
+	for c := p.NextSibling(); c != nil; c = c.NextSibling() {
+		rest = append(rest, r.node(c)...)
+	}
+
+	return append([]elem.Node{title}, rest...)
+}
 
 // text resolves escapes and entities exactly as goldmark's HTML renderer
 // does, then hands elem plain text to escape again.
@@ -203,11 +225,17 @@ func anchorID(raw string) string {
 }
 
 func (r renderer) list(n *ast.List) elem.Node {
-	if !n.IsOrdered() {
-		return elem.Ul(attrs.Props{attrs.Class: "list-disc list-inside space-y-2 pb-3"}, r.children(n)...)
+	// The old Christmas page left 16px under a list, its Markdown 12.
+	after := "pb-3"
+	if r.event {
+		after = "pb-4"
 	}
 
-	p := attrs.Props{attrs.Class: "list-decimal list-inside space-y-2 pb-3"}
+	if !n.IsOrdered() {
+		return elem.Ul(attrs.Props{attrs.Class: "list-disc list-inside space-y-2 " + after}, r.children(n)...)
+	}
+
+	p := attrs.Props{attrs.Class: "list-decimal list-inside space-y-2 " + after}
 	if n.Start != 1 {
 		p["start"] = strconv.Itoa(n.Start)
 	}

@@ -84,7 +84,8 @@ func TestEventSpecimen(t *testing.T) {
 	require.Contains(t, got, `<h2 class="text-4xl mt-2 mb-6 font-display text-tre">`)
 	require.Contains(t, got, `<h3 class="text-3xl mt-8 mb-4 font-display text-tre">Når og hvor</h3>`)
 	require.Contains(t, got, `<h4 class="font-bold text-lg mt-8 mb-4">`)
-	require.Contains(t, got, `<div class="bg-brown/20 p-6 my-8">`)
+	require.Contains(t, got, `<div class="bg-brown/20 p-6 my-8"><p class="text-lg font-bold mb-2">Velkommen!</p><p class="pb-3 text-sort">`)
+	require.Contains(t, got, `<ul class="list-disc list-inside space-y-2 pb-4">`)
 }
 
 func TestExcerpt(t *testing.T) {
