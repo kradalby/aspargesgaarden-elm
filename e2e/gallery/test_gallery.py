@@ -438,3 +438,25 @@ def test_data_matches_the_grid(desktop):
     )
     assert [i for i, _ in pairs] == list(range(len(photos)))
     assert [src for _, src in pairs] == [p["src"] for p in photos]
+
+
+def test_om_oss_icons_rows_of_three(desktop, phone):
+    """The occasion icons sit three to a row, each row centred in its column."""
+    for c in (desktop, phone):
+        page = c.page("/om-oss")
+        box, rows = page.evaluate(
+            """() => {
+                 const centre = r => Math.round(r.left + r.width / 2);
+                 const grid = document.querySelector('img[alt=Bryllup]').parentElement.parentElement;
+                 const rows = {};
+                 for (const i of grid.querySelectorAll('img')) {
+                   const r = i.getBoundingClientRect();
+                   (rows[Math.round(r.top)] ??= []).push(r);
+                 }
+                 const sorted = Object.keys(rows).map(Number).sort((a, b) => a - b).map(t => rows[t]);
+                 return [centre(grid.getBoundingClientRect()),
+                         sorted.map(rs => [rs.length, Math.round((rs[0].left + rs.at(-1).right) / 2)])];
+               }"""
+        )
+        assert [n for n, _ in rows] == [3, 3, 3], rows
+        assert all(abs(mid - box) <= 1 for _, mid in rows), (box, rows)

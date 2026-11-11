@@ -27,7 +27,8 @@ const (
 	IconLocation   Icon = "location.svg"
 )
 
-// IconImage shows an icon at its natural size. Alt says what it stands for.
+// IconImage shows an icon as wide as its box: the files have no size of
+// their own. Alt says what it stands for.
 func IconImage(icon Icon, alt string) elem.Node {
 	return iconImg(icon, alt, "")
 }

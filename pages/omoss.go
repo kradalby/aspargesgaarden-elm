@@ -57,7 +57,7 @@ var occasions = []struct {
 func OmOss(s Site) *elem.Element {
 	icons := make([]elem.Node, len(occasions))
 	for i, o := range occasions {
-		icons[i] = ui.IconImage(o.icon, o.name)
+		icons[i] = elem.Div(attrs.Props{attrs.Class: "w-1/3 p-2"}, ui.IconImage(o.icon, o.name))
 	}
 
 	return s.page(meta("/om-oss",
@@ -67,7 +67,7 @@ func OmOss(s Site) *elem.Element {
 			elem.Div(attrs.Props{attrs.Class: "flex flex-row flex-wrap"},
 				elem.Div(attrs.Props{attrs.Class: "w-full px-5 text-sort md:w-1/2 md:px-0"},
 					append(markdown.Render(omOssText), ui.ContactLink())...),
-				elem.Div(attrs.Props{attrs.Class: "w-full flex flex-row flex-wrap justify-center md:w-1/2 md:-mt-12"}, icons...),
+				elem.Div(attrs.Props{attrs.Class: "w-full flex flex-row flex-wrap content-start justify-center md:w-1/2 md:-mt-12"}, icons...),
 			),
 		),
 	)
