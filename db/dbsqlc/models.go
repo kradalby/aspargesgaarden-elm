@@ -59,6 +59,7 @@ type Photo struct {
 	PhotographerID sql.NullInt64 `db:"photographer_id"`
 	CreatedAt      int64         `db:"created_at"`
 	UpdatedAt      int64         `db:"updated_at"`
+	Caption        string        `db:"caption"`
 }
 
 type PhotoCrop struct {

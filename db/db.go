@@ -52,6 +52,28 @@ var schema = &squibble.Schema{
 			// whether it was typed.
 			Apply: squibble.Exec(`ALTER TABLE events ADD COLUMN slug_from_title INTEGER NOT NULL DEFAULT 0 CHECK (slug_from_title IN (0, 1));`),
 		},
+		{
+			Source: "e1cd24d3375aad77a05d966425975e8cd3133740471d1b86e0563b8eba44afa6",
+			Target: "2df1c5197beb555486fb86cb626527dbc64db44a4eb3d89b35012ba2ec48fc55",
+			// SQLite cannot change a CHECK in place, so event_photos is
+			// rebuilt under its own name for the poster role.
+			Apply: squibble.Exec(`ALTER TABLE photos ADD COLUMN caption TEXT NOT NULL DEFAULT '';
+ALTER TABLE event_photos RENAME TO event_photos_old;
+CREATE TABLE event_photos (
+    event_id INTEGER NOT NULL REFERENCES events (id) ON DELETE CASCADE,
+    photo_id INTEGER NOT NULL REFERENCES photos (id),
+    role     TEXT    NOT NULL CHECK (role IN ('main', 'extra', 'poster')),
+    position INTEGER NOT NULL CHECK (position >= 0),
+    PRIMARY KEY (event_id, photo_id),
+    UNIQUE (event_id, position)
+) WITHOUT ROWID;
+INSERT INTO event_photos (event_id, photo_id, role, position)
+    SELECT event_id, photo_id, role, position FROM event_photos_old;
+DROP TABLE event_photos_old;
+CREATE UNIQUE INDEX event_photos_one_main ON event_photos (event_id) WHERE role = 'main';
+CREATE UNIQUE INDEX event_photos_one_poster ON event_photos (event_id) WHERE role = 'poster';
+CREATE INDEX event_photos_photo ON event_photos (photo_id);`),
+		},
 	},
 }
 

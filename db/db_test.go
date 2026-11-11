@@ -204,6 +204,13 @@ func TestEventPhotoInvariants(t *testing.T) {
 
 	err = q.InsertEventPhoto(ctx, dbsqlc.InsertEventPhotoParams{EventID: eventID, PhotoID: 999, Role: "extra", Position: 1})
 	require.True(t, IsForeignKeyViolation(err), "missing photo: got %v", err)
+
+	require.NoError(t, q.InsertEventPhoto(ctx, dbsqlc.InsertEventPhotoParams{EventID: eventID, PhotoID: b, Role: "poster", Position: 1}))
+
+	c, err := q.CreatePhoto(ctx, photo(3))
+	require.NoError(t, err)
+	err = q.InsertEventPhoto(ctx, dbsqlc.InsertEventPhotoParams{EventID: eventID, PhotoID: c, Role: "poster", Position: 2})
+	require.True(t, IsUniqueViolation(err), "second poster: got %v", err)
 }
 
 func TestCreatePhotoDedupes(t *testing.T) {

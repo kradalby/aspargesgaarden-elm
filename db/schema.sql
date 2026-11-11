@@ -74,6 +74,8 @@ CREATE TABLE photographers (
 
 -- photos is one uploaded original, named by the sha256 of its content; the
 -- file itself lives in originals/ and is never referenced by any other key.
+-- alt describes the photo for screen readers and search; caption is optional
+-- text shown under it in the lightbox.
 CREATE TABLE photos (
     id              INTEGER PRIMARY KEY,
     sha256          TEXT    NOT NULL UNIQUE
@@ -84,7 +86,8 @@ CREATE TABLE photos (
     alt             TEXT    NOT NULL DEFAULT '',
     photographer_id INTEGER REFERENCES photographers (id),
     created_at      INTEGER NOT NULL,
-    updated_at      INTEGER NOT NULL
+    updated_at      INTEGER NOT NULL,
+    caption         TEXT    NOT NULL DEFAULT ''
 );
 
 -- Without ON DELETE: a photographer credited on a photo cannot be deleted.
@@ -107,13 +110,14 @@ CREATE TABLE photo_crops (
 CREATE TABLE event_photos (
     event_id INTEGER NOT NULL REFERENCES events (id) ON DELETE CASCADE,
     photo_id INTEGER NOT NULL REFERENCES photos (id),
-    role     TEXT    NOT NULL CHECK (role IN ('main', 'extra')),
+    role     TEXT    NOT NULL CHECK (role IN ('main', 'extra', 'poster')),
     position INTEGER NOT NULL CHECK (position >= 0),
     PRIMARY KEY (event_id, photo_id),
     UNIQUE (event_id, position)
 ) WITHOUT ROWID;
 
 CREATE UNIQUE INDEX event_photos_one_main ON event_photos (event_id) WHERE role = 'main';
+CREATE UNIQUE INDEX event_photos_one_poster ON event_photos (event_id) WHERE role = 'poster';
 CREATE INDEX event_photos_photo ON event_photos (photo_id);
 
 CREATE TABLE gallery_photos (
