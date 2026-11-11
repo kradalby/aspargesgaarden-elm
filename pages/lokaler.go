@@ -14,7 +14,7 @@ import (
 var (
 	marianneOus    = ui.Photographer{Name: "Marianne Ous", Website: "https://www.instagram.com/marianneous"}
 	hanneGulliksen = ui.Photographer{Name: "Hanne Gulliksen"}
-	auroraHovland  = ui.Photographer{Name: "Aurora Hovland", Website: "https://www.aurorahovland.com"}
+	auroraHovland  = ui.Photographer{Name: "Aurora Hovland"}
 )
 
 // facilities are the rooms, from the old content/facilities/*.md.
