@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/chasefleming/elem-go"
@@ -18,14 +19,15 @@ func TestPhotoCredit(t *testing.T) {
 	).Render())
 }
 
-// The hidden bar must not catch a tap meant for the photo's link, and must
-// show when a keyboard reaches its link.
-func TestPhotoCreditHiddenBarLetsTapsThrough(t *testing.T) {
+// The bar never catches a tap meant for the photo's link, its name only a
+// mouse's, and it shows when a keyboard reaches its link.
+func TestPhotoCreditBarLetsTapsThrough(t *testing.T) {
 	got := PhotoCredit(Photographer{Name: "Aurora Hovland", Website: "https://www.aurorahovland.com"}, elem.Span(nil)).Render()
 
-	for _, c := range []string{"opacity-0 pointer-events-none", "group-focus-within:opacity-100", "group-focus-within:pointer-events-auto", "group-hover:pointer-events-auto"} {
-		require.Contains(t, got, c)
-	}
+	require.Contains(t, got, `<a class="pointer-events-none pointer-fine:group-hover:pointer-events-auto"`)
+	require.Contains(t, got, `<div class="opacity-0 pointer-events-none `)
+	require.Contains(t, got, "group-focus-within:opacity-100")
+	require.Equal(t, 3, strings.Count(got, "pointer-events-"), "only a mouse over the name turns them on")
 }
 
 // The old site showed an empty "av " bar when nobody was credited.

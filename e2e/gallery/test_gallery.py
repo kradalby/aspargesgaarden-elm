@@ -232,6 +232,51 @@ def test_phone_on_its_side_uses_the_height(browser):
     c.close()
 
 
+def credited(page):
+    """The first photo whose credit is a link, and that link's bar."""
+    i = next(i for i, p in enumerate(galleries(page)[0]) if p.get("link"))
+    item = link(page, i).locator("xpath=..")
+    item.scroll_into_view_if_needed()
+    return i, item.locator("a[target=_blank]")
+
+
+def test_credit_strip_opens_the_lightbox_mouse(desktop):
+    """Off the name, the strip is the photo, as on the old site; the name
+    opens the photographer's site."""
+    page = desktop.page("/galleri")
+    desktop.ctx.route("https://luckythirteen.no/**", lambda r: r.fulfill(status=200, body=""))
+    i, name = credited(page)
+    link(page, i).hover()
+    expect(name).to_be_visible()
+    strip = name.locator("xpath=..").bounding_box()
+    page.mouse.click(strip["x"] + 4, strip["y"] + strip["height"] / 2)
+    expect(page.locator(DIALOG)).to_have_attribute("aria-label", f"Bilde {i + 1} av {PHOTOS}")
+    page.keyboard.press("Escape")
+    with page.expect_popup() as popup:
+        name.click()
+    assert popup.value.url.startswith("https://luckythirteen.no")
+    expect(page.locator(DIALOG)).to_have_count(0)
+
+
+def test_credit_strip_opens_the_lightbox_touch(phone):
+    """A tap on the hidden strip, name or not, opens the photo it covers."""
+    page = phone.page("/galleri")
+    i, name = credited(page)
+    box = name.bounding_box()
+    page.touchscreen.tap(box["x"] + box["width"] / 2, box["y"] + box["height"] / 2)
+    expect(page.locator(DIALOG)).to_have_attribute("aria-label", f"Bilde {i + 1} av {PHOTOS}")
+    assert len(phone.ctx.pages) == 1, "no photographer's site opened"
+
+
+def test_credit_is_reachable_by_keyboard(desktop):
+    page = desktop.page("/galleri")
+    i, name = credited(page)
+    link(page, i).focus()
+    page.keyboard.press("Tab")
+    expect(name).to_be_focused()
+    expect(name).to_be_visible()
+
+
 def test_escape_closes_and_returns_focus(desktop):
     page = desktop.page("/galleri")
     link(page, 3).focus()
