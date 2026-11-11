@@ -65,7 +65,7 @@ Any `4xx`/`5xx` from `/admin/api/` has this body:
 | `slug_reserved`                                                            | 422         | `ErrSlugReserved`      | `slug`                               |                                                                                                                                                                                              |
 | `slug_taken`                                                               | 422         | `ErrSlugTaken`         | `slug`                               |                                                                                                                                                                                              |
 | `slug_frozen`                                                              | 422         | `ErrSlugFrozen`        | `slug`                               |                                                                                                                                                                                              |
-| `end_before_start`                                                         | 422         | `ErrEndBeforeStart`    | `end` or `endTime`                   | `end` when the last day is before the first; `endTime` when a one-day event ends before it starts.                                                                                           |
+| `end_before_start`                                                         | 422         | `ErrEndBeforeStart`    | `end` or `endTime`                   | `end` when the last day is before the first; `endTime` when it is not after `startTime`, since the times are each day's.                                                                     |
 | `extra_date`                                                               | 422         | `ErrExtraDate`         | `extraDates`                         |                                                                                                                                                                                              |
 | `ticket_url`                                                               | 422         | `ErrTicketURL`         | `ticketUrl`                          |                                                                                                                                                                                              |
 | `title_required`                                                           | 422         | `ErrTitleRequired`     | `title`                              |                                                                                                                                                                                              |
@@ -215,7 +215,7 @@ to them.
   "year": 2026,
   "path": "/arrangementer/2026/julemarked",
   "url": "https://aspargesgaarden.no/arrangementer/2026/julemarked",
-  "dateText": "14. november kl. 12.00 – 15. november 2026 kl. 16.00 på Aspargesgården",
+  "dateText": "14.–15. november 2026 kl. 12.00–16.00 på Aspargesgården",
   "isOver": false,
   "title": "Julemarked 2026",
   "summary": "Velkommen til årets julemarked i Låven.",

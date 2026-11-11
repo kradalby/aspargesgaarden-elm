@@ -81,10 +81,6 @@ yet.
 - [ ] `images.Store.Status` loads its photo from the database again, though
       every caller in `server/` already has it, once per photo on
       `GET /admin/api/events`. Pass the photo in (`Status(images.Photo)`).
-- [ ] A two-day market (start and end date, start and end time) reads as
-      one event from the first day's start to the last day's end, in the
-      date line and the JSON-LD; the real hours are the same each day. Decide
-      what an end date with an end time means, then render it so.
 - [ ] Crops are not redaction. Every built size of every stored photo, the
       uncropped one included, is public at its unguessable `/img/` address,
       drafts and unused photos too. A photo that must not be seen has to be
