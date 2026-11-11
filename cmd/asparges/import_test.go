@@ -47,6 +47,7 @@ type imported struct {
 	BodyStart          string
 	Alt, Credit        string
 	ExtraPhotos        int
+	Poster             string
 }
 
 func summarize(t *testing.T, store *site.Store) []imported {
@@ -64,6 +65,10 @@ func summarize(t *testing.T, store *site.Store) []imported {
 		}
 		for _, d := range e.ExtraDates {
 			got.Extra = append(got.Extra, d.String())
+		}
+
+		if p := e.Poster; p != nil {
+			got.Poster = p.Alt
 		}
 
 		if p := e.MainPhoto; p != nil {
@@ -92,7 +97,8 @@ func TestImport(t *testing.T) {
 		{
 			Path: "/arrangementer/2026/julemarked", Status: "published", Start: "2026-11-14", End: "2026-11-15",
 			StartTime: "12:00", EndTime: "16:00", BodyStart: "# Velkommen til Julemarked på Aspargesgården!",
-			Alt: "Bålfat på gårdsplassen", ExtraPhotos: 4,
+			Alt: "Bålfat på gårdsplassen", ExtraPhotos: 3,
+			Poster: "Julemarked på Aspargesgården lørdag og søndag 14.–15. november kl. 12–16. Mer enn 30 utstillere, kafeteria og tombola.",
 		},
 		{
 			Path: "/arrangementer/2026/takkebakstkurs-med-anita-saga", Status: "published", Start: "2026-10-31",
@@ -125,14 +131,16 @@ func TestImport(t *testing.T) {
 	require.NoError(t, err)
 
 	alts := make([]string, len(gallery))
+	captions := make([]string, len(gallery))
 	for i, p := range gallery {
-		alts[i] = p.Alt
+		alts[i], captions[i] = p.Alt, p.Caption
 	}
 
-	// patrick was imported with the gourmet event first and keeps that alt;
-	// liten, too small, is left out.
+	// patrick was imported with the gourmet event first and keeps that alt,
+	// with the gallery's caption; liten, too small, is left out.
 	require.Len(t, gallery, 12)
 	require.Equal(t, []string{"", "Gourmetaften", "Blomster fra @bondenshage", "Låven pyntet til bryllup"}, alts[:4])
+	require.Equal(t, []string{"", "Kokken", "Blomster fra @bondenshage", "Låven pyntet til bryllup"}, captions[:4])
 	require.Equal(t, "Sophia Karlsen Edwards", gallery[0].Photographer.Name)
 
 	// Centred crops of every kind the photo is large enough for; the narrow

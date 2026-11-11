@@ -147,9 +147,12 @@ func (im importer) event(ctx context.Context, file string, have map[string]bool)
 		return nil
 	}
 
-	extras := []oldPhoto(nil)
+	var (
+		extras []oldPhoto
+		poster *oldPhoto
+	)
 	if page, ok := oldChristmasPages[e.Path()]; ok {
-		e.BodyMD, extras = page.body, page.photos
+		e.BodyMD, extras, poster = page.body, page.photos, page.poster
 	}
 
 	// Publishing needs alt text, and the old event photos had none.
@@ -179,6 +182,18 @@ func (im importer) event(ctx context.Context, file string, have map[string]bool)
 		}
 
 		e.ExtraPhotos = append(e.ExtraPhotos, p)
+	}
+
+	if poster != nil {
+		p, err := im.photo(ctx, *poster, poster.Description)
+		switch {
+		case errors.Is(err, images.ErrTooSmall):
+			im.log.WarnContext(ctx, "poster too small to use, left out", "path", e.Path(), "err", err)
+		case err != nil:
+			return err
+		default:
+			e.Poster = &p
+		}
 	}
 
 	create := im.store.CreateEvent
@@ -377,6 +392,15 @@ func (im importer) gallery(ctx context.Context) error {
 			return err
 		}
 
+		// The old gallery showed the description under the photo. One an
+		// event brought in first has no caption yet.
+		if c := strings.TrimSpace(gp.Description); c != "" && p.Caption == "" {
+			p.Caption = c
+			if p, err = im.store.UpdatePhoto(ctx, p); err != nil {
+				return fmt.Errorf("gallery photo %d (%s): %w", i, gp.Path, err)
+			}
+		}
+
 		ids = append(ids, p.ID)
 	}
 
@@ -394,10 +418,11 @@ var errUnknownPhotographer = errors.New("photographer not in the photographers l
 // oldChristmasPage is a hand-made Christmas market page of the old site
 // (src/Page/Christmas/Year_.elm), whose address now leads to that year's
 // market event. Its text is fuller than the event file's, which only
-// linked to it, so it becomes the event's text, with its photos.
+// linked to it, so it becomes the event's text, with its photos and poster.
 type oldChristmasPage struct {
 	body   string
 	photos []oldPhoto
+	poster *oldPhoto
 }
 
 var oldChristmasPages = map[string]oldChristmasPage{
@@ -438,10 +463,10 @@ Vi er utrolig takknemlige for at Aspargesgården kan være en vakker ramme for s
 		// The old page also showed julemarked1, which is the event's
 		// banner here; one event cannot show a photo twice.
 		photos: []oldPhoto{
-			{Path: "arrangementer/2026-11-14-julemarked", Description: "Julemarked på Aspargesgården lørdag og søndag 14.–15. november kl. 12–16. Mer enn 30 utstillere, kafeteria og tombola."},
 			{Path: "arrangementer/julemarked3", Description: "Fra et tidligere julemarked på Aspargesgården"},
 			{Path: "arrangementer/julemarked2", Description: "Et tilbakeblikk på julemarkedet"},
 			{Path: "arrangementer/julemarked4", Description: "Julemarked på gården"},
 		},
+		poster: &oldPhoto{Path: "arrangementer/2026-11-14-julemarked", Description: "Julemarked på Aspargesgården lørdag og søndag 14.–15. november kl. 12–16. Mer enn 30 utstillere, kafeteria og tombola."},
 	},
 }
