@@ -187,16 +187,28 @@ def test_scrollbar_gutter_takes_the_backdrop_colour(desktop):
     expect(page.locator("html")).to_have_css("background-color", "rgba(0, 0, 0, 0)")
 
 
-def test_shows_alt_text_and_credit(desktop):
+def test_shows_caption_only_where_set_and_credit(desktop):
     page = desktop.page("/galleri")
     photos = galleries(page)[0]
-    i = next(i for i, p in enumerate(photos) if p["alt"] == "Blomster fra @bondenshage")
+    caption = page.locator("[role=dialog] figcaption")
+
+    # The import gave patrick the gourmet event's alt and the gallery's caption.
+    i = next(i for i, p in enumerate(photos) if p.get("caption") == "Kokken")
     link(page, i).click()
-    expect(page.locator(SHOWN)).to_have_attribute("alt", "Blomster fra @bondenshage")
-    expect(page.locator("[role=dialog] figcaption")).to_contain_text("Blomster fra @bondenshage")
+    expect(page.locator(SHOWN)).to_have_attribute("alt", "Gourmetaften")
+    expect(caption).to_contain_text("Kokken")
+    expect(caption).not_to_contain_text("Gourmetaften")
     credit = page.locator("[role=dialog] figcaption a")
     expect(credit).to_have_text("Foto: Lucky Thirteen")
     expect(credit).to_have_attribute("href", "https://luckythirteen.no/")
+    page.keyboard.press("Escape")
+
+    # No caption: the credit alone, and the alt is still announced.
+    i = next(i for i, p in enumerate(photos) if "caption" not in p and p["alt"])
+    link(page, i).click()
+    expect(page.locator(SHOWN)).to_have_attribute("alt", photos[i]["alt"])
+    expect(caption).to_have_text(f"Foto: {photos[i]['by']}" if "by" in photos[i] else "")
+    expect(page.locator("[role=dialog] [aria-live=polite]")).to_contain_text(photos[i]["alt"])
 
 
 def test_old_frame(desktop):
@@ -214,10 +226,10 @@ def test_whole_caption_on_a_phone(phone):
     """A long caption wraps in full; nothing is cut off with an ellipsis."""
     page = phone.page("/galleri")
     photos = galleries(page)[0]
-    i = max(range(len(photos)), key=lambda i: len(photos[i]["alt"]))
+    i = max(range(len(photos)), key=lambda i: len(photos[i].get("caption", "")))
     link(page, i).tap()
     caption = page.locator("[role=dialog] figcaption > div:last-child")
-    expect(caption).to_have_text(photos[i]["alt"])
+    expect(caption).to_have_text(photos[i]["caption"])
     assert caption.evaluate("c => c.scrollHeight <= c.clientHeight && getComputedStyle(c).webkitLineClamp === 'none'")
 
 
@@ -364,18 +376,20 @@ def test_fits_the_window_it_opens_in(desktop):
 
 
 def test_event_page_gallery(desktop):
-    """The Christmas market's further photos open in the lightbox too."""
+    """The Christmas market's further photos open in the lightbox too; its poster is no part of them."""
     page = desktop.page("/arrangementer/2026/julemarked")
     assert page.locator("script[src*='/static/gallery.js']").count() == 1
     (photos,) = galleries(page)
-    assert len(photos) == 4
-    link(page, 3).click()
-    expect_shown(page, photos[3])
-    expect(page.locator(DIALOG)).to_have_attribute("aria-label", "Bilde 4 av 4")
+    assert len(photos) == 3
+    poster = page.locator("article a:not([data-index]) img[alt^='Julemarked på Aspargesgården lørdag']")
+    expect(poster).to_have_count(1)
+    link(page, 2).click()
+    expect_shown(page, photos[2])
+    expect(page.locator(DIALOG)).to_have_attribute("aria-label", "Bilde 3 av 3")
     page.keyboard.press("ArrowRight")  # wraps within the event's photos
     expect_shown(page, photos[0])
     page.keyboard.press("Escape")
-    expect(link(page, 3)).to_be_focused()
+    expect(link(page, 2)).to_be_focused()
 
 
 def test_lightbox_fetches_the_size_the_viewport_needs(desktop, phone):

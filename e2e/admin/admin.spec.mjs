@@ -1260,3 +1260,77 @@ test("a draft's address follows its title until she chooses one", async ({
     `${host}/arrangementer/2026/jul – tøm feltet`,
   );
 });
+
+test("a poster: chosen in its slot, whole in the preview and on the page, and shared", async ({
+  page,
+  request,
+  seed,
+}) => {
+  const draft = await (
+    await request.post("/admin/api/events", { data: draftInput(seed) })
+  ).json();
+  await page.goto(`/admin/arrangementer/${draft.id}`);
+  const slot = page.locator("#plakat-seksjon");
+  await choose(
+    page,
+    slot.getByRole("button", { name: "Velg plakat" }),
+    fixture("konsert.jpg"),
+  );
+  await expect(slot.locator('[data-photo-status="ready"]')).toBeVisible({
+    timeout: 60_000,
+  });
+  await slot
+    .getByLabel("Hva står på plakaten?")
+    .fill("Plakat: høstmarked 21. november");
+  const frame = page.frameLocator("#forhandsvisning iframe");
+  await expect(
+    frame.locator('img[alt="Plakat: høstmarked 21. november"]'),
+  ).toHaveCount(1);
+
+  await page.getByRole("button", { name: "Publiser" }).click();
+  await expect(
+    page.getByText("Publisert! Arrangementet er nå på nettsiden.").first(),
+  ).toBeVisible();
+  const event = await (
+    await request.get(`/admin/api/events/${draft.id}`)
+  ).json();
+  const sha = event.poster.previewUrl.split("/")[3];
+  const ogImage = (html) =>
+    /<meta content="([^"]+)" property="og:image">/.exec(html)?.[1];
+
+  const live = (await publicText(request, event.path)).text;
+  expect(live).toContain('alt="Plakat: høstmarked 21. november"');
+  expect(ogImage(live)).toContain(`/${sha}/full-`);
+  // The banner is still the main photo.
+  expect(cropOf(live, "banner")).toBeTruthy();
+
+  await slot.getByRole("button", { name: "Ta bort plakaten" }).click();
+  await page.getByRole("button", { name: "Lagre endringene" }).click();
+  await expect(page.getByText("Endringene er lagret").first()).toBeVisible();
+  const without = (await publicText(request, event.path)).text;
+  expect(without).not.toContain("Plakat: høstmarked");
+  expect(ogImage(without)).not.toContain(sha);
+});
+
+test("a caption shows in the lightbox, and nothing where there is none", async ({
+  page,
+  seed,
+}) => {
+  await page.goto("/admin/galleri");
+  const card = page.locator(`[data-photo="${seed.landskap}"]`);
+  await card.getByLabel("Bildetekst (valgfritt)").fill("Julemarkedet i fjor");
+  await card.getByLabel("Bildetekst (valgfritt)").press("Tab");
+  await expect(card.getByText("Lagret")).toBeVisible();
+
+  await page.goto("/galleri");
+  await page.locator("[data-gallery] a[data-index='0']").click();
+  const caption = page.locator("[role=dialog] figcaption");
+  await expect(caption).toContainText("Julemarkedet i fjor");
+  await expect(caption).not.toContainText("Boder med julepynt");
+  await expect(page.locator("[role=dialog] [aria-live=polite]")).toContainText(
+    "Boder med julepynt i låven",
+  );
+  // portrett has neither caption nor photographer: nothing under it.
+  await page.getByRole("button", { name: "Neste bilde" }).click();
+  await expect(caption).toHaveText("");
+});
