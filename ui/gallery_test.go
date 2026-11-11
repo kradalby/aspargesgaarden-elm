@@ -15,7 +15,7 @@ import (
 )
 
 var testGallery = []GalleryPhoto{
-	{Photo: testPhoto(), Alt: "Låven pyntet til bryllup", By: Photographer{Name: "Lucky Thirteen", Website: "https://luckythirteen.no/"}},
+	{Photo: testPhoto(), Alt: "Låven pyntet til bryllup", Caption: " Bryllup i juni ", By: Photographer{Name: "Lucky Thirteen", Website: "https://luckythirteen.no/"}},
 	{Photo: testPhoto(images.JPEG), Alt: "Fjøset", By: Photographer{Name: "Sophia Karlsen Edwards"}},
 	{Photo: testPhoto(images.WebP, images.JPEG), Alt: "Hagen"},
 }
@@ -57,7 +57,7 @@ func TestGalleryData(t *testing.T) {
 	jpeg := "/img/x-480.jpeg 480w, /img/x-800.jpeg 800w, /img/x-1200.jpeg 1200w, /img/x-1600.jpeg 1600w"
 	want := []lightboxPhoto{
 		{
-			Alt: "Låven pyntet til bryllup", Width: 1600, Height: 2400, Src: "/img/x-1200.jpeg", Srcset: jpeg,
+			Alt: "Låven pyntet til bryllup", Caption: "Bryllup i juni", Width: 1600, Height: 2400, Src: "/img/x-1200.jpeg", Srcset: jpeg,
 			Sources: []lightboxSource{
 				{Type: "image/avif", Srcset: "/img/x-480.avif 480w, /img/x-800.avif 800w, /img/x-1200.avif 1200w, /img/x-1600.avif 1600w"},
 				{Type: "image/webp", Srcset: "/img/x-480.webp 480w, /img/x-800.webp 800w, /img/x-1200.webp 1200w, /img/x-1600.webp 1600w"},

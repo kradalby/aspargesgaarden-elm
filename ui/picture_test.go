@@ -66,7 +66,7 @@ func TestPictureRefusesIncompleteProps(t *testing.T) {
 var layoutKinds = map[Layout][]images.Kind{
 	LayoutFullscreen: nil,
 	LayoutRowPhoto:   {images.Card},
-	LayoutBanner:     {images.Banner},
+	LayoutBanner:     {images.Banner, images.Full},
 	LayoutCardGrid:   {images.Card},
 	LayoutHalfColumn: {images.Full},
 	LayoutGallery:    {images.Full},

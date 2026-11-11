@@ -14,7 +14,8 @@ import (
 )
 
 // Event is an event's own page: banner, the quick facts with the ticket
-// button, then the whole text and the further photos. A past event keeps
+// button, the poster if it has one, then the whole text and the further
+// photos. A past event keeps
 // its page, marked as over, so links and search results still land.
 func Event(s Site, e site.Event, now time.Time) *elem.Element {
 	over := e.IsOver(now)
@@ -41,6 +42,12 @@ func Event(s Site, e site.Event, now time.Time) *elem.Element {
 
 	if e.Summary != "" {
 		kids = append(kids, ui.Lead(e.Summary))
+	}
+
+	// After the opening words, where the old pages had it: the poster
+	// repeats the facts above it, and the text below goes on from it.
+	if p := e.Poster; p != nil {
+		kids = append(kids, ui.EventPoster(photoRef(*p, images.Full), altOf(*p), credit(p.Photographer)))
 	}
 
 	kids = append(kids, markdown.RenderEvent(e.BodyMD)...)
@@ -82,9 +89,7 @@ func eventMeta(s Site, e site.Event, ticketURL string) ui.Meta {
 
 	m.Description = seo.Clip(description, descriptionRunes)
 
-	if e.MainPhoto != nil {
-		m.Image, _ = seo.PhotoImage(*e.MainPhoto)
-	}
+	m.Image, _ = seo.EventImage(e)
 
 	return m
 }

@@ -66,6 +66,26 @@ func PhotoImage(p site.Photo) (img Image, ok bool) {
 	return Image{}, false
 }
 
+// EventImage is the event's share image: its poster, whole, as the old
+// pages shared it, or else its main photo's (PhotoImage). A tall poster is
+// shared as it is too; a scraper that wants 1.91:1 crops it to the middle.
+// ok is false without either.
+func EventImage(e site.Event) (img Image, ok bool) {
+	if p := e.Poster; p != nil {
+		if ref, err := images.RefFor(p.Image(), images.Full); err == nil {
+			if v, ok := largestJPEG(ref); ok {
+				return Image{URL: v.URL, Width: v.Width, Height: ref.Height * v.Width / ref.Width, Alt: p.Alt}, true
+			}
+		}
+	}
+
+	if e.MainPhoto == nil {
+		return Image{}, false
+	}
+
+	return PhotoImage(*e.MainPhoto)
+}
+
 func largestJPEG(ref images.Ref) (images.Variant, bool) {
 	var best images.Variant
 	for _, v := range ref.Variants {

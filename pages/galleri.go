@@ -37,7 +37,7 @@ func galleryPhotos(photos []site.Photo) []ui.GalleryPhoto {
 	out := make([]ui.GalleryPhoto, len(photos))
 
 	for i, p := range photos {
-		out[i] = ui.GalleryPhoto{Photo: photoRef(p, images.Full), Alt: p.Alt, By: credit(p.Photographer)}
+		out[i] = ui.GalleryPhoto{Photo: photoRef(p, images.Full), Alt: p.Alt, Caption: p.Caption, By: credit(p.Photographer)}
 		if out[i].Alt == "" {
 			out[i].Alt = fallbackAlt
 		}

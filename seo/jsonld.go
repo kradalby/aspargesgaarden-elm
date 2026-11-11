@@ -263,17 +263,17 @@ func when(d site.Date, clock string) string {
 	return time.Date(d.Year, d.Month, d.Day, hh, mm, 0, 0, site.Oslo).Format(time.RFC3339)
 }
 
-// eventImages are the event's photo in its share, banner and card crops,
-// as search engines like several aspect ratios.
+// eventImages are the event's share image (EventImage) and its main photo's
+// banner and card crops, as search engines like several aspect ratios.
 func eventImages(baseURL string, e site.Event) []string {
-	if e.MainPhoto == nil {
-		return nil
-	}
-
 	var out []string
 
-	if img, ok := PhotoImage(*e.MainPhoto); ok {
+	if img, ok := EventImage(e); ok {
 		out = append(out, baseURL+img.URL)
+	}
+
+	if e.MainPhoto == nil {
+		return out
 	}
 
 	for _, k := range []images.Kind{images.Banner, images.Card} {

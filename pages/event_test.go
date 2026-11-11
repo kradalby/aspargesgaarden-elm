@@ -25,6 +25,20 @@ func TestEvent(t *testing.T) {
 	require.NotContains(t, got, "Arrangementet er")
 }
 
+// A poster sits whole after the opening words and is the share image; the
+// banner stays the main photo.
+func TestEventPoster(t *testing.T) {
+	e := testEvents()[0]
+	poster := testPhoto('f', "Plakat: julemarked 14.–15. november")
+	e.Poster = &poster
+
+	got := Event(testSite, e, testNow).Render()
+	require.Contains(t, got, "/"+strings.Repeat("a", 64)+"/banner-")
+	require.Contains(t, got, `alt="Plakat: julemarked 14.–15. november"`)
+	require.Less(t, strings.Index(got, "Mer enn 30 utstillere, kafé"), strings.Index(got, `alt="Plakat`), "after the lead")
+	require.Regexp(t, `<meta content="https://aspargesgaarden.no/img/v[0-9]+/`+strings.Repeat("f", 64)+`/full-[0-9a-f]{8}-1600.jpg" property="og:image">`, got)
+}
+
 // Further photos are a gallery with its lightbox; an event without them
 // loads no script.
 func TestEventGallery(t *testing.T) {

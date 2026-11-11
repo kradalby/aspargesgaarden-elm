@@ -113,3 +113,26 @@ func TestPhotoImage(t *testing.T) {
 		})
 	}
 }
+
+// A poster is shared whole in place of the main photo's share crop, tall or
+// wide; the JSON-LD leads with it and keeps the main photo's other shapes.
+func TestEventImagePoster(t *testing.T) {
+	e := testEvent()
+
+	img, ok := EventImage(e)
+	require.True(t, ok)
+	require.Contains(t, img.URL, "/share-", "without a poster, the main photo's share crop")
+
+	poster := testPhoto('f', 1600, 2200)
+	poster.Alt = "Plakat for julemarkedet"
+	e.Poster = &poster
+
+	img, ok = EventImage(e)
+	require.True(t, ok)
+	require.Contains(t, img.URL, "/"+strings.Repeat("f", 64)+"/full-")
+	require.Equal(t, Image{URL: img.URL, Width: 1600, Height: 2200, Alt: "Plakat for julemarkedet"}, img)
+
+	ev := EventNodes(testBase, EventInput{Event: e})[0].(Event) //nolint:forcetypeassert // fails the test otherwise
+	require.Equal(t, testBase+img.URL, ev.Image[0])
+	require.Len(t, ev.Image, 3, "poster, banner and card")
+}

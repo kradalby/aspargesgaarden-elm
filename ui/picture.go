@@ -25,8 +25,8 @@ const (
 	// LayoutRowPhoto is the photo column of PhotoRows: full width on a
 	// phone, half from md, a third from lg, at most 48rem.
 	LayoutRowPhoto
-	// LayoutBanner is the photo at the top of an event page, as wide as
-	// EventColumn.
+	// LayoutBanner is a photo as wide as EventColumn: the banner at the top
+	// of an event page, and its poster.
 	LayoutBanner
 	// LayoutCardGrid is a photo in EventCards: half the width on a phone,
 	// a third from md, a quarter from lg, at most 48rem.

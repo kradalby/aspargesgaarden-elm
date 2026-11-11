@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"slices"
 	"strconv"
+	"strings"
 
 	"github.com/chasefleming/elem-go"
 	"github.com/chasefleming/elem-go/attrs"
@@ -16,7 +17,9 @@ type GalleryPhoto struct {
 	// Photo is the whole, uncropped photo: grid and lightbox show it as taken.
 	Photo images.Ref
 	Alt   string
-	By    Photographer
+	// Caption is shown under the photo in the lightbox; "" shows none.
+	Caption string
+	By      Photographer
 }
 
 // galleryAttr marks a gallery's grid. Page loads the lightbox when a page
@@ -93,6 +96,7 @@ func Gallery(layout GalleryLayout, photos ...GalleryPhoto) elem.Node {
 
 		data[i] = lightboxPhoto{
 			Alt:     p.Alt,
+			Caption: strings.TrimSpace(p.Caption),
 			Width:   p.Photo.Width,
 			Height:  p.Photo.Height,
 			Src:     fallback(img.variants).URL,
@@ -117,6 +121,7 @@ func Gallery(layout GalleryLayout, photos ...GalleryPhoto) elem.Node {
 // lightbox offers the browser the same formats.
 type lightboxPhoto struct {
 	Alt     string           `json:"alt"`
+	Caption string           `json:"caption,omitempty"`
 	Width   int              `json:"width"`
 	Height  int              `json:"height"`
 	Src     string           `json:"src"`
