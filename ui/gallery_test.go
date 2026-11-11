@@ -85,7 +85,7 @@ func TestGalleryData(t *testing.T) {
 // Without JavaScript the photo link is the gallery: it must lead to the
 // largest photo in the format every browser shows.
 func TestGalleryLinksToLargestPhoto(t *testing.T) {
-	require.Contains(t, Gallery(GalleryPage, testGallery[0]).Render(), `<a class="block" data-index="0" href="/img/x-1600.jpeg">`)
+	require.Contains(t, Gallery(GalleryPage, testGallery[0]).Render(), `<a class="block focus-visible:-outline-offset-4" data-index="0" href="/img/x-1600.jpeg">`)
 }
 
 func TestEmptyGalleryRendersNothing(t *testing.T) {

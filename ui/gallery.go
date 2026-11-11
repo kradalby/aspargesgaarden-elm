@@ -33,7 +33,8 @@ const (
 	// GalleryPage fills a page, as the old /gallery did: photos full width
 	// on a phone, 20rem from md and 27rem from lg, wrapping.
 	GalleryPage
-	// GalleryColumn closes an EventColumn: two columns of photos.
+	// GalleryColumn closes an EventColumn: two columns of photos with
+	// rounded corners, as the old Christmas page had.
 	GalleryColumn
 )
 
@@ -42,7 +43,7 @@ func (l GalleryLayout) classes() (grid, item string, picture Layout) {
 	case GalleryPage:
 		return "w-full flex flex-row flex-wrap", "md:w-80 md:mr-6 md:mb-6 lg:w-108", LayoutGallery
 	case GalleryColumn:
-		return "grid grid-cols-2 gap-4 my-12 md:gap-6", "", LayoutHalfColumn
+		return "grid grid-cols-2 gap-4 my-12 md:gap-6", "self-start overflow-hidden rounded-lg", LayoutHalfColumn
 	}
 
 	panic("ui: Gallery needs a GalleryLayout")
@@ -77,7 +78,8 @@ func Gallery(layout GalleryLayout, photos ...GalleryPhoto) elem.Node {
 			pic.Priority = Hero
 		}
 
-		link := elem.A(attrs.Props{attrs.Href: largest.URL, "data-index": strconv.Itoa(i), attrs.Class: "block"}, Picture(pic))
+		// The focus ring goes inside, where a rounded item cannot clip it.
+		link := elem.A(attrs.Props{attrs.Href: largest.URL, "data-index": strconv.Itoa(i), attrs.Class: "block focus-visible:-outline-offset-4"}, Picture(pic))
 		items[i] = PhotoCredit(p.By, link)
 		if item != "" {
 			items[i] = elem.Div(attrs.Props{attrs.Class: item}, items[i])
