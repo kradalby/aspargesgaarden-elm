@@ -72,7 +72,6 @@ type Msg
     | PointerMove Pointer
     | PointerUp Pointer
     | PointerCancel
-    | FocusEdge String
     | NoOp
 
 
@@ -143,9 +142,6 @@ update msg model =
 
         PointerCancel ->
             ( { model | drag = Nothing }, Cmd.none )
-
-        FocusEdge id ->
-            ( model, focus id )
 
         NoOp ->
             ( model, Cmd.none )
@@ -245,7 +241,7 @@ view model =
                 , Attr.attribute "aria-label" (position index count)
 
                 -- A click on the photo focuses the dialog rather than the
-                -- page under it, so Tab stays inside (trapTab).
+                -- page under it, so Tab stays inside (boot.js).
                 , Attr.tabindex -1
                 , Attr.attribute "data-lightbox" ""
 
@@ -256,7 +252,6 @@ view model =
                     (Decode.at [ "target", "dataset", "backdrop" ] Decode.string
                         |> Decode.map (\_ -> Did Close)
                     )
-                , Events.preventDefaultOn "keydown" (trapTab (focusEnds model photo))
                 , Events.on "pointerdown" (touchPointer PointerDown)
                 , Events.on "pointermove" (touchPointer PointerMove)
                 , Events.on "pointerup" (touchPointer PointerUp)
@@ -285,51 +280,6 @@ view model =
 position : Int -> Int -> String
 position index count =
     "Bilde " ++ String.fromInt (index + 1) ++ " av " ++ String.fromInt count
-
-
-{-| The first and last control in tab order: Close, then the credit link,
-then the arrows.
--}
-focusEnds : Model -> Photo -> Lightbox.Ends
-focusEnds model photo =
-    { dialog = model.id
-    , first = closeId model
-    , last =
-        if Array.length model.photos > 1 then
-            nextId model
-
-        else if Maybe.andThen .link photo.credit /= Nothing then
-            creditId model
-
-        else
-            closeId model
-    }
-
-
-creditId : Model -> String
-creditId model =
-    model.id ++ "-credit"
-
-
-{-| Tab past either end goes round to the other, so focus cannot wander to
-the page underneath. Deciding on keydown, before the browser moves focus,
-holds however fast the keys come.
--}
-trapTab : Lightbox.Ends -> Decoder ( Msg, Bool )
-trapTab ends =
-    Decode.map3 Lightbox.Tab
-        (Decode.field "key" Decode.string)
-        (Decode.field "shiftKey" Decode.bool)
-        (Decode.at [ "target", "id" ] Decode.string)
-        |> Decode.andThen
-            (\tab ->
-                case Lightbox.wrapFocus ends tab of
-                    Just id ->
-                        Decode.succeed ( FocusEdge id, True )
-
-                    Nothing ->
-                        Decode.fail "default"
-            )
 
 
 button : String -> String -> String -> Msg -> String -> Html Msg
@@ -370,13 +320,13 @@ figure model photo =
             [ Attr.class "w-0 min-w-full mt-2 flex justify-between gap-4 text-sm leading-5 text-sort" ]
             -- The <img> carries the same text as its alt.
             [ Html.span [ Attr.class "line-clamp-2", Attr.attribute "aria-hidden" "true" ] [ Html.text photo.alt ]
-            , credit (creditId model) photo
+            , credit photo
             ]
         ]
 
 
-credit : String -> Photo -> Html msg
-credit id photo =
+credit : Photo -> Html msg
+credit photo =
     case photo.credit of
         Nothing ->
             Html.text ""
@@ -391,7 +341,7 @@ credit id photo =
                     Html.span [ Attr.class "shrink-0" ] [ Html.text label ]
 
                 Just href ->
-                    Html.a [ Attr.id id, Attr.href href, Attr.target "_blank", Attr.rel "noopener noreferrer", Attr.class "shrink-0 underline" ] [ Html.text label ]
+                    Html.a [ Attr.href href, Attr.target "_blank", Attr.rel "noopener noreferrer", Attr.class "shrink-0 underline" ] [ Html.text label ]
 
 
 {-| The photo at the size that fits; `sizes` tells the browser that width so

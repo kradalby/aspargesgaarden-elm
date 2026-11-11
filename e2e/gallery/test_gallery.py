@@ -218,14 +218,33 @@ def test_backdrop_closes_photo_does_not(desktop):
     expect(page.locator(DIALOG)).to_have_count(0)
 
 
-def test_focus_stays_in_the_lightbox(desktop):
-    page = desktop.page("/galleri")
-    link(page, 0).click()
+@pytest.mark.parametrize(
+    "path,cycle",
+    [
+        ("/galleri", ["Lukk", "Foto: Lucky Thirteen", "Forrige bilde", "Neste bilde"]),
+        # No credit links among the event's photos.
+        ("/arrangementer/2026/julemarked", ["Lukk", "Forrige bilde", "Neste bilde"]),
+    ],
+)
+def test_tab_goes_round_the_controls(desktop, path, cycle):
+    """Round and round both ways, however fast the keys come."""
+    page = desktop.page(path)
+    # A photo whose credit is a link, where there is one.
+    links = [i for i, p in enumerate(galleries(page)[0]) if p.get("link")]
+    link(page, links[0] if links else 0).click()
     expect(page.get_by_role("button", name="Lukk")).to_be_focused()
-    inside = "document.activeElement.closest('[role=dialog]') !== null"
-    for key in ["Tab"] * 8 + ["Shift+Tab"] * 8:
-        page.keyboard.press(key)
-        assert page.evaluate(inside), key
+    name = "(e => e.getAttribute('aria-label') || e.textContent.trim())(document.activeElement)"
+    got = []
+    for _ in range(2 * len(cycle)):
+        page.keyboard.press("Tab")
+        got.append(page.evaluate(name))
+    assert got == (cycle[1:] + cycle + cycle[:1]), got
+    got = []
+    for _ in range(2 * len(cycle)):
+        page.keyboard.press("Shift+Tab")
+        got.append(page.evaluate(name))
+    back = cycle[::-1]
+    assert got == (back + back), got
 
 
 def test_focus_stays_in_the_lightbox_after_clicking_the_photo(desktop):

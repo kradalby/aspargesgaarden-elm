@@ -35,3 +35,17 @@ document.querySelectorAll("[data-gallery]").forEach((grid, n) => {
 
   app.ports.closed.subscribe(() => opener?.focus());
 });
+
+// Tab goes round inside the open lightbox. Here, not in Elm: Elm moves focus
+// a frame later, and a quick second Tab got past it.
+document.addEventListener("keydown", (e) => {
+  const box = document.querySelector("[data-lightbox]");
+  if (e.key !== "Tab" || !box) return;
+  const controls = box.querySelectorAll("a[href], button");
+  const [first, last] = [controls[0], controls[controls.length - 1]];
+  const at = document.activeElement;
+  if (at === box || !box.contains(at) || at === (e.shiftKey ? first : last)) {
+    e.preventDefault();
+    (e.shiftKey ? last : first).focus();
+  }
+});

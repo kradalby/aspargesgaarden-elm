@@ -1,20 +1,17 @@
 module Lightbox exposing
     ( Action(..)
     , Credit
-    , Ends
     , Flags
     , Key
     , Photo
     , Size
     , Source
-    , Tab
     , apply
     , fit
     , flagsDecoder
     , keyAction
     , swipeAction
     , swipeThreshold
-    , wrapFocus
     )
 
 {-| The lightbox's rules, free of the DOM so they can be tested: what the
@@ -246,50 +243,3 @@ images.Full's SharpWidth is this number; a test in ui reads it from here.
 widest : Int
 widest =
     992
-
-
-{-| The ids of the first and last focusable control of the lightbox, and of
-the dialog itself, which takes focus when the photo is clicked.
--}
-type alias Ends =
-    { first : String
-    , last : String
-    , dialog : String
-    }
-
-
-{-| A keydown: its key, Shift, and the id of the focused element.
--}
-type alias Tab =
-    { key : String
-    , shift : Bool
-    , target : String
-    }
-
-
-{-| Where focus goes instead when Tab would leave the lightbox: round to the
-other end, or from the dialog itself to the end Tab points at. Nothing lets
-the browser move it as usual.
--}
-wrapFocus : Ends -> Tab -> Maybe String
-wrapFocus ends { key, shift, target } =
-    if key /= "Tab" then
-        Nothing
-
-    else if target == ends.dialog then
-        Just
-            (if shift then
-                ends.last
-
-             else
-                ends.first
-            )
-
-    else if shift && target == ends.first then
-        Just ends.last
-
-    else if not shift && target == ends.last then
-        Just ends.first
-
-    else
-        Nothing

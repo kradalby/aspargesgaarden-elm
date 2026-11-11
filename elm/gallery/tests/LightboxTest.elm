@@ -33,24 +33,6 @@ suite =
             , test "the threshold itself counts" <| \_ -> Lightbox.swipeAction { dx = -50, dy = 0 } |> Expect.equal (Just Next)
             , test "a mostly vertical move is not a swipe" <| \_ -> Lightbox.swipeAction { dx = 60, dy = 90 } |> Expect.equal Nothing
             ]
-        , describe "wrapFocus"
-            [ test "tab on the last control goes to the first" <|
-                \_ -> Lightbox.wrapFocus ends { key = "Tab", shift = False, target = "g-next" } |> Expect.equal (Just "g-close")
-            , test "shift+tab on the first goes to the last" <|
-                \_ -> Lightbox.wrapFocus ends { key = "Tab", shift = True, target = "g-close" } |> Expect.equal (Just "g-next")
-            , test "tab inside moves as usual" <|
-                \_ -> Lightbox.wrapFocus ends { key = "Tab", shift = False, target = "g-close" } |> Expect.equal Nothing
-            , test "shift+tab inside moves as usual" <|
-                \_ -> Lightbox.wrapFocus ends { key = "Tab", shift = True, target = "g-next" } |> Expect.equal Nothing
-            , test "other keys are not ours" <|
-                \_ -> Lightbox.wrapFocus ends { key = "Enter", shift = False, target = "g-next" } |> Expect.equal Nothing
-            , test "tab on the dialog itself (the photo was clicked) goes to the first" <|
-                \_ -> Lightbox.wrapFocus ends { key = "Tab", shift = False, target = "g" } |> Expect.equal (Just "g-close")
-            , test "shift+tab on the dialog itself goes to the last" <|
-                \_ -> Lightbox.wrapFocus ends { key = "Tab", shift = True, target = "g" } |> Expect.equal (Just "g-next")
-            , test "one photo, no credit link: tab stays on Close" <|
-                \_ -> Lightbox.wrapFocus { ends | last = "g-close" } { key = "Tab", shift = False, target = "g-close" } |> Expect.equal (Just "g-close")
-            ]
         , describe "fit"
             [ test "landscape on a phone fills the width" <|
                 \_ -> Lightbox.fit { width = 390, height = 844 } { width = 2000, height = 1333 } |> Expect.equal { width = 374, height = 249 }
@@ -102,11 +84,6 @@ suite =
                             )
             ]
         ]
-
-
-ends : Lightbox.Ends
-ends =
-    { first = "g-close", last = "g-next", dialog = "g" }
 
 
 {-| boot.js's flags around the JSON ui.Gallery writes (gallery\_test.go
