@@ -41,6 +41,9 @@ type Store struct {
 	gen uint64
 
 	flight singleflight.Group
+
+	// afterMiss, when set (tests only), runs between the miss and the flight.
+	afterMiss func()
 }
 
 // New returns an empty Store; now is the clock that decides the day.
@@ -65,6 +68,10 @@ func (s *Store) Get(ctx context.Context, key string, build Builder) (*Page, erro
 	gen := s.gen
 	s.mu.Unlock()
 
+	if s.afterMiss != nil {
+		s.afterMiss()
+	}
+
 	// One caller giving up must not fail the others waiting on the render.
 	ctx = context.WithoutCancel(ctx)
 
@@ -77,15 +84,23 @@ func (s *Store) Get(ctx context.Context, key string, build Builder) (*Page, erro
 			}
 		}()
 
-		// A flight that ended between the miss above and this one has kept
-		// the page already; rendering it again yields the same bytes, and the
-		// window is too narrow to be worth a second look.
+		// The miss above and this flight are not atomic: a flight that began
+		// after it may already have ended with the page kept. Any kept page
+		// is at least as new as gen, as Invalidate empties the map.
+		s.mu.Lock()
+		p, ok := s.pages[key]
+		s.mu.Unlock()
+
+		if ok {
+			return p, nil
+		}
+
 		page, err := build(ctx)
 		if err != nil {
 			return nil, err
 		}
 
-		p := newPage(page.Render())
+		p = newPage(page.Render())
 
 		s.mu.Lock()
 		if s.gen == gen {

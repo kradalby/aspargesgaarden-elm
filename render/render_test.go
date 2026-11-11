@@ -173,6 +173,47 @@ func TestConcurrentMissesRenderOnce(t *testing.T) {
 	}
 }
 
+// A request that missed while another's render was finishing finds the page
+// kept when its own flight starts, rather than rendering it again.
+func TestMissAfterKeptFlightRendersNothing(t *testing.T) {
+	s := New((&clock{t: oslo("2026-11-10 12:00")}).now)
+
+	missed, proceed := make(chan struct{}), make(chan struct{})
+
+	var calls atomic.Int32
+
+	s.afterMiss = func() {
+		if calls.Add(1) == 1 {
+			close(missed)
+			<-proceed
+		}
+	}
+
+	var builds atomic.Int32
+
+	var build Builder = func(context.Context) (*elem.Element, error) {
+		builds.Add(1)
+
+		return elem.P(nil), nil
+	}
+
+	late := make(chan *Page)
+
+	go func() {
+		p, _ := s.Get(t.Context(), "/a", build)
+		late <- p
+	}()
+
+	<-missed
+
+	kept, err := s.Get(t.Context(), "/a", build)
+	require.NoError(t, err)
+
+	close(proceed)
+	require.Same(t, kept, <-late)
+	require.Equal(t, int32(1), builds.Load())
+}
+
 // A page that panics while rendering is one error with its cause for each
 // request that waited on it, not a panic thrown into all of them.
 func TestPanickingRenderIsAnError(t *testing.T) {
