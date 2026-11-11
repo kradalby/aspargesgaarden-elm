@@ -191,7 +191,8 @@ browser then picks the variant from the srcset for this width.
 The frame is the old gallery's: the whole window on a phone, four fifths of
 it from 768 px (of the window less 16 px from 1280), at most 1024 px, with
 p-4 pb-10 (Gallery.figure). On a phone the arrows sit below the photo, from
-768 px beside it.
+768 px beside it. A window too low for photo and caption, a phone on its
+side, gives the photo its height, and the caption is scrolled to.
 
 -}
 fit : Size -> Size -> Size
@@ -216,7 +217,10 @@ fit viewport photo =
             { width = max 1 (frame - 32)
             , height =
                 max 1
-                    (if viewport.width >= 768 then
+                    (if viewport.height < 500 then
+                        viewport.height - 32
+
+                     else if viewport.width >= 768 then
                         viewport.height - 32 - chrome
 
                      else

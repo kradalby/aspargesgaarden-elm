@@ -221,6 +221,17 @@ def test_whole_caption_on_a_phone(phone):
     assert caption.evaluate("c => c.scrollHeight <= c.clientHeight && getComputedStyle(c).webkitLineClamp === 'none'")
 
 
+def test_phone_on_its_side_uses_the_height(browser):
+    c = Checked(browser, viewport={"width": 844, "height": 390}, has_touch=True)
+    page = c.page("/galleri")
+    photos = galleries(page)[0]
+    i = next(i for i, p in enumerate(photos) if p["width"] > p["height"])
+    link(page, i).tap()
+    box = page.locator(SHOWN).bounding_box()
+    assert box["height"] >= 390 - 32 - 1 or box["width"] >= 844 * 0.6, box
+    c.close()
+
+
 def test_escape_closes_and_returns_focus(desktop):
     page = desktop.page("/galleri")
     link(page, 3).focus()

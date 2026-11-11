@@ -46,6 +46,8 @@ suite =
                 \_ -> Lightbox.fit { width = 1280, height = 800 } { width = 1333, height = 2000 } |> Expect.equal { width = 442, height = 664 }
             , test "landscape on a laptop fills the old frame" <|
                 \_ -> Lightbox.fit { width = 1280, height = 800 } { width = 2000, height = 1333 } |> Expect.equal { width = 979, height = 652 }
+            , test "a phone on its side gives the photo the height" <|
+                \_ -> Lightbox.fit { width = 844, height = 390 } { width = 2000, height = 1333 } |> Expect.equal { width = 537, height = 358 }
             , test "a small photo is not enlarged" <|
                 \_ -> Lightbox.fit { width = 1920, height = 1080 } { width = 400, height = 300 } |> Expect.equal { width = 400, height = 300 }
             , test "a tiny viewport still gives a box" <|
