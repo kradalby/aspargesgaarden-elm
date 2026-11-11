@@ -50,7 +50,8 @@ func Header(menu []MenuItem, current string) elem.Node {
 		elem.Div(attrs.Props{attrs.Class: "flex flex-auto mr-5 justify-between items-center lg:flex-1 lg:mr-0"},
 			elem.A(attrs.Props{attrs.Href: "/"},
 				elem.Img(attrs.Props{
-					attrs.Class: "h-28",
+					// Squeezed between 1024 and 1280 px, it shrinks whole.
+					attrs.Class: "h-28 object-contain object-left",
 					attrs.Src:   static.URL("Aspargesgaarden_HOVEDLOGO_bredde_DempetSort.png"),
 					attrs.Alt:   "Aspargesgården",
 				}))),
