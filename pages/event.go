@@ -15,8 +15,8 @@ import (
 
 // Event is an event's own page: banner, the quick facts with the ticket
 // button, the poster if it has one, then the whole text and the further
-// photos. A past event keeps
-// its page, marked as over, so links and search results still land.
+// photos. A past event keeps its page, marked as over, so links and search
+// results still land.
 func Event(s Site, e site.Event, now time.Time) *elem.Element {
 	over := e.IsOver(now)
 

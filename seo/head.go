@@ -66,9 +66,10 @@ func PhotoImage(p site.Photo) (img Image, ok bool) {
 	return Image{}, false
 }
 
-// EventImage is the event's share image: its poster, whole, as the old
-// pages shared it, or else its main photo's (PhotoImage). A tall poster is
-// shared as it is too; a scraper that wants 1.91:1 crops it to the middle.
+// EventImage is the event's share image: its poster if it has one, else its
+// main photo's PhotoImage. The poster is the one picture shared whole, tall
+// or wide, as the old pages shared it: it is made to be read whole, which a
+// photo is not. A scraper that wants 1.91:1 crops a tall one to the middle.
 // ok is false without either.
 func EventImage(e site.Event) (img Image, ok bool) {
 	if p := e.Poster; p != nil {
