@@ -17,6 +17,13 @@
   html:has([data-lightbox]) {
     overflow: hidden;
     scrollbar-gutter: stable;
+    /* Chromium paints the gutter with the root's background, which the
+       backdrop cannot reach: give it the backdrop's colour over white, and
+       the body the white it had. */
+    background-color: color-mix(in srgb, var(--color-brown) 60%, white);
+    & body {
+      background-color: var(--color-white);
+    }
   }
 
   /* A picture whose file fails (a size the server has not built yet is a

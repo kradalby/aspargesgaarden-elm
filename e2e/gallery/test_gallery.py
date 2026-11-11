@@ -7,6 +7,7 @@ violation or a page error.
 """
 
 import os
+import re
 
 import pytest
 from playwright.sync_api import expect, sync_playwright
@@ -174,6 +175,16 @@ def test_buttons_browse_and_close(desktop):
     expect(page.locator(DIALOG)).to_have_count(0)
     expect(link(page, 1)).to_be_focused()
     assert page.evaluate("getComputedStyle(document.documentElement).overflow") != "hidden"
+
+
+def test_scrollbar_gutter_takes_the_backdrop_colour(desktop):
+    """Chromium paints the kept scrollbar gutter with the root's background."""
+    page = desktop.page("/galleri")
+    link(page, 0).click()
+    # brown at 60% over white, the backdrop's colour on a white page
+    expect(page.locator("html")).to_have_css("background-color", re.compile(r"^color\(srgb 0\.8305"))
+    page.keyboard.press("Escape")
+    expect(page.locator("html")).to_have_css("background-color", "rgba(0, 0, 0, 0)")
 
 
 def test_shows_alt_text_and_credit(desktop):
