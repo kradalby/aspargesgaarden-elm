@@ -13,6 +13,6 @@ func EventBanner(photo images.Ref, alt string, by Photographer) elem.Node {
 	return elem.Div(attrs.Props{attrs.Class: "my-4"},
 		PhotoCredit(by, Picture(PictureProps{
 			Photo: photo, Alt: alt, Layout: LayoutBanner, Priority: Hero,
-			Class: "w-full h-auto",
+			Class: "w-full h-auto aspect-video object-cover",
 		})))
 }

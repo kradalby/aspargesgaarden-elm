@@ -28,9 +28,9 @@ type Site struct {
 }
 
 // photoRef is what ui.Picture needs to show an uploaded photo as kind. A
-// photo without a crop of that kind (too small for it, or not set yet) is
-// shown whole rather than not at all; Intake refuses photos too small for
-// that.
+// photo with no variants of that kind (a stored crop today's rules refuse)
+// is shown whole rather than not at all; Intake refuses photos too small
+// for that.
 func photoRef(p site.Photo, kind images.Kind) images.Ref {
 	ref, err := images.RefFor(p.Image(), kind)
 	if err != nil {

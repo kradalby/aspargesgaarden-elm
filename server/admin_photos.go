@@ -66,7 +66,8 @@ type qualityJSON struct {
 }
 
 // quality judges what the public pages draw for each kind, as pages'
-// photoRef picks it: the kind's crop, or the whole photo where it has none.
+// photoRef picks it: the kind's crop (images cuts a centred one where none
+// was chosen), or the whole photo where it has no variants.
 // Share has no such stand-in (the link preview uses the banner), so without
 // a crop it is never soft.
 func quality(p site.Photo) map[string]qualityJSON {

@@ -67,15 +67,21 @@ func groups(p Photo) []group {
 			err error
 		)
 
-		if k == Full {
-			r, err = DefaultCrop(Full, p.Width, p.Height)
-		} else {
-			var ok bool
-			if r, ok = p.Crops[k]; !ok {
-				continue
-			}
+		stored, ok := p.Crops[k]
 
-			err = ValidateCrop(k, p.Width, p.Height, r)
+		switch {
+		case k == Full:
+			r, err = DefaultCrop(Full, p.Width, p.Height)
+		case ok:
+			r, err = stored, ValidateCrop(k, p.Width, p.Height, stored)
+		case k == Share:
+			// Fixed size, never upscaled: no crop, no share image.
+			continue
+		default:
+			// No crop chosen, most often because the photo is under the
+			// kind's MinWidth: its centred crop, soft, still has the shape
+			// the page draws, where the whole photo would not.
+			r = CentredCrop(k, p.Width, p.Height)
 		}
 
 		if err != nil {

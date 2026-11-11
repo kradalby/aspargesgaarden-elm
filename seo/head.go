@@ -49,10 +49,10 @@ func DefaultImage() Image {
 }
 
 // PhotoImage is p as a share image: its share crop, or for a photo too small
-// for one the largest JPEG of its banner crop, or of the whole photo. ok is
-// false for a photo with no JPEG at all.
+// for one the largest JPEG of its banner crop. ok is false when it has
+// neither: the whole photo may be a portrait, which previews crop badly.
 func PhotoImage(p site.Photo) (img Image, ok bool) {
-	for _, k := range []images.Kind{images.Share, images.Banner, images.Full} {
+	for _, k := range []images.Kind{images.Share, images.Banner} {
 		ref, err := images.RefFor(p.Image(), k)
 		if err != nil {
 			continue

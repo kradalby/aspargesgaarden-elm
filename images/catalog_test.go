@@ -76,7 +76,7 @@ func TestGroupsTallPhoto(t *testing.T) {
 	p := Photo{SHA256: testSHA, MIME: "image/png", Width: 1100, Height: 17000}
 
 	gs := groups(p)
-	require.Len(t, gs, 1)
+	require.Equal(t, Full, gs[0].kind)
 	require.Equal(t, ladder(480, 800), func() []string {
 		out := make([]string, 0, len(gs[0].specs))
 		for _, s := range gs[0].specs {
@@ -90,7 +90,9 @@ func TestGroupsTallPhoto(t *testing.T) {
 		require.LessOrEqual(t, s.Kind.height(Rect{W: p.Width, H: p.Height}, s.Width), maxSide, s.Name())
 	}
 
-	require.Empty(t, groups(Photo{SHA256: testSHA, Width: 480, Height: 16384}))
+	for _, g := range groups(Photo{SHA256: testSHA, Width: 480, Height: 16384}) {
+		require.NotEqual(t, Full, g.kind, "no width of the whole photo fits")
+	}
 }
 
 func TestGroupsLadder(t *testing.T) {
@@ -208,6 +210,25 @@ func TestRefFor(t *testing.T) {
 	require.Equal(t, 1500, full.Width)
 	require.Equal(t, 2000, full.Height)
 
-	_, err = RefFor(p, Banner)
+	// No crop chosen: the centred one.
+	banner, err := RefFor(p, Banner)
+	require.NoError(t, err)
+	require.Equal(t, [2]int{1500, 843}, [2]int{banner.Width, banner.Height})
+
+	_, err = RefFor(p, Share)
+	require.ErrorIs(t, err, ErrNotFound)
+}
+
+// A portrait photo under Banner's MinWidth still shows as a banner: soft,
+// but in the banner's shape, never the whole portrait.
+func TestRefForTooSmallIsCentred(t *testing.T) {
+	p := Photo{SHA256: testSHA, Width: 768, Height: 1024}
+
+	ref, err := RefFor(p, Banner)
+	require.NoError(t, err)
+	require.Equal(t, [2]int{768, 432}, [2]int{ref.Width, ref.Height})
+	require.True(t, Banner.Soft(ref.Width))
+
+	_, err = RefFor(p, Share)
 	require.ErrorIs(t, err, ErrNotFound)
 }

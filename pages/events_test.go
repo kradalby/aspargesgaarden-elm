@@ -99,7 +99,7 @@ func TestEvents(t *testing.T) {
 	require.NotContains(t, got, "Ingen kommende arrangementer")
 
 	require.Contains(t, got, "/"+strings.Repeat("a", 64)+"/card-")
-	require.Contains(t, got, "/"+strings.Repeat("c", 64)+"/full-", "no card crop: the photo is shown whole")
+	require.Contains(t, got, "/"+strings.Repeat("c", 64)+"/card-", "no card crop: its centred one")
 }
 
 func TestEventsTeaserFallsBackToTheText(t *testing.T) {

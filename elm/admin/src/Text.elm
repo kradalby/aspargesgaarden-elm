@@ -14,9 +14,9 @@ module Text exposing
     , problem
     , sharp
     , shownSmaller
+    , softCentred
     , softCrop
     , softKind
-    , softWhole
     , tookTheirs
     , uploadFailure
     , withoutScheme
@@ -192,16 +192,16 @@ noCrop key minWidth =
             "Bildet er " ++ under ++ ", så det får ikke eget bilde for deling på Facebook. Da brukes bildet fra toppen av siden. Det går fint."
 
         "banner" ->
-            "Bildet er for lite til toppen av siden (" ++ under ++ "), så der vises det uten beskjæring."
+            "Bildet er for lite til toppen av siden (" ++ under ++ "), så der brukes et utsnitt fra midten."
 
         _ ->
-            "Bildet er for lite til listen (" ++ under ++ "), så der vises det uten beskjæring."
+            "Bildet er for lite til listen (" ++ under ++ "), så der brukes et utsnitt fra midten."
 
 
-{-| Follows noCrop when the whole photo shown there is soft.
+{-| Follows noCrop when the centred crop shown there is soft.
 -}
-softWhole : String
-softWhole =
+softCentred : String
+softCentred =
     "Der blir det uskarpt. Bruk et større bilde om du har det."
 
 

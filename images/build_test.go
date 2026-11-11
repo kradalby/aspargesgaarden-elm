@@ -220,7 +220,7 @@ func TestBuildTall(t *testing.T) {
 	require.NoError(t, err)
 
 	p := Photo{SHA256: testSHA, MIME: "image/png", Width: hdr.width, Height: hdr.height}
-	require.Len(t, buildAll(t, v, p, orig, t.TempDir()), 6)
+	require.Len(t, buildAll(t, v, p, orig, t.TempDir(), Full), 6)
 }
 
 func TestBuildLeavesNothingOnFailure(t *testing.T) {

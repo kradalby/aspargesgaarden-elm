@@ -1240,7 +1240,7 @@ smallPhotoNote photo =
                     Just ( False, fallbackText kind )
 
                 ( False, True ) ->
-                    Just ( True, fallbackText kind ++ " " ++ Text.softWhole )
+                    Just ( True, fallbackText kind ++ " " ++ Text.softCentred )
 
                 ( True, True ) ->
                     Just ( True, Text.softKind kind.usedFor )
@@ -1617,7 +1617,7 @@ cropChoice photo c kind =
         div [ class "flex flex-col gap-2 items-start p-2", attribute "data-crop-unusable" kind.key ]
             [ span [ class "font-bold" ] [ text kind.usedFor ]
             , if kind.quality.soft then
-                Ui.verdict "soft" [] [ fallbackText kind ++ " " ++ Text.softWhole, Text.askForOriginal ]
+                Ui.verdict "soft" [] [ fallbackText kind ++ " " ++ Text.softCentred, Text.askForOriginal ]
 
               else
                 Ui.help [] (fallbackText kind)
