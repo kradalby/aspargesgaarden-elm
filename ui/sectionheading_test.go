@@ -7,8 +7,7 @@ import (
 )
 
 func TestSectionHeading(t *testing.T) {
-	got := SectionHeading("Tidligere arrangementer").Render()
-
-	require.Contains(t, got, `<h2 class="text-center mt-16 py-6 text-3xl font-display text-tre md:text-left md:text-5xl">`)
-	require.Contains(t, got, ">Tidligere arrangementer</h2>")
+	require.Equal(t,
+		`<h2 class="mt-16 text-center py-6 text-4xl font-medium font-display text-tre md:text-left md:text-6xl lg:pt-12">Tidligere arrangementer</h2>`,
+		SectionHeading("Tidligere arrangementer").Render())
 }
