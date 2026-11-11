@@ -52,6 +52,7 @@ var fields = map[site.Field]string{
 	site.FieldTicketURL:       "ticketUrl",
 	site.FieldMainPhoto:       "mainPhoto",
 	site.FieldExtraPhotos:     "extraPhotos",
+	site.FieldPoster:          "poster",
 	site.FieldAlt:             "alt",
 	site.Field(images.Card):   "card",
 	site.Field(images.Banner): "banner",

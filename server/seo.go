@@ -155,11 +155,7 @@ func (s *Server) indexable(ctx context.Context) ([]seo.Page, error) {
 // one of its photos (alt text, crop, credit).
 func lastMod(e site.Event) time.Time {
 	t := e.UpdatedAt
-	if e.MainPhoto != nil {
-		t = later(t, e.MainPhoto.UpdatedAt)
-	}
-
-	for _, p := range e.ExtraPhotos {
+	for _, p := range e.Photos() {
 		t = later(t, p.UpdatedAt)
 	}
 

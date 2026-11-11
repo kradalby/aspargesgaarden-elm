@@ -49,6 +49,7 @@ type photoJSON struct {
 	Width        int                    `json:"width"`
 	Height       int                    `json:"height"`
 	Alt          string                 `json:"alt"`
+	Caption      string                 `json:"caption"`
 	Photographer *photographerJSON      `json:"photographer"`
 	PreviewURL   string                 `json:"previewUrl"`
 	ThumbURL     string                 `json:"thumbUrl"`
@@ -92,7 +93,7 @@ func toPhotographerJSON(p site.Photographer) photographerJSON {
 func (s *Server) photoJSON(ctx context.Context, p site.Photo) photoJSON {
 	img := p.Image()
 	out := photoJSON{
-		ID: p.ID, Width: p.Width, Height: p.Height, Alt: p.Alt,
+		ID: p.ID, Width: p.Width, Height: p.Height, Alt: p.Alt, Caption: p.Caption,
 		PreviewURL: images.PreviewURL(img),
 		ThumbURL:   images.ThumbURL(img),
 		Crops:      map[string]rectJSON{},
@@ -334,8 +335,10 @@ func (s *Server) preparePhoto(w http.ResponseWriter, r *http.Request, p site.Pho
 
 func (s *Server) updatePhoto(w http.ResponseWriter, r *http.Request, p site.Photo) {
 	var in struct {
-		Alt            string `json:"alt"`
-		PhotographerID *int64 `json:"photographerId"`
+		Alt string `json:"alt"`
+		// Left out (nil) keeps the stored caption.
+		Caption        *string `json:"caption"`
+		PhotographerID *int64  `json:"photographerId"`
 	}
 
 	if err := readJSON(w, r, &in); err != nil {
@@ -344,6 +347,9 @@ func (s *Server) updatePhoto(w http.ResponseWriter, r *http.Request, p site.Phot
 	}
 
 	p.Alt, p.Photographer = in.Alt, nil
+	if in.Caption != nil {
+		p.Caption = *in.Caption
+	}
 
 	if in.PhotographerID != nil {
 		ph, err := s.cfg.Store.Photographer(r.Context(), *in.PhotographerID)

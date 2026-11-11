@@ -193,6 +193,16 @@ func TestAdminEventRules(t *testing.T) {
 			http.StatusUnprocessableEntity,
 			[]problem{{Code: "duplicate_photo", Field: "extraPhotos", PhotoID: main.ID}},
 		},
+		{
+			"poster is the main photo", func(f map[string]any) { f["poster"] = ref(main, "x") },
+			http.StatusUnprocessableEntity,
+			[]problem{{Code: "duplicate_photo", Field: "poster", PhotoID: main.ID}},
+		},
+		{
+			"unknown poster", func(f map[string]any) { f["poster"] = map[string]any{"id": 999, "alt": "x"} },
+			http.StatusNotFound,
+			[]problem{{Code: "not_found", Field: "poster", PhotoID: 999}},
+		},
 		{"unknown photos", func(f map[string]any) {
 			f["mainPhoto"] = map[string]any{"id": 999, "alt": "x"}
 			f["extraPhotos"] = []any{ref(extra, "y"), map[string]any{"id": extra.ID, "alt": "y", "photographerId": 77}}
@@ -413,6 +423,30 @@ func TestAdminDraftSlugFollowsTheTitle(t *testing.T) {
 	e = decode[eventJSON](t, a.do(t, "PUT", "/admin/api/events/"+itoa(e.ID), req{body: form}))
 	require.Equal(t, "jul", e.Slug)
 	require.False(t, e.SlugFromTitle, "one she typed is hers")
+}
+
+func TestAdminEventPosterAndCaptions(t *testing.T) {
+	a := newAdmin(t, false)
+	main, extra, poster := a.storedPhoto(t, 'a'), a.storedPhoto(t, 'b'), a.storedPhoto(t, 'c')
+
+	form := julemarked(main)
+	captioned := ref(extra, "Boder i fjøset")
+	captioned["caption"] = "Fjøset fylt av boder"
+	form["extraPhotos"] = []any{captioned}
+	form["poster"] = ref(poster, "Plakat for julemarkedet 14.–15. november")
+
+	e := decode[eventJSON](t, a.do(t, "POST", "/admin/api/events", req{body: form}))
+	require.Equal(t, poster.ID, e.Poster.ID)
+	require.Equal(t, "Plakat for julemarkedet 14.–15. november", e.Poster.Alt)
+	require.Equal(t, "Fjøset fylt av boder", e.ExtraPhotos[0].Caption)
+
+	// An older form, without captions or a poster.
+	delete(captioned, "caption")
+	delete(form, "poster")
+	form["updatedAt"] = e.UpdatedAt
+	e = decode[eventJSON](t, a.do(t, "PUT", "/admin/api/events/"+itoa(e.ID), req{body: form}))
+	require.Equal(t, "Fjøset fylt av boder", e.ExtraPhotos[0].Caption, "left out, the caption is kept")
+	require.Nil(t, e.Poster)
 }
 
 func itoa(id int64) string { return strconv.FormatInt(id, 10) }

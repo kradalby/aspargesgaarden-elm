@@ -230,6 +230,11 @@ func TestAdminPhoto(t *testing.T) {
 	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
 	require.Equal(t, &ola, decode[photoJSON](t, rec).Photographer, "an empty alt is allowed here")
 
+	rec = a.do(t, "PUT", path, req{body: map[string]any{"alt": "", "caption": "Låven i mai", "photographerId": ola.ID}})
+	require.Equal(t, "Låven i mai", decode[photoJSON](t, rec).Caption)
+	rec = a.do(t, "PUT", path, req{body: map[string]any{"alt": "Låven", "photographerId": ola.ID}})
+	require.Equal(t, "Låven i mai", decode[photoJSON](t, rec).Caption, "left out, the caption is kept")
+
 	rec = a.do(t, "PUT", path, req{body: map[string]any{"alt": "Hagen", "photographerId": 999}})
 	require.Equal(t, http.StatusNotFound, rec.Code)
 	require.Equal(t, []problem{{Code: "not_found", Field: "photographerId", PhotoID: p.ID}}, errorsOf(t, rec))

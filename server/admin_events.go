@@ -63,6 +63,7 @@ type eventJSON struct {
 	Cancelled     bool        `json:"cancelled"`
 	MainPhoto     *photoJSON  `json:"mainPhoto"`
 	ExtraPhotos   []photoJSON `json:"extraPhotos"`
+	Poster        *photoJSON  `json:"poster"`
 	PublishedAt   *string     `json:"publishedAt"`
 	CreatedAt     string      `json:"createdAt"`
 	UpdatedAt     string      `json:"updatedAt"`
@@ -100,6 +101,10 @@ func (s *Server) eventJSON(ctx context.Context, e site.Event) eventJSON {
 		out.ExtraPhotos = append(out.ExtraPhotos, s.photoJSON(ctx, p))
 	}
 
+	if e.Poster != nil {
+		out.Poster = new(s.photoJSON(ctx, *e.Poster))
+	}
+
 	if !e.PublishedAt.IsZero() {
 		out.PublishedAt = new(stamp(e.PublishedAt))
 	}
@@ -108,9 +113,11 @@ func (s *Server) eventJSON(ctx context.Context, e site.Event) eventJSON {
 }
 
 type photoRefJSON struct {
-	ID             int64  `json:"id"`
-	Alt            string `json:"alt"`
-	PhotographerID *int64 `json:"photographerId"`
+	ID  int64  `json:"id"`
+	Alt string `json:"alt"`
+	// Caption left out (nil) keeps the stored one.
+	Caption        *string `json:"caption"`
+	PhotographerID *int64  `json:"photographerId"`
 	// UpdatedAt is the photo's version the form loaded; "" skips the check.
 	UpdatedAt string `json:"updatedAt"`
 }
@@ -134,10 +141,11 @@ type eventInput struct {
 	Cancelled   bool           `json:"cancelled"`
 	MainPhoto   *photoRefJSON  `json:"mainPhoto"`
 	ExtraPhotos []photoRefJSON `json:"extraPhotos"`
+	Poster      *photoRefJSON  `json:"poster"`
 }
 
 // toEvent turns the form into an event, loading each photo it refers to
-// and setting the alt text and credit the form gives it. strict is for
+// and setting the alt text, caption and credit the form gives it. strict is for
 // saves: an unreadable date is an error; a preview leaves it out.
 func (s *Server) toEvent(ctx context.Context, in eventInput, strict bool) (site.Event, error) {
 	e := site.Event{
@@ -186,6 +194,9 @@ func (s *Server) toEvent(ctx context.Context, in eventInput, strict bool) (site.
 		}
 
 		p.Alt, p.Photographer, p.UpdatedAt = ref.Alt, nil, time.Time{}
+		if ref.Caption != nil {
+			p.Caption = *ref.Caption
+		}
 
 		if strict && ref.UpdatedAt != "" {
 			if p.UpdatedAt, err = time.Parse(time.RFC3339, ref.UpdatedAt); err != nil {
@@ -216,6 +227,12 @@ func (s *Server) toEvent(ctx context.Context, in eventInput, strict bool) (site.
 	for _, ref := range in.ExtraPhotos {
 		if p, ok := photo(site.FieldExtraPhotos, ref); ok {
 			e.ExtraPhotos = append(e.ExtraPhotos, p)
+		}
+	}
+
+	if in.Poster != nil {
+		if p, ok := photo(site.FieldPoster, *in.Poster); ok {
+			e.Poster = &p
 		}
 	}
 
@@ -389,11 +406,7 @@ func (s *Server) eventWritten(w http.ResponseWriter, r *http.Request, e site.Eve
 	// A published event's photos are wanted on the public pages now.
 	var shas []string
 	if e.Status == site.Published {
-		if e.MainPhoto != nil {
-			shas = append(shas, e.MainPhoto.SHA256)
-		}
-
-		for _, p := range e.ExtraPhotos {
+		for _, p := range e.Photos() {
 			shas = append(shas, p.SHA256)
 		}
 	}
