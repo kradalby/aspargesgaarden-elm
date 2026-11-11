@@ -256,18 +256,18 @@ view model =
                 , Events.on "pointermove" (touchPointer PointerMove)
                 , Events.on "pointerup" (touchPointer PointerUp)
                 , Events.on "pointercancel" (Decode.succeed PointerCancel)
-                , Attr.class "fixed inset-0 z-50 flex flex-col items-center justify-center bg-brown/60 font-system touch-pinch-zoom motion-safe:transition-opacity motion-safe:duration-200 starting:opacity-0"
+                , Attr.class "fixed inset-0 z-50 overflow-y-auto flex flex-col items-center bg-brown/60 font-system touch-pinch-zoom motion-safe:transition-opacity motion-safe:duration-200 starting:opacity-0"
                 ]
                 ([ -- First, so the same node stays and its new text is read
                    -- out: focus stays on the arrow while the photo changes.
                    Html.p [ Attr.class "sr-only", Attr.attribute "aria-live" "polite" ]
                     [ Html.text (position index count ++ ": " ++ photo.alt) ]
-                 , button (closeId model) "Lukk" "✕" (Did Close) "top-2 right-2"
+                 , button (closeId model) "Lukk" "X" (Did Close) "top-2 right-2 xl:right-4"
                  , figure model photo
                  ]
                     ++ (if several then
-                            [ button (model.id ++ "-previous") "Forrige bilde" "❮" (Did Previous) "left-2 bottom-6 pr-1 md:top-1/2 md:-translate-y-1/2"
-                            , button (nextId model) "Neste bilde" "❯" (Did Next) "right-2 bottom-6 pl-1 md:top-1/2 md:-translate-y-1/2"
+                            [ button (model.id ++ "-previous") "Forrige bilde" "❮" (Did Previous) "left-2 bottom-6 pr-1 pb-1 md:top-1/2 xl:left-4"
+                            , button (nextId model) "Neste bilde" "❯" (Did Next) "right-2 bottom-6 pl-1 pb-1 md:top-1/2 xl:right-4"
                             ]
 
                         else
@@ -289,7 +289,7 @@ button id label glyph msg place =
         , Attr.type_ "button"
         , Attr.attribute "aria-label" label
         , Events.onClick msg
-        , Attr.class ("absolute w-14 h-14 rounded-full bg-white text-4xl text-sort flex flex-col justify-center text-center " ++ place)
+        , Attr.class ("fixed w-14 h-14 rounded-full bg-white text-4xl text-sort flex flex-col justify-center text-center " ++ place)
         ]
         [ Html.span [ Attr.attribute "aria-hidden" "true" ] [ Html.text glyph ] ]
 
@@ -310,17 +310,20 @@ figure model photo =
                     ( 0, " motion-safe:transition-transform motion-safe:duration-200" )
     in
     Html.node "figure"
-        [ Attr.class ("bg-white p-2 md:p-4" ++ settle)
+        -- m-auto, not the dialog's centring: a frame taller than the window
+        -- (a long caption, a phone on its side) scrolls rather than clips.
+        [ Attr.class ("m-auto bg-white p-4 pb-10" ++ settle)
 
         -- CSSOM, not a style attribute: allowed under style-src 'self'.
         , Attr.style "transform" ("translateX(" ++ String.fromFloat shift ++ "px)")
         ]
         [ picture model.viewport photo
         , Html.node "figcaption"
-            [ Attr.class "w-0 min-w-full mt-2 flex justify-between gap-4 text-sm leading-5 text-sort" ]
+            [ Attr.class "w-0 min-w-full text-black" ]
+            [ credit photo
+
             -- The <img> carries the same text as its alt.
-            [ Html.span [ Attr.class "line-clamp-2", Attr.attribute "aria-hidden" "true" ] [ Html.text photo.alt ]
-            , credit photo
+            , Html.div [ Attr.attribute "aria-hidden" "true" ] [ Html.text photo.alt ]
             ]
         ]
 
@@ -338,10 +341,11 @@ credit photo =
             in
             case link of
                 Nothing ->
-                    Html.span [ Attr.class "shrink-0" ] [ Html.text label ]
+                    Html.div [ Attr.class "text-right" ] [ Html.text label ]
 
                 Just href ->
-                    Html.a [ Attr.href href, Attr.target "_blank", Attr.rel "noopener noreferrer", Attr.class "shrink-0 underline" ] [ Html.text label ]
+                    Html.div [ Attr.class "text-right" ]
+                        [ Html.a [ Attr.href href, Attr.target "_blank", Attr.rel "noopener noreferrer", Attr.class "underline" ] [ Html.text label ] ]
 
 
 {-| The photo at the size that fits; `sizes` tells the browser that width so

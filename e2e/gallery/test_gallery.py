@@ -199,6 +199,28 @@ def test_shows_alt_text_and_credit(desktop):
     expect(credit).to_have_attribute("href", "https://luckythirteen.no/")
 
 
+def test_old_frame(desktop):
+    """The old gallery's frame: white, p-4 pb-10, the credit right over the
+    caption, X in the corner, the arrows' top edge at half height."""
+    page = desktop.page("/galleri")
+    link(page, 0).click()
+    frame = page.locator("[role=dialog] figure")
+    expect(frame).to_have_css("padding", "16px 16px 40px")
+    expect(page.get_by_role("button", name="Lukk")).to_have_text("X")
+    assert page.get_by_role("button", name="Neste bilde").evaluate("b => b.getBoundingClientRect().top") == 400
+
+
+def test_whole_caption_on_a_phone(phone):
+    """A long caption wraps in full; nothing is cut off with an ellipsis."""
+    page = phone.page("/galleri")
+    photos = galleries(page)[0]
+    i = max(range(len(photos)), key=lambda i: len(photos[i]["alt"]))
+    link(page, i).tap()
+    caption = page.locator("[role=dialog] figcaption > div:last-child")
+    expect(caption).to_have_text(photos[i]["alt"])
+    assert caption.evaluate("c => c.scrollHeight <= c.clientHeight && getComputedStyle(c).webkitLineClamp === 'none'")
+
+
 def test_escape_closes_and_returns_focus(desktop):
     page = desktop.page("/galleri")
     link(page, 3).focus()

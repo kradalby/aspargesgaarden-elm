@@ -35,15 +35,17 @@ suite =
             ]
         , describe "fit"
             [ test "landscape on a phone fills the width" <|
-                \_ -> Lightbox.fit { width = 390, height = 844 } { width = 2000, height = 1333 } |> Expect.equal { width = 374, height = 249 }
+                \_ -> Lightbox.fit { width = 390, height = 844 } { width = 2000, height = 1333 } |> Expect.equal { width = 358, height = 238 }
             , test "portrait on a tall phone still fills the width" <|
-                \_ -> Lightbox.fit { width = 390, height = 844 } { width = 1333, height = 2000 } |> Expect.equal { width = 374, height = 561 }
+                \_ -> Lightbox.fit { width = 390, height = 844 } { width = 1333, height = 2000 } |> Expect.equal { width = 358, height = 537 }
             , test "portrait on a short phone is bound by the height" <|
-                \_ -> Lightbox.fit { width = 390, height = 600 } { width = 1333, height = 2000 } |> Expect.equal { width = 255, height = 384 }
+                \_ -> Lightbox.fit { width = 390, height = 600 } { width = 1333, height = 2000 } |> Expect.equal { width = 229, height = 344 }
             , test "landscape on a desktop stops at the frame" <|
                 \_ -> Lightbox.fit { width = 1920, height = 1080 } { width = 2000, height = 1333 } |> Expect.equal { width = 992, height = 661 }
             , test "portrait on a laptop is bound by the height" <|
-                \_ -> Lightbox.fit { width = 1280, height = 800 } { width = 1333, height = 2000 } |> Expect.equal { width = 437, height = 656 }
+                \_ -> Lightbox.fit { width = 1280, height = 800 } { width = 1333, height = 2000 } |> Expect.equal { width = 442, height = 664 }
+            , test "landscape on a laptop fills the old frame" <|
+                \_ -> Lightbox.fit { width = 1280, height = 800 } { width = 2000, height = 1333 } |> Expect.equal { width = 979, height = 652 }
             , test "a small photo is not enlarged" <|
                 \_ -> Lightbox.fit { width = 1920, height = 1080 } { width = 400, height = 300 } |> Expect.equal { width = 400, height = 300 }
             , test "a tiny viewport still gives a box" <|

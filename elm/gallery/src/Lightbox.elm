@@ -188,38 +188,42 @@ swipeAction { dx, dy } =
 controls and above the caption, never larger than the photo itself. The
 browser then picks the variant from the srcset for this width.
 
-The margins mirror the classes in Gallery.view: on a phone the arrows sit
-below the photo, from 768 px beside it, and the frame stops at 1024 px.
+The frame is the old gallery's: the whole window on a phone, four fifths of
+it from 768 px (of the window less 16 px from 1280), at most 1024 px, with
+p-4 pb-10 (Gallery.figure). On a phone the arrows sit below the photo, from
+768 px beside it.
 
 -}
 fit : Size -> Size -> Size
 fit viewport photo =
     let
-        wide =
-            viewport.width >= 768
-
-        -- frame padding (p-2 / p-4) on both sides
         frame =
-            if wide then
-                32
+            if viewport.width >= 1280 then
+                min (widest + 32) ((viewport.width - 16) * 4 // 5)
+
+            else if viewport.width >= 768 then
+                viewport.width * 4 // 5
 
             else
-                16
+                viewport.width
 
-        -- two lines of caption and the gap above it
-        caption =
-            48
+        -- the padding above the photo, the credit and a caption line under
+        -- it, and the padding under them
+        chrome =
+            16 + 24 + 24 + 40
 
         room =
-            if wide then
-                { width = max 1 (min widest (viewport.width - 2 * 80 - frame))
-                , height = max 1 (viewport.height - 2 * 32 - frame - caption)
-                }
+            { width = max 1 (frame - 32)
+            , height =
+                max 1
+                    (if viewport.width >= 768 then
+                        viewport.height - 32 - chrome
 
-            else
-                { width = max 1 (viewport.width - frame)
-                , height = max 1 (viewport.height - 64 - 88 - frame - caption)
-                }
+                     else
+                        -- Close above, the arrows below.
+                        viewport.height - 64 - 88 - chrome
+                    )
+            }
 
         w =
             max 1 photo.width
