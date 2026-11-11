@@ -56,10 +56,11 @@ func Header(menu []MenuItem, current string) elem.Node {
 					attrs.Alt:   "Aspargesgården",
 				}))),
 		// Closed, the details holds only the summary, which is out of flow,
-		// so its row has no height; open, the menu fills that row. h-28 is
-		// the logo's height, so the burger stays centred beside the logo.
+		// so its row has no height; open, the menu fills that row. 38 px
+		// down centres the 36 px summary beside the 112 px logo; its padding
+		// keeps the burger where it was and frames it for the focus ring.
 		elem.Details(attrs.Props{attrs.Class: "w-full lg:hidden"},
-			elem.Summary(attrs.Props{attrs.Class: "absolute top-0 right-4 h-28 flex items-center cursor-pointer list-none [&::-webkit-details-marker]:hidden"},
+			elem.Summary(attrs.Props{attrs.Class: "absolute top-[38px] right-2 p-2 cursor-pointer list-none [&::-webkit-details-marker]:hidden"},
 				elem.Raw(burger), elem.Span(attrs.Props{attrs.Class: "sr-only"}, elem.Text("Meny"))),
 			nav(attrs.Props{})),
 		nav(attrs.Props{attrs.Class: "hidden lg:flex lg:items-center"}),
@@ -67,7 +68,7 @@ func Header(menu []MenuItem, current string) elem.Node {
 }
 
 // elem-go has no SVG elements; the classes inside are still scanned.
-const burger = `<svg class="fill-current text-brown-link" width="20" height="20" viewBox="0 0 20 20" aria-hidden="true"><path d="M0 3h20v2H0V3zm0 6h20v2H0V9zm0 6h20v2H0v-2z"></path></svg>`
+const burger = `<svg class="block fill-current text-brown-link" width="20" height="20" viewBox="0 0 20 20" aria-hidden="true"><path d="M0 3h20v2H0V3zm0 6h20v2H0V9zm0 6h20v2H0v-2z"></path></svg>`
 
 func headerLink(m MenuItem, current bool) elem.Node {
 	link := attrs.Props{
