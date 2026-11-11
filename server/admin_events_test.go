@@ -447,6 +447,20 @@ func TestAdminEventPosterAndCaptions(t *testing.T) {
 	e = decode[eventJSON](t, a.do(t, "PUT", "/admin/api/events/"+itoa(e.ID), req{body: form}))
 	require.Equal(t, "Fjøset fylt av boder", e.ExtraPhotos[0].Caption, "left out, the caption is kept")
 	require.Nil(t, e.Poster)
+
+	// A poster set in one tab is not dropped by a save from a tab that
+	// loaded the event before it.
+	stale := e.UpdatedAt
+	a.clock.set(a.clock.now().Add(time.Second))
+	form["updatedAt"], form["poster"] = stale, ref(poster, "Plakat")
+	require.NotNil(t, decode[eventJSON](t, a.do(t, "PUT", "/admin/api/events/"+itoa(e.ID), req{body: form})).Poster)
+
+	delete(form, "poster")
+	rec := a.do(t, "PUT", "/admin/api/events/"+itoa(e.ID), req{body: form})
+	require.Equal(t, http.StatusConflict, rec.Code)
+	require.Equal(t, poster.ID, decode[struct {
+		Current eventJSON `json:"current"`
+	}](t, rec).Current.Poster.ID)
 }
 
 func itoa(id int64) string { return strconv.FormatInt(id, 10) }
