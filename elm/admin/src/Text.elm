@@ -227,7 +227,7 @@ shownSmaller =
 -}
 smallPoster : String
 smallPoster =
-    "Plakaten er litt liten. Den vises hel, men teksten på den blir lettere å lese om du har en større fil."
+    "Plakaten er litt liten, men den vises hel. Last opp en større fil hvis du har en. Da blir teksten lettere å lese."
 
 
 {-| The caption beside the description: she must not write the same in
@@ -240,7 +240,7 @@ captionLabel =
 
 captionHelp : String
 captionHelp =
-    "Vises under bildet når det åpnes stort. «Beskriv bildet» leses bare opp for blinde og Google, så ikke skriv det samme her."
+    "Skriv en kort tekst som alle kan lese under bildet. Teksten vises når bildet åpnes stort. Beskrivelsen over vises ikke. Den er for blinde og for Google."
 
 
 {-| Said aloud after a move button, with the item's new place.

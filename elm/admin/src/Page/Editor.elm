@@ -1330,7 +1330,7 @@ posterView : Model -> Html Msg
 posterView model =
     Ui.card [ A.id "plakat-seksjon" ]
         [ Html.h2 [ class "font-display text-tre text-2xl" ] [ text "Plakat (valgfritt)" ]
-        , Ui.help [] "Har arrangementet en plakat, vises den hel inne i teksten, og det er den folk ser når lenken deles på Facebook."
+        , Ui.help [] "Last opp plakaten til arrangementet her. Hele plakaten vises på arrangementets side, og den blir bildet folk ser når lenken deles på Facebook."
         , case model.form.poster |> Maybe.andThen (\r -> Photos.get r.id model.photos |> Maybe.map (Tuple.pair r)) of
             Just ( ref, photo ) ->
                 let
@@ -1353,7 +1353,7 @@ posterView model =
                         , Ui.field
                             { id = id
                             , label = "Hva står på plakaten?"
-                            , help = "Det viktigste, som hva, når og hvor. Leses opp for blinde, og hjelper Google."
+                            , help = "Skriv det viktigste som står på plakaten, som hva, når og hvor. Teksten leses opp for blinde og hjelper Google."
                             , errors = errs model id
                             , control = Ui.input [ A.value ref.alt, onInput (SetAlt ref.id) ]
                             }
