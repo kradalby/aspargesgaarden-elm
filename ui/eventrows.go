@@ -44,7 +44,7 @@ func eventTeaser(it EventItem) []elem.Node {
 	}
 
 	body = append(body,
-		elem.H2(attrs.Props{attrs.Class: headlineClass},
+		elem.H2(attrs.Props{attrs.Class: headlineClass + " hyphens-auto"},
 			elem.A(attrs.Props{attrs.Href: it.Href, attrs.Class: "hover:text-rust"}, elem.Text(it.Title))),
 		EventDetail(it.DateLabel, it.DateLine),
 	)
