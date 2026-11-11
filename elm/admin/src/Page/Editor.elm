@@ -1020,6 +1020,7 @@ formView siteUrl model =
             , timeField model "slutter" "Slutter klokken (valgfritt)" EndTime f.endTime
             ]
         , Ui.help [] "«Siste dag» er for arrangementer som varer flere dager på rad, som julemarkedet."
+        , Ui.help [] "Klokkeslettene gjelder hver dag. Står det 12.00 og 16.00, er det åpent fra 12 til 16 alle dagene."
         , div [ A.id "flere-datoer", A.tabindex -1, class "flex flex-col gap-3" ]
             [ if List.isEmpty f.extraDates then
                 text ""

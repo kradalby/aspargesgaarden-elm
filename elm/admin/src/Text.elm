@@ -62,7 +62,7 @@ problem p =
             "Adressen kan ikke endres etter at arrangementet er publisert, så lenker som er delt fortsatt virker."
 
         ( "end_before_start", Just "endTime" ) ->
-            "Arrangementet kan ikke slutte før det starter. Sjekk klokkeslettene."
+            "Arrangementet kan ikke slutte før det starter. Klokkeslettene gjelder hver dag, så sluttiden må være etter starttiden."
 
         ( "end_before_start", _ ) ->
             "Siste dag kan ikke være før første dag."
