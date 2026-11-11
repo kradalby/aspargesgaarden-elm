@@ -454,6 +454,10 @@ func TestValidate(t *testing.T) {
 			e.MainPhoto = &Photo{ID: 1}
 			e.ExtraPhotos = []Photo{{ID: 1}}
 		}, ErrDuplicatePhoto},
+		{"poster is the main photo", func(e *Event) {
+			e.MainPhoto = &Photo{ID: 1}
+			e.Poster = &Photo{ID: 1}
+		}, ErrDuplicatePhoto},
 		{"draft may lack a photo", func(e *Event) { e.Status = Draft }, nil},
 		{"published needs a photo", func(e *Event) { e.Status = Published }, ErrMainPhotoRequired},
 	}
@@ -506,6 +510,7 @@ func TestCopy(t *testing.T) {
 	src.Cancelled = true
 	src.MainPhoto = &Photo{ID: 1, Alt: "Bålfat"}
 	src.ExtraPhotos = []Photo{photoWithAlt(2, "Boder")}
+	src.Poster = new(photoWithAlt(3, "Plakat"))
 	src.PublishedAt = oslo("2026-10-10 12:00")
 	src.CreatedAt = src.PublishedAt
 
@@ -520,6 +525,7 @@ func TestCopy(t *testing.T) {
 		Status:      Draft,
 		MainPhoto:   &Photo{ID: 1, Alt: "Bålfat"},
 		ExtraPhotos: []Photo{photoWithAlt(2, "Boder")},
+		Poster:      new(photoWithAlt(3, "Plakat")),
 	}
 	if diff := cmp.Diff(want, got); diff != "" {
 		t.Fatalf("Copy() mismatch (-want +got):\n%s", diff)
@@ -527,8 +533,10 @@ func TestCopy(t *testing.T) {
 
 	got.MainPhoto.Alt = "changed"
 	got.ExtraPhotos[0].Alt = "changed"
+	got.Poster.Alt = "changed"
 	require.Equal(t, "Bålfat", src.MainPhoto.Alt, "copy shares no photo with its source")
 	require.Equal(t, "Boder", src.ExtraPhotos[0].Alt)
+	require.Equal(t, "Plakat", src.Poster.Alt)
 }
 
 func TestPath(t *testing.T) {

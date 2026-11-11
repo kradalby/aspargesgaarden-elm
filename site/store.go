@@ -297,10 +297,14 @@ func writeEventChildren(ctx context.Context, q *dbsqlc.Queries, id int64, e Even
 		return fmt.Errorf("clearing photos of event %d: %w", id, err)
 	}
 
-	for i, p := range e.photos() {
+	photos := e.Photos()
+	for i, p := range photos {
 		role := "extra"
-		if i == 0 && e.MainPhoto != nil {
+		switch {
+		case i == 0 && e.MainPhoto != nil:
 			role = "main"
+		case i == len(photos)-1 && e.Poster != nil:
+			role = "poster"
 		}
 
 		err := q.InsertEventPhoto(ctx, dbsqlc.InsertEventPhotoParams{
@@ -321,7 +325,7 @@ func writeEventChildren(ctx context.Context, q *dbsqlc.Queries, id int64, e Even
 	return releasePhotos(ctx, q, before, e.UpdatedAt)
 }
 
-// writePhotoMeta stores the alt text and credit the event form edits with
+// writePhotoMeta stores the alt text, caption and credit the event form edits with
 // it. An unchanged photo is left alone, so its pages' lastmod stays put.
 // p.UpdatedAt is the version of the photo the editor loaded: events share
 // photos, and if it was changed since, writing hers would undo that change
@@ -334,7 +338,7 @@ func writePhotoMeta(ctx context.Context, q *dbsqlc.Queries, e Event, p Photo) er
 	}
 
 	ref := photographerRef(p.Photographer)
-	if row.Alt == p.Alt && row.PhotographerID == ref {
+	if row.Alt == p.Alt && row.Caption == p.Caption && row.PhotographerID == ref {
 		return nil
 	}
 
@@ -345,7 +349,7 @@ func writePhotoMeta(ctx context.Context, q *dbsqlc.Queries, e Event, p Photo) er
 	}
 
 	_, err = q.UpdatePhotoMeta(ctx, dbsqlc.UpdatePhotoMetaParams{
-		Alt: p.Alt, PhotographerID: ref, UpdatedAt: e.UpdatedAt.Unix(), ID: p.ID,
+		Alt: p.Alt, Caption: p.Caption, PhotographerID: ref, UpdatedAt: e.UpdatedAt.Unix(), ID: p.ID,
 	})
 	if db.IsForeignKeyViolation(err) {
 		return e.photoErr(p.ID, fmt.Errorf("photographer %d: %w", ref.Int64, ErrNotFound))
@@ -423,9 +427,12 @@ func events(ctx context.Context, q *dbsqlc.Queries, what string, list func(conte
 			return nil, fmt.Errorf("event %d links photo %d, which is not there", l.EventID, l.PhotoID)
 		}
 
-		if l.Role == "main" {
+		switch l.Role {
+		case "main":
 			e.MainPhoto = &p
-		} else {
+		case "poster":
+			e.Poster = &p
+		default:
 			e.ExtraPhotos = append(e.ExtraPhotos, p)
 		}
 	}
@@ -575,6 +582,7 @@ func (s *Store) AddPhoto(ctx context.Context, p Photo) (Photo, bool, error) {
 			Width:          int64(p.Width),
 			Height:         int64(p.Height),
 			Alt:            p.Alt,
+			Caption:        p.Caption,
 			PhotographerID: photographerRef(p.Photographer),
 			CreatedAt:      now,
 			UpdatedAt:      now,
@@ -651,8 +659,8 @@ func (s *Store) Photos(ctx context.Context) ([]Photo, error) {
 	})
 }
 
-// UpdatePhoto saves the editable fields of p: alt text and photographer, which
-// a nil Photographer clears.
+// UpdatePhoto saves the editable fields of p: alt text, caption and
+// photographer, which a nil Photographer clears.
 func (s *Store) UpdatePhoto(ctx context.Context, p Photo) (Photo, error) {
 	return write(ctx, s, func(q *dbsqlc.Queries) (Photo, error) {
 		// Event saves check this with the publish rules; this route is the
@@ -675,6 +683,7 @@ func (s *Store) UpdatePhoto(ctx context.Context, p Photo) (Photo, error) {
 
 		n, err := q.UpdatePhotoMeta(ctx, dbsqlc.UpdatePhotoMetaParams{
 			Alt:            p.Alt,
+			Caption:        p.Caption,
 			PhotographerID: photographerRef(p.Photographer),
 			UpdatedAt:      s.now().Unix(),
 			ID:             p.ID,
@@ -999,6 +1008,7 @@ func photoFromRow(r dbsqlc.Photo) Photo {
 		Width:     int(r.Width),
 		Height:    int(r.Height),
 		Alt:       r.Alt,
+		Caption:   r.Caption,
 		Crops:     map[images.Kind]images.Rect{},
 		CreatedAt: fromUnix(r.CreatedAt),
 		UpdatedAt: fromUnix(r.UpdatedAt),

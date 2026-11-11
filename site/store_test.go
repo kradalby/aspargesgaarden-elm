@@ -54,6 +54,8 @@ func TestStoreEventRoundTrip(t *testing.T) {
 
 	main := addPhoto(t, s, 'a', "Anita Saga ved bakebordet")
 	extra := addPhoto(t, s, 'b', "Ferske takker")
+	extra.Caption = "Takkene fra forrige kurs"
+	poster := addPhoto(t, s, 'c', "Plakat for takkebakstkurset")
 
 	in := Event{
 		Title:       "Takkebakstkurs med Anita Saga",
@@ -71,6 +73,7 @@ func TestStoreEventRoundTrip(t *testing.T) {
 		Cancelled:   true,
 		MainPhoto:   &main,
 		ExtraPhotos: []Photo{extra},
+		Poster:      &poster,
 	}
 
 	got, err := s.CreateEvent(ctx, in)

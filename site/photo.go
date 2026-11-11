@@ -53,6 +53,8 @@ type Photo struct {
 	MIME          string
 	Width, Height int
 	Alt           string
+	// Caption is shown under the photo in the lightbox; "" for none.
+	Caption string
 	// Photographer is the credit, nil for none; only its ID is read on writes.
 	Photographer *Photographer
 	// Crops holds the rectangles set so far; a missing kind is cut centred

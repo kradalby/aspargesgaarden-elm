@@ -54,6 +54,8 @@ type Event struct {
 	UpdatedAt   time.Time
 	MainPhoto   *Photo
 	ExtraPhotos []Photo
+	// Poster is shown whole in the text and is the share image; nil for none.
+	Poster *Photo
 }
 
 // Path is the event's address on the public site.
@@ -152,10 +154,16 @@ func (e Event) Validate() error {
 	}
 
 	seen := map[int64]bool{}
-	for _, p := range e.photos() {
-		// The second use of a photo is always among the further photos.
+	photos := e.Photos()
+	for i, p := range photos {
+		// The second use of a photo is among the further photos, or the
+		// poster, which comes last.
 		if seen[p.ID] {
-			errs = append(errs, &FieldError{Field: FieldExtraPhotos, PhotoID: p.ID, Err: fmt.Errorf("%w: %d", ErrDuplicatePhoto, p.ID)})
+			f := FieldExtraPhotos
+			if e.Poster != nil && i == len(photos)-1 {
+				f = FieldPoster
+			}
+			errs = append(errs, &FieldError{Field: f, PhotoID: p.ID, Err: fmt.Errorf("%w: %d", ErrDuplicatePhoto, p.ID)})
 		}
 		seen[p.ID] = true
 	}
@@ -197,7 +205,7 @@ func (e Event) Publishable() error {
 		errs = append(errs, fieldErr(FieldMainPhoto, ErrMainPhotoRequired))
 	}
 
-	for _, p := range e.photos() {
+	for _, p := range e.Photos() {
 		if strings.TrimSpace(p.Alt) == "" {
 			errs = append(errs, e.photoErr(p.ID, ErrAltRequired))
 		}
@@ -206,12 +214,19 @@ func (e Event) Publishable() error {
 	return errors.Join(errs...)
 }
 
-func (e Event) photos() []Photo {
-	if e.MainPhoto == nil {
-		return e.ExtraPhotos
+// Photos is every photo of the event in page order: main, extras, poster.
+func (e Event) Photos() []Photo {
+	var out []Photo
+	if e.MainPhoto != nil {
+		out = append(out, *e.MainPhoto)
 	}
 
-	return append([]Photo{*e.MainPhoto}, e.ExtraPhotos...)
+	out = append(out, e.ExtraPhotos...)
+	if e.Poster != nil {
+		out = append(out, *e.Poster)
+	}
+
+	return out
 }
 
 // Publish makes the event public. The first publish stamps PublishedAt,
@@ -252,6 +267,10 @@ func (e Event) Copy() Event {
 		c.MainPhoto = &p
 	}
 	c.ExtraPhotos = slices.Clone(e.ExtraPhotos)
+	if e.Poster != nil {
+		p := *e.Poster
+		c.Poster = &p
+	}
 
 	return c
 }

@@ -17,6 +17,7 @@ const (
 	FieldTicketURL   Field = "ticketUrl"
 	FieldMainPhoto   Field = "mainPhoto"
 	FieldExtraPhotos Field = "extraPhotos"
+	FieldPoster      Field = "poster"
 	// FieldAlt is a photo's description where it is edited on its own.
 	FieldAlt Field = "alt"
 )
@@ -47,10 +48,15 @@ func fieldErr(f Field, err error) error {
 	return &FieldError{Field: f, Err: err}
 }
 
-// photoField says whether photo id is e's main photo or one of the others.
+// photoField says whether photo id is e's main photo, its poster or one of
+// the others.
 func (e Event) photoField(id int64) Field {
 	if e.MainPhoto != nil && e.MainPhoto.ID == id {
 		return FieldMainPhoto
+	}
+
+	if e.Poster != nil && e.Poster.ID == id {
+		return FieldPoster
 	}
 
 	return FieldExtraPhotos
