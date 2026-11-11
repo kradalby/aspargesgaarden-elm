@@ -246,11 +246,29 @@
           inherit (goBuild) goModules;
           meta.mainProgram = "imagesbuild";
         });
+
+        # The dashboard generator is its own build so the Grafana Foundation SDK
+        # stays out of the service binary. Running it is the validation: a
+        # dashboard that does not build exits non-zero and fails the derivation.
+        dashboard = goBuild.overrideAttrs (_: {
+          pname = "asparges-dashboard";
+          subPackages = [ "cmd/dashboard" ];
+          meta.mainProgram = "dashboard";
+        });
+        grafanaDashboards = pkgs.runCommand "asparges-grafana-dashboards" { } ''
+          mkdir -p $out
+          ${dashboard}/bin/dashboard > $out/asparges.json
+        '';
       in
       {
         packages = {
           default = asparges;
-          inherit vips imagesbuild;
+          inherit
+            vips
+            imagesbuild
+            dashboard
+            grafanaDashboards
+            ;
           photo-variants = staticPhotos;
         }
         # The NixOS module and systemd-run need a Linux system.
@@ -311,6 +329,7 @@
             )
           );
           photo-variants = staticPhotos;
+          inherit grafanaDashboards;
           golangci-lint = withStatic (fc.goLint common);
           formatting = fc.goFormat common;
           # db/dbsqlc is sqlc output with no //go:generate directive, so the
