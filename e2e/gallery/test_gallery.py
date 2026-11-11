@@ -549,7 +549,8 @@ def test_data_matches_the_grid(desktop):
 
 
 def test_om_oss_icons_rows_of_three(desktop, phone):
-    """The occasion icons sit three to a row, each row centred in its column."""
+    """The occasion icons sit three to a row, each row centred in its column,
+    Konfirmasjon last and alone."""
     for c in (desktop, phone):
         page = c.page("/om-oss")
         box, rows = page.evaluate(
@@ -566,5 +567,7 @@ def test_om_oss_icons_rows_of_three(desktop, phone):
                          sorted.map(rs => [rs.length, Math.round((rs[0].left + rs.at(-1).right) / 2)])];
                }"""
         )
-        assert [n for n, _ in rows] == [3, 3, 3], rows
+        assert [n for n, _ in rows] == [3, 3, 3, 1], rows
+        last = "[...document.querySelector('img[alt=Bryllup]').parentElement.parentElement.querySelectorAll('img')].at(-1).alt"
+        assert page.evaluate(last) == "Konfirmasjon"
         assert all(abs(mid - box) <= 1 for _, mid in rows), (box, rows)

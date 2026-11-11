@@ -13,18 +13,19 @@ type Icon string
 
 // The icons.
 const (
-	IconBryllup    Icon = "bryllup.svg"
-	IconMinnestund Icon = "minnestund.svg"
-	IconDaap       Icon = "daap.svg"
-	IconJulebord   Icon = "julebord.svg"
-	IconBursdag    Icon = "bursdag.svg"
-	IconKonferanse Icon = "konferanse.svg"
-	IconFeiring    Icon = "feiring.svg"
-	IconNyttaar    Icon = "nyttaar.svg"
-	IconVitnemaal  Icon = "vitnemaal.svg"
-	IconPhone      Icon = "tlf.svg"
-	IconMail       Icon = "mail.svg"
-	IconLocation   Icon = "location.svg"
+	IconBryllup      Icon = "bryllup.svg"
+	IconMinnestund   Icon = "minnestund.svg"
+	IconDaap         Icon = "daap.svg"
+	IconJulebord     Icon = "julebord.svg"
+	IconBursdag      Icon = "bursdag.svg"
+	IconKonferanse   Icon = "konferanse.svg"
+	IconFeiring      Icon = "feiring.svg"
+	IconNyttaar      Icon = "nyttaar.svg"
+	IconVitnemaal    Icon = "vitnemaal.svg"
+	IconKonfirmasjon Icon = "konfirmasjon.svg"
+	IconPhone        Icon = "tlf.svg"
+	IconMail         Icon = "mail.svg"
+	IconLocation     Icon = "location.svg"
 )
 
 // IconImage shows an icon as wide as its box: the files have no size of

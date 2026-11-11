@@ -51,6 +51,7 @@ var occasions = []struct {
 	{ui.IconFeiring, "Feiring"},
 	{ui.IconNyttaar, "Nyttår"},
 	{ui.IconVitnemaal, "Vitnemål"},
+	{ui.IconKonfirmasjon, "Konfirmasjon"},
 }
 
 // OmOss is about the farm and its hosts (old /about).
