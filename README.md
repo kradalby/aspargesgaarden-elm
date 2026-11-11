@@ -28,6 +28,7 @@ Open work is in [TODO.md](TODO.md). Rules for changing the code are in
 | -------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
 | `cmd/asparges`             | The binary: `serve`, `import`. Flags also read `ASPARGES_*` environment variables.                                           |
 | `cmd/imagesbuild`          | Builds the embedded photos' variants at build time, with the same `images` code.                                             |
+| `cmd/dashboard`            | Prints the Grafana dashboard JSON (`nix build .#grafanaDashboards`).                                                         |
 | `cmd/vendorhash`           | Keeps `flakehashes.json` in step with `go.mod`.                                                                              |
 | `ui/`                      | The component kit: one file per component, typed props, golden tests.                                                        |
 | `pages/`                   | Pages composed from `ui/`, and the admin's HTML document.                                                                    |

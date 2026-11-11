@@ -29,6 +29,10 @@ conventions (Go, Nix, Elm, git, services, secrets) are in
   one tag per line, the JSON in it indented. Change on purpose with
   `UPDATE_GOLDEN=1 go test ./...`, which also rewrites
   `elm/admin/tests/ApiExamples.elm`, and read the diff before committing.
+- **The dashboard charts what is exported.** `cmd/dashboard` generates it
+  with the Grafana Foundation SDK; `TestQueriesNameExportedMetrics` fails
+  when a panel queries a metric the service does not export. Renaming a
+  metric means changing its panel, and the alerts in dotfiles, with it.
 - **Old addresses keep working.** `TestAddresses` in `server/` lists every
   redirect; never remove a row.
 - **A schema change migrates whole.** Change `db/schema.sql` with an update
