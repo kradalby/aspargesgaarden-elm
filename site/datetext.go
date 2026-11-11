@@ -46,37 +46,22 @@ func (e Event) DateLabel() string {
 	return "Dato:"
 }
 
-// DateLine is the event's when-and-where sentence:
-//
-//  19. mai 2026 kl. 19.30–22.00 på Aspargesgården
-//  14. november kl. 12.00 – 15. november 2026 kl. 16.00 på Aspargesgården
-//  31. oktober, 28. november og 29. november 2026 kl. 10.00–15.00 på Aspargesgården
-//
-// A year is written once, after the last day in it. The dash is tight
-// between hours and spaced between days, which hold spaces themselves.
-// An end time with no end day reads as the same day.
+// DateLine is the event's when-and-where sentence: its days, then the hours
+// of each, as in "14.–15. november 2026 kl. 12.00–16.00 på Aspargesgården",
+// or for a course "31. oktober, 28. november og 29. november 2026 kl.
+// 10.00–15.00 på Aspargesgården". A year is written once, after the last day
+// in it.
 func (e Event) DateLine() string {
 	if e.Start.IsZero() {
 		return ""
 	}
 
-	var line string
-
-	switch {
-	case len(e.ExtraDates) > 0:
-		line = dayList(slices.SortedFunc(slices.Values(e.days()), Date.Compare)) + hours(e.StartTime, e.EndTime)
-	case e.End.IsZero() || e.End == e.Start:
-		line = NorwegianDate(e.Start) + hours(e.StartTime, e.EndTime)
-	default:
-		first := NorwegianDate(e.Start)
-		if e.Start.Year == e.End.Year {
-			first = dayMonth(e.Start)
-		}
-
-		line = first + hours(e.StartTime, "") + " – " + NorwegianDate(e.End) + hours(e.EndTime, "")
+	days := e.Days()
+	if len(e.ExtraDates) > 0 {
+		days = dayList(slices.SortedFunc(slices.Values(e.days()), Date.Compare))
 	}
 
-	return line + " på Aspargesgården"
+	return days + hours(e.StartTime, e.EndTime) + " på Aspargesgården"
 }
 
 // dayList is sorted days as "28. desember 2026, 4. januar og 11. januar 2027".

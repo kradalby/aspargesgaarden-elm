@@ -137,8 +137,9 @@ func (e Event) Validate() error {
 		errs = append(errs, fieldErr(FieldEnd, ErrEndBeforeStart))
 	}
 
-	sameDay := e.End.IsZero() || e.End == e.Start
-	if sameDay && e.StartTime != "" && e.EndTime != "" && e.EndTime <= e.StartTime {
+	// The times are each day's hours, so a day cannot end before it starts,
+	// however many days there are.
+	if e.StartTime != "" && e.EndTime != "" && e.EndTime <= e.StartTime {
 		errs = append(errs, fieldErr(FieldEndTime, fmt.Errorf("%w: %s-%s", ErrEndBeforeStart, e.StartTime, e.EndTime)))
 	}
 
@@ -278,6 +279,20 @@ func (e Event) Copy() Event {
 // days is every day the event starts on: Start and the extra dates.
 func (e Event) days() []Date {
 	return append([]Date{e.Start}, e.ExtraDates...)
+}
+
+// Dates is every day the event takes place, sorted: each day from Start to
+// End, and the extra dates. StartTime and EndTime are the hours of each.
+func (e Event) Dates() []Date {
+	out := e.days()
+	for d := e.Start; d.Before(e.End); {
+		d = DateOf(time.Date(d.Year, d.Month, d.Day+1, 0, 0, 0, 0, time.UTC))
+		out = append(out, d)
+	}
+
+	slices.SortFunc(out, Date.Compare)
+
+	return slices.Compact(out)
 }
 
 // LastDay is the final day the event runs.

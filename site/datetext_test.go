@@ -65,30 +65,36 @@ func TestDateLine(t *testing.T) {
 			event: Event{Start: d("2026-05-19"), End: d("2026-05-19"), StartTime: "19:30", EndTime: "22:00"},
 			want:  "19. mai 2026 kl. 19.30–22.00 på Aspargesgården",
 		},
+		// Over several days, the hours are each day's.
 		{
-			name:  "end day in the same year writes the year once",
+			name:  "several days with both times",
 			event: Event{Start: d("2026-11-14"), StartTime: "12:00", End: d("2026-11-15"), EndTime: "16:00"},
-			want:  "14. november kl. 12.00 – 15. november 2026 kl. 16.00 på Aspargesgården",
+			want:  "14.–15. november 2026 kl. 12.00–16.00 på Aspargesgården",
 		},
 		{
-			name:  "end day without times",
+			name:  "several days without times",
 			event: Event{Start: d("2026-11-14"), End: d("2026-11-15")},
-			want:  "14. november – 15. november 2026 på Aspargesgården",
+			want:  "14.–15. november 2026 på Aspargesgården",
 		},
 		{
-			name:  "end day in the next year",
+			name:  "several days across a month",
+			event: Event{Start: d("2026-11-30"), End: d("2026-12-01"), StartTime: "12:00", EndTime: "16:00"},
+			want:  "30. november – 1. desember 2026 kl. 12.00–16.00 på Aspargesgården",
+		},
+		{
+			name:  "several days across a new year",
 			event: Event{Start: d("2026-12-31"), End: d("2027-01-01")},
 			want:  "31. desember 2026 – 1. januar 2027 på Aspargesgården",
 		},
 		{
-			name:  "end day with the start time only",
+			name:  "several days with the start time only",
 			event: Event{Start: d("2026-11-14"), StartTime: "12:00", End: d("2026-11-15")},
-			want:  "14. november kl. 12.00 – 15. november 2026 på Aspargesgården",
+			want:  "14.–15. november 2026 kl. 12.00 på Aspargesgården",
 		},
 		{
-			name:  "end day with the end time only",
+			name:  "several days with the end time only",
 			event: Event{Start: d("2026-11-14"), End: d("2026-11-15"), EndTime: "16:00"},
-			want:  "14. november – 15. november 2026 kl. 16.00 på Aspargesgården",
+			want:  "14.–15. november 2026 til kl. 16.00 på Aspargesgården",
 		},
 		{
 			name:  "two days",

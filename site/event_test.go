@@ -79,7 +79,7 @@ var legacyEvents = []legacyEvent{
 	{
 		file:  "2025-12-06-julemarked.md",
 		event: legacy(8, "Julemarked på Aspargesgården", "2025-11-15", "12:00", "2025-11-16", "16:00"),
-		label: "Dato:", line: "15. november kl. 12.00 – 16. november 2025 kl. 16.00 på Aspargesgården",
+		label: "Dato:", line: "15.–16. november 2025 kl. 12.00–16.00 på Aspargesgården",
 	},
 	{
 		file:  "2026-04-15-manneken.md",
@@ -99,7 +99,7 @@ var legacyEvents = []legacyEvent{
 	{
 		file:  "2026-11-14-julemarked.md",
 		event: legacy(12, "Julemarked på Aspargesgården", "2026-11-14", "12:00", "2026-11-15", "16:00"),
-		label: "Dato:", line: "14. november kl. 12.00 – 15. november 2026 kl. 16.00 på Aspargesgården",
+		label: "Dato:", line: "14.–15. november 2026 kl. 12.00–16.00 på Aspargesgården",
 	},
 }
 
@@ -229,6 +229,29 @@ func TestNextDate(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			require.Equal(t, tt.want, tt.event.NextDate(tt.now))
 		})
+	}
+}
+
+// A run of days is over after its last day, not its first.
+func TestIsOverAfterTheLastDay(t *testing.T) {
+	market := legacyEvents[11].event
+	require.Equal(t, d("2026-11-15"), market.End)
+
+	require.False(t, market.IsOver(oslo("2026-11-15 23:59")))
+	require.True(t, market.IsOver(oslo("2026-11-16 00:00")))
+}
+
+func TestDates(t *testing.T) {
+	for _, tt := range []struct {
+		event Event
+		want  []Date
+	}{
+		{Event{Start: d("2026-05-19")}, []Date{d("2026-05-19")}},
+		{Event{Start: d("2026-11-14"), End: d("2026-11-14")}, []Date{d("2026-11-14")}},
+		{Event{Start: d("2026-12-31"), End: d("2027-01-02")}, []Date{d("2026-12-31"), d("2027-01-01"), d("2027-01-02")}},
+		{Event{Start: d("2026-10-31"), ExtraDates: []Date{d("2026-11-28"), d("2026-11-29")}}, []Date{d("2026-10-31"), d("2026-11-28"), d("2026-11-29")}},
+	} {
+		require.Equal(t, tt.want, tt.event.Dates())
 	}
 }
 
@@ -443,7 +466,7 @@ func TestValidate(t *testing.T) {
 		{"end day before start", func(e *Event) { e.End = d("2026-10-30") }, ErrEndBeforeStart},
 		{"end without start", func(e *Event) { e.Start = Date{}; e.End = d("2026-10-30") }, ErrEndBeforeStart},
 		{"same-day end time before start time", func(e *Event) { e.EndTime = "09:00" }, ErrEndBeforeStart},
-		{"overnight is fine", func(e *Event) { e.End = d("2026-11-01"); e.EndTime = "02:00" }, nil},
+		{"no overnight: the times are each day's", func(e *Event) { e.End = d("2026-11-01"); e.EndTime = "02:00" }, ErrEndBeforeStart},
 		{"extra date before start", func(e *Event) { e.ExtraDates = []Date{d("2026-10-01")} }, ErrExtraDate},
 		{"extra date on start", func(e *Event) { e.ExtraDates = []Date{d("2026-10-31")} }, ErrExtraDate},
 		{"extra date twice", func(e *Event) { e.ExtraDates = []Date{d("2026-11-28"), d("2026-11-28")} }, ErrExtraDate},
