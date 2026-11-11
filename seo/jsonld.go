@@ -1,7 +1,6 @@
 package seo
 
 import (
-	"cmp"
 	"encoding/json"
 	"regexp"
 	"slices"
@@ -192,9 +191,11 @@ type EventInput struct {
 	TicketURL string
 }
 
-// EventNodes describes an event page. An event on separate days (a course)
-// is one Event per day, as search engines ask, so no day in between looks
-// like part of it.
+// EventNodes describes an event page: one Event per day it takes place,
+// each with that day's hours, since its times are the hours of each day.
+// Google's event results take separate Events for an event on several
+// dates and read one Event from start to end as a single unbroken stretch;
+// they do not use schema.org's eventSchedule.
 func EventNodes(baseURL string, in EventInput) []any {
 	e := in.Event
 
@@ -220,22 +221,7 @@ func EventNodes(baseURL string, in EventInput) []any {
 
 	base.Offers, base.IsAccessibleForFree = offer(e.PriceText, in.TicketURL)
 
-	if len(e.ExtraDates) == 0 {
-		base.StartDate = when(e.Start, e.StartTime)
-
-		switch {
-		case e.EndTime != "":
-			base.EndDate = when(cmp.Or(e.End, e.Start), e.EndTime)
-		case !e.End.IsZero() && e.End != e.Start:
-			base.EndDate = when(e.End, "")
-		}
-
-		return []any{base}
-	}
-
-	days := append([]site.Date{e.Start}, e.ExtraDates...)
-	slices.SortFunc(days, site.Date.Compare)
-
+	days := e.Dates()
 	out := make([]any, len(days))
 	for i, d := range days {
 		ev := base

@@ -150,11 +150,15 @@ func TestEventNodes(t *testing.T) {
 	nodes := EventNodes(testBase, EventInput{Event: testEvent(), Description: "Mer enn 30 utstillere.", TicketURL: "https://fabnite.com/julemarked"})
 	checkNodes(t, nodes)
 
-	require.Len(t, nodes, 1)
-	ev := nodes[0].(Event) //nolint:forcetypeassert // fails the test otherwise
+	// Two days, each with its own hours: not 28 hours on end.
+	require.Len(t, nodes, 2)
+	ev := nodes[0].(Event)     //nolint:forcetypeassert // fails the test otherwise
+	second := nodes[1].(Event) //nolint:forcetypeassert // fails the test otherwise
 
 	require.Equal(t, "2026-11-14T12:00:00+01:00", ev.StartDate)
-	require.Equal(t, "2026-11-15T16:00:00+01:00", ev.EndDate)
+	require.Equal(t, "2026-11-14T16:00:00+01:00", ev.EndDate)
+	require.Equal(t, "2026-11-15T12:00:00+01:00", second.StartDate)
+	require.Equal(t, "2026-11-15T16:00:00+01:00", second.EndDate)
 	require.Equal(t, "https://schema.org/EventScheduled", ev.EventStatus)
 	require.Equal(t, "https://aspargesgaarden.no/arrangementer/2026/julemarked", ev.URL)
 	require.Equal(t, &Offer{Type: "Offer", URL: "https://fabnite.com/julemarked", Price: "0", PriceCurrency: "NOK", Description: "Gratis inngang"}, ev.Offers)
@@ -207,7 +211,7 @@ func TestEventEnd(t *testing.T) {
 		},
 		{
 			name: "days without times", edit: func(e *site.Event) { e.StartTime, e.EndTime = "", "" },
-			wantStart: "2026-11-14", wantEnd: "2026-11-15",
+			wantStart: "2026-11-14",
 		},
 	}
 
