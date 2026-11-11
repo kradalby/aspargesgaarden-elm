@@ -2,6 +2,7 @@
 package server
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
@@ -186,17 +187,23 @@ func (s *Server) route(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// An address with a trailing slash goes, in one hop, wherever the address
-	// without it does, but only if that exists: anything else is a plain 404.
-	if trimmed := strings.TrimRight(path, "/"); !ok && trimmed != path && trimmed != "" {
-		a, ok, err = s.lookup(ctx, trimmed)
+	// An address with a trailing slash, or a folder's index.html as the old
+	// host served it, goes in one hop wherever the bare address does, but
+	// only if that exists: anything else is a plain 404.
+	bare := strings.TrimRight(path, "/")
+	if dir, index := strings.CutSuffix(path, "/index.html"); index {
+		bare = cmp.Or(dir, "/")
+	}
+
+	if !ok && bare != path && bare != "" {
+		a, ok, err = s.lookup(ctx, bare)
 		if err != nil {
 			s.fail(w, r, err)
 			return
 		}
 
 		if ok && a.build != nil {
-			a = answer{to: trimmed, code: http.StatusMovedPermanently, build: a.build}
+			a = answer{to: bare, code: http.StatusMovedPermanently, build: a.build}
 		}
 	}
 

@@ -189,12 +189,18 @@ func TestAddresses(t *testing.T) {
 		{path: "/galleri/", wantCode: http.StatusMovedPermanently, wantTo: "/galleri"},
 		{path: "/gallery/", wantCode: http.StatusMovedPermanently, wantTo: "/galleri"},
 		{path: "/julemarked/?ref=fb", wantCode: http.StatusFound, wantTo: "/arrangementer/2026/julemarked?ref=fb"},
+		// The old host answered every folder's index.html too.
+		{path: "/index.html", wantCode: http.StatusMovedPermanently, wantTo: "/"},
+		{path: "/events/index.html", wantCode: http.StatusMovedPermanently, wantTo: "/arrangementer"},
+		{path: "/christmas/2026/index.html", wantCode: http.StatusMovedPermanently, wantTo: "/arrangementer/2026/julemarked"},
+		{path: "/gallery/index.html?ref=fb", wantCode: http.StatusMovedPermanently, wantTo: "/galleri?ref=fb"},
+		{path: "/finnes-ikke/index.html", wantCode: http.StatusNotFound},
 
 		// Unknown addresses get the 404 page with a real 404, slash or not.
 		{path: "/finnes-ikke", wantCode: http.StatusNotFound, wantBody: ">Fant ikke siden</h1>"},
 		{path: "/finnes-ikke/", wantCode: http.StatusNotFound, wantBody: ">Fant ikke siden</h1>"},
 		{path: "/lokaler/x", wantCode: http.StatusNotFound, wantBody: ">Fant ikke siden</h1>"},
-		{path: "/index.html", wantCode: http.StatusNotFound},
+		{path: "/index.htm", wantCode: http.StatusNotFound},
 		{path: "/arrangementer/2026/finnes-ikke", wantCode: http.StatusNotFound, wantBody: ">Fant ikke siden</h1>"},
 		{path: "/arrangementer/2026/finnes-ikke/", wantCode: http.StatusNotFound},
 		{path: "/arrangementer/2024/julemarked", wantCode: http.StatusNotFound},
