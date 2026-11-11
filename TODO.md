@@ -32,8 +32,8 @@ yet.
 
 - [ ] Umami site id: find or create the site on umami.kradalby.no and set
       `services.asparges.umamiSiteId` at cutover (unset means no tracker).
-- [ ] Font licence: Avenir LT Std and Cardillac are commercial fonts, served
-      from the binary. Confirm the web licence covers self-hosting.
+- [ ] Font licence: Cardillac is a commercial font, served from the binary.
+      Confirm the web licence covers self-hosting.
 
 ## Outside this repository
 

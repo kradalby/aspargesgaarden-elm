@@ -24,8 +24,17 @@ var (
 // CSS generic families need no @font-face: the browser always has one.
 var genericFamilies = []string{"serif", "sans-serif", "monospace", "cursive", "fantasy", "system-ui", "math", "emoji", "fangsong"}
 
-// The font check: every family a served stylesheet asks for has an
-// embedded @font-face, and every @font-face points at a file in the binary.
+// deviceFamilies are taken from the visitor's device on purpose, as the old
+// site did (theme.css); any other family must be embedded.
+var deviceFamilies = []string{
+	"Avenir",
+	"ui-sans-serif", "-apple-system", "BlinkMacSystemFont", "Segoe UI", "Roboto", "Helvetica Neue", "Arial",
+	"Noto Sans", "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji",
+}
+
+// The font check: every family a served stylesheet asks for is generic,
+// the device's or embedded, and every @font-face points at a file in the
+// binary.
 // A var() fallback only counts when its variable is undefined, since only
 // then can the browser reach it.
 func TestFontsAreEmbedded(t *testing.T) {
@@ -78,7 +87,7 @@ func checkFonts(t *testing.T, css string) {
 
 		for f := range strings.SplitSeq(m[2], ",") {
 			f = strings.Trim(strings.TrimSpace(f), `"'`)
-			if strings.HasPrefix(f, "var(") || slices.Contains(genericFamilies, f) {
+			if strings.HasPrefix(f, "var(") || slices.Contains(genericFamilies, f) || slices.Contains(deviceFamilies, f) {
 				continue
 			}
 

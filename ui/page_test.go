@@ -43,8 +43,7 @@ func TestPageLoadsLightboxOnlyWithGallery(t *testing.T) {
 	require.Equal(t, 1, strings.Count(page(Container(Gallery(GalleryPage, testGallery...), Gallery(GalleryColumn, testGallery[:1]...))), script))
 }
 
-// The display font is preloaded only where a heading uses it; the text
-// fonts on every page.
+// The display font is preloaded only where a heading uses it.
 func TestPagePreloadsOnlyFontsInUse(t *testing.T) {
 	preloads := func(body ...elem.Node) int {
 		return strings.Count(Page(PageProps{BaseURL: "https://aspargesgaarden.no", Meta: Meta{Title: "x"}}, body...).Render(), `rel="preload"`)

@@ -29,7 +29,7 @@ func PhotoCredit(by Photographer, picture elem.Node) elem.Node {
 		}
 
 		kids = append(kids, elem.Div(attrs.Props{
-			attrs.Class: "opacity-0 pointer-events-none absolute left-0 bottom-0 right-0 z-10 flex justify-around items-end bg-brown text-black group-hover:opacity-100 group-hover:pointer-events-auto group-focus-within:opacity-100 group-focus-within:pointer-events-auto",
+			attrs.Class: "opacity-0 pointer-events-none absolute left-0 bottom-0 right-0 z-10 flex justify-around items-end bg-brown font-system text-black group-hover:opacity-100 group-hover:pointer-events-auto group-focus-within:opacity-100 group-focus-within:pointer-events-auto",
 		}, name))
 	}
 

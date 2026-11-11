@@ -261,7 +261,7 @@ view model =
                 , Events.on "pointermove" (touchPointer PointerMove)
                 , Events.on "pointerup" (touchPointer PointerUp)
                 , Events.on "pointercancel" (Decode.succeed PointerCancel)
-                , Attr.class "fixed inset-0 z-50 flex flex-col items-center justify-center bg-brown/60 touch-pinch-zoom motion-safe:transition-opacity motion-safe:duration-200 starting:opacity-0"
+                , Attr.class "fixed inset-0 z-50 flex flex-col items-center justify-center bg-brown/60 font-system touch-pinch-zoom motion-safe:transition-opacity motion-safe:duration-200 starting:opacity-0"
                 ]
                 ([ -- First, so the same node stays and its new text is read
                    -- out: focus stays on the arrow while the photo changes.

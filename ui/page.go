@@ -41,9 +41,9 @@ func Page(p PageProps, body ...elem.Node) *elem.Element {
 	)
 
 	// The stylesheet would ask for the fonts only once it has been parsed.
-	// Avenir sets the menu and text of every page; the display font only
-	// headings (font-display), which some pages (the front) have none of,
-	// and an unused preload competes with the page's photo.
+	// The display font sets only headings (font-display), which some pages
+	// (the front) have none of, and an unused preload competes with the
+	// page's photo.
 	display := holds(body, func(e *elem.Element) bool {
 		return slices.Contains(strings.Fields(e.Attrs[attrs.Class]), "font-display")
 	})
