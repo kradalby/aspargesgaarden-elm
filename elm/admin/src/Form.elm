@@ -42,6 +42,7 @@ type alias Form =
     , cancelled : Bool
     , mainPhoto : Maybe PhotoRef
     , extraPhotos : List PhotoRef
+    , poster : Maybe PhotoRef
     }
 
 
@@ -63,6 +64,7 @@ empty =
     , cancelled = False
     , mainPhoto = Nothing
     , extraPhotos = []
+    , poster = Nothing
     }
 
 
@@ -92,12 +94,13 @@ fromEvent e =
     , cancelled = e.cancelled
     , mainPhoto = Maybe.map ref e.mainPhoto
     , extraPhotos = List.map ref e.extraPhotos
+    , poster = Maybe.map ref e.poster
     }
 
 
 ref : Photo -> PhotoRef
 ref p =
-    { id = p.id, alt = p.alt, photographerId = Maybe.map .id p.photographer, updatedAt = p.updatedAt }
+    { id = p.id, alt = p.alt, caption = p.caption, photographerId = Maybe.map .id p.photographer, updatedAt = p.updatedAt }
 
 
 {-| The form's photos at the versions given, their words kept: what she
@@ -116,8 +119,8 @@ withVersions photos =
         )
 
 
-{-| The form's photos with the description and photographer of the given
-photos, as stored.
+{-| The form's photos with the description, caption and photographer of the
+given photos, as stored.
 -}
 takePhotos : List Photo -> Form -> Form
 takePhotos photos =
@@ -134,7 +137,7 @@ takePhotos photos =
 
 mapRefs : (PhotoRef -> PhotoRef) -> Form -> Form
 mapRefs f form =
-    { form | mainPhoto = Maybe.map f form.mainPhoto, extraPhotos = List.map f form.extraPhotos }
+    { form | mainPhoto = Maybe.map f form.mainPhoto, extraPhotos = List.map f form.extraPhotos, poster = Maybe.map f form.poster }
 
 
 {-| The request body. A date row left empty is an unused "add a date" click,
@@ -164,6 +167,7 @@ toInput updatedAt f =
     , cancelled = f.cancelled
     , mainPhoto = f.mainPhoto
     , extraPhotos = f.extraPhotos
+    , poster = f.poster
     }
 
 
@@ -184,6 +188,9 @@ fieldId p =
             Just ("alt-" ++ String.fromInt id)
 
         ( Just "extraPhotos", Just id, "alt_required" ) ->
+            Just ("alt-" ++ String.fromInt id)
+
+        ( Just "poster", Just id, "alt_required" ) ->
             Just ("alt-" ++ String.fromInt id)
 
         ( Just f, _, _ ) ->
@@ -230,6 +237,9 @@ fieldId p =
                 "extraPhotos" ->
                     Just "flere-bilder"
 
+                "poster" ->
+                    Just "plakat"
+
                 _ ->
                     Nothing
 
@@ -257,7 +267,7 @@ afterSave { sent, current, stored } =
         versioned =
             mapRefs
                 (\r ->
-                    case List.filter (\s -> s.id == r.id) (List.filterMap identity [ stored.mainPhoto ] ++ stored.extraPhotos) of
+                    case List.filter (\s -> s.id == r.id) (List.filterMap identity [ stored.mainPhoto, stored.poster ] ++ stored.extraPhotos) of
                         s :: _ ->
                             { r | updatedAt = s.updatedAt }
 

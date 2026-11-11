@@ -41,7 +41,7 @@ photoJson p =
         ++ String.fromInt p.height
         ++ """, "alt": """
         ++ quote p.alt
-        ++ """, "photographer": """
+        ++ """, "caption": "", "photographer": """
         ++ (case p.photographer of
                 Just ph ->
                     """{ "id": """ ++ String.fromInt ph ++ """, "name": "Ola", "url": "" }"""
@@ -90,7 +90,7 @@ eventWith main e =
       "extraDates": [], "priceText": "", "ticketUrl": "", "showInMenu": false, "menuLabel": "",
       "cancelled": false, "mainPhoto": """
                 ++ (main |> Maybe.map photoJson |> Maybe.withDefault "null")
-                ++ """, "extraPhotos": [], "publishedAt": null,
+                ++ """, "extraPhotos": [], "poster": null, "publishedAt": null,
       "createdAt": "2026-11-01T10:00:00Z", "updatedAt": """
                 ++ quote e.updatedAt
                 ++ " }"

@@ -77,12 +77,13 @@ type alias Upload =
     }
 
 
-{-| Where an upload goes: the event's main photo, its other photos, or the
-gallery.
+{-| Where an upload goes: the event's main photo, its other photos, its
+poster, or the gallery.
 -}
 type Slot
     = Main
     | Extra
+    | Poster
     | Gallery
 
 
@@ -296,11 +297,11 @@ update msg model =
                 sending =
                     List.filter (\u -> u.state == Sending) new
 
-                -- One main photo: the newest choice wins, so an earlier one
-                -- still on its way must not land after it.
+                -- One main photo and one poster: the newest choice wins, so
+                -- an earlier one still on its way must not land after it.
                 replaced =
-                    if slot == Main then
-                        uploadsFor Main model
+                    if slot == Main || slot == Poster then
+                        uploadsFor slot model
 
                     else
                         []

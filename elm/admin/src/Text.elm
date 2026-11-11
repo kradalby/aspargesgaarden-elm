@@ -2,6 +2,8 @@ module Text exposing
     ( address
     , askForOriginal
     , atFloor
+    , captionHelp
+    , captionLabel
     , cropTooSmall
     , error
     , movedTo
@@ -14,6 +16,7 @@ module Text exposing
     , problem
     , sharp
     , shownSmaller
+    , smallPoster
     , softCentred
     , softCrop
     , softKind
@@ -218,6 +221,26 @@ stretched, only shown smaller, so this is information, not a warning.
 shownSmaller : String
 shownSmaller =
     "Bildet er litt lite, så det vises mindre når man åpner det stort. Det går fint."
+
+
+{-| A poster narrower than the widest it is drawn: shown whole all the same.
+-}
+smallPoster : String
+smallPoster =
+    "Plakaten er litt liten. Den vises hel, men teksten på den blir lettere å lese om du har en større fil."
+
+
+{-| The caption beside the description: she must not write the same in
+both, so the help says which one the visitors see.
+-}
+captionLabel : String
+captionLabel =
+    "Bildetekst (valgfritt)"
+
+
+captionHelp : String
+captionHelp =
+    "Vises under bildet når det åpnes stort. «Beskriv bildet» leses bare opp for blinde og Google, så ikke skriv det samme her."
 
 
 {-| Said aloud after a move button, with the item's new place.

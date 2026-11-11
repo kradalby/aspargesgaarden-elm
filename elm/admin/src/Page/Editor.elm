@@ -176,8 +176,10 @@ type Msg
     | SetDate Int String
     | RemoveDate Int
     | SetAlt Int String
+    | SetCaption Int String
     | SetPhotographer Int (Maybe Int)
     | RemoveMain
+    | RemovePoster
     | RemoveExtra Int
     | MoveExtra Int Int
     | PhotosMsg Photos.Msg
@@ -244,6 +246,9 @@ update msg model =
         SetAlt id s ->
             edit (mapRef id (\r -> { r | alt = s })) model
 
+        SetCaption id s ->
+            edit (mapRef id (\r -> { r | caption = s })) model
+
         SetPhotographer id ph ->
             edit (mapRef id (\r -> { r | photographerId = ph })) model
 
@@ -253,6 +258,13 @@ update msg model =
                     edit (\form -> { form | mainPhoto = Nothing }) model
             in
             ( { m | announce = "Bildet er tatt bort fra arrangementet." }, Cmd.batch [ cmd, focus "hovedbilde" ], out )
+
+        RemovePoster ->
+            let
+                ( m, cmd, out ) =
+                    edit (\form -> { form | poster = Nothing }) model
+            in
+            ( { m | announce = "Plakaten er tatt bort fra arrangementet." }, Cmd.batch [ cmd, focus "plakat" ], out )
 
         RemoveExtra i ->
             let
@@ -534,7 +546,7 @@ load e model =
         , saved = form
         , form = form
         , bodyKey = model.bodyKey + 1
-        , photos = Photos.add (List.filterMap identity [ e.mainPhoto ] ++ e.extraPhotos) model.photos
+        , photos = Photos.add (eventPhotos e) model.photos
         , problems = []
     }
 
@@ -559,7 +571,7 @@ afterSave e model =
 
             else
                 model.bodyKey
-        , photos = Photos.add (List.filterMap identity [ e.mainPhoto ] ++ e.extraPhotos) model.photos
+        , photos = Photos.add (eventPhotos e) model.photos
     }
 
 
@@ -684,12 +696,15 @@ applyPhotosOut : Photos.Out -> ( Model, Cmd Msg, Maybe Out ) -> ( Model, Cmd Msg
 applyPhotosOut out ( model, cmd, o ) =
     let
         ref p =
-            { id = p.id, alt = p.alt, photographerId = Maybe.map .id p.photographer, updatedAt = p.updatedAt }
+            { id = p.id, alt = p.alt, caption = p.caption, photographerId = Maybe.map .id p.photographer, updatedAt = p.updatedAt }
 
         ( m, c, _ ) =
             case out of
                 Photos.Added Photos.Main p ->
                     edit (\f -> { f | mainPhoto = Just (ref p) }) model
+
+                Photos.Added Photos.Poster p ->
+                    edit (\f -> { f | poster = Just (ref p) }) model
 
                 Photos.Added _ p ->
                     edit
@@ -718,7 +733,7 @@ mapRef id f form =
             else
                 r
     in
-    { form | mainPhoto = Maybe.map g form.mainPhoto, extraPhotos = List.map g form.extraPhotos }
+    { form | mainPhoto = Maybe.map g form.mainPhoto, extraPhotos = List.map g form.extraPhotos, poster = Maybe.map g form.poster }
 
 
 setField : Field -> String -> Form -> Form
@@ -790,12 +805,12 @@ photosPending model =
 
 eventPhotos : Event -> List Photo
 eventPhotos e =
-    List.filterMap identity [ e.mainPhoto ] ++ e.extraPhotos
+    List.filterMap identity [ e.mainPhoto, e.poster ] ++ e.extraPhotos
 
 
 formPhotos : Model -> List Photo
 formPhotos model =
-    (List.filterMap identity [ model.form.mainPhoto ] ++ model.form.extraPhotos)
+    (List.filterMap identity [ model.form.mainPhoto, model.form.poster ] ++ model.form.extraPhotos)
         |> List.filterMap (\r -> Photos.get r.id model.photos)
 
 
@@ -1095,6 +1110,7 @@ formView siteUrl model =
                 }
             ]
         ]
+    , posterView model
     , extraPhotosView model
     , Ui.card []
         [ Ui.checkbox
@@ -1299,6 +1315,58 @@ altField model ref =
         }
 
 
+captionField : PhotoRef -> Html Msg
+captionField ref =
+    Ui.field
+        { id = "bildetekst-" ++ String.fromInt ref.id
+        , label = Text.captionLabel
+        , help = Text.captionHelp
+        , errors = []
+        , control = Ui.input [ A.value ref.caption, onInput (SetCaption ref.id) ]
+        }
+
+
+posterView : Model -> Html Msg
+posterView model =
+    Ui.card [ A.id "plakat-seksjon" ]
+        [ Html.h2 [ class "font-display text-tre text-2xl" ] [ text "Plakat (valgfritt)" ]
+        , Ui.help [] "Har arrangementet en plakat, vises den hel inne i teksten, og det er den folk ser når lenken deles på Facebook."
+        , case model.form.poster |> Maybe.andThen (\r -> Photos.get r.id model.photos |> Maybe.map (Tuple.pair r)) of
+            Just ( ref, photo ) ->
+                let
+                    id =
+                        "alt-" ++ String.fromInt ref.id
+                in
+                div [ class "flex flex-wrap gap-5 items-start" ]
+                    [ Photos.image [ class "w-36 h-44 rounded-lg" ] photo
+                    , div [ class "flex-1 min-w-60 flex flex-col gap-4" ]
+                        [ Photos.statusView PhotosMsg photo
+                        , div [ class "flex flex-wrap gap-2" ]
+                            [ Ui.secondaryButton [ A.id "plakat" ] (PhotosMsg (Photos.pick Photos.Poster False)) "Bytt plakat"
+                            , Ui.quietButton [] RemovePoster "Ta bort plakaten"
+                            ]
+                        , if photo.quality.full.soft then
+                            Ui.verdict "info" [] [ Text.smallPoster ]
+
+                          else
+                            text ""
+                        , Ui.field
+                            { id = id
+                            , label = "Hva står på plakaten?"
+                            , help = "Det viktigste, som hva, når og hvor. Leses opp for blinde, og hjelper Google."
+                            , errors = errs model id
+                            , control = Ui.input [ A.value ref.alt, onInput (SetAlt ref.id) ]
+                            }
+                        ]
+                    ]
+
+            Nothing ->
+                div [] [ Ui.secondaryButton [ A.id "plakat", attribute "aria-describedby" "plakat-feil" ] (PhotosMsg (Photos.pick Photos.Poster False)) "Velg plakat" ]
+        , Ui.errorText "plakat-feil" (errs model "plakat")
+        , div [ class "flex flex-col gap-2" ] (List.map (Photos.uploadRow PhotosMsg) (Photos.uploadsFor Photos.Poster model.photos))
+        ]
+
+
 extraPhotosView : Model -> Html Msg
 extraPhotosView model =
     let
@@ -1320,6 +1388,7 @@ extraPhotosView model =
                                     , Photos.statusView PhotosMsg photo
                                     , Photos.sizeNote photo
                                     , altField model ref
+                                    , captionField ref
                                     , Photos.photographerField { photoId = ref.id, selected = ref.photographerId, onSelect = SetPhotographer ref.id, toMsg = PhotosMsg } model.photos
                                     , div [ class "flex flex-wrap gap-2" ]
                                         [ Ui.secondaryButton [ A.id (Ui.moveId i -1), A.disabled (i == 0), attribute "aria-label" ("Flytt bilde " ++ String.fromInt (i + 1) ++ " tidligere") ] (MoveExtra i -1) "↑ Tidligere"

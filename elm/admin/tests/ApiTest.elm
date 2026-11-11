@@ -12,7 +12,7 @@ import Test exposing (Test, describe, test)
 photoJson : String
 photoJson =
     """
-    { "id": 12, "width": 4032, "height": 3024, "alt": "Låven",
+    { "id": 12, "width": 4032, "height": 3024, "alt": "Låven", "caption": "",
       "photographer": { "id": 3, "name": "Ola", "url": "" },
       "previewUrl": "/img/p.jpg", "thumbUrl": "/img/t.jpg",
       "crops": { "card": { "x": 1012, "y": 0, "w": 2419, "h": 3024 } },
@@ -35,7 +35,7 @@ eventJson =
       "title": "Julemarked", "summary": "", "body": "## Hei", "start": "2026-11-14", "startTime": "12:00",
       "end": "", "endTime": "", "extraDates": ["2026-11-21"], "priceText": "", "ticketUrl": "",
       "showInMenu": true, "menuLabel": "", "cancelled": false,
-      "mainPhoto": """ ++ photoJson ++ """, "extraPhotos": [],
+      "mainPhoto": """ ++ photoJson ++ """, "extraPhotos": [], "poster": null,
       "publishedAt": null, "createdAt": "2026-11-01T10:00:00Z", "updatedAt": "2026-11-10T09:12:44Z" }
     """
 
@@ -132,8 +132,9 @@ suite =
                     , showInMenu = False
                     , menuLabel = ""
                     , cancelled = False
-                    , mainPhoto = Just { id = 12, alt = "Låven", photographerId = Nothing, updatedAt = "2026-11-09T17:02:10Z" }
+                    , mainPhoto = Just { id = 12, alt = "Låven", caption = "", photographerId = Nothing, updatedAt = "2026-11-09T17:02:10Z" }
                     , extraPhotos = []
+                    , poster = Nothing
                     }
                     |> E.encode 0
                     |> inputKeys
@@ -148,14 +149,14 @@ suite =
         , test "a photo reference carries the photo's version" <|
             \_ ->
                 Api.encodeEventInput
-                    { updatedAt = "", slug = "", title = "", summary = "", body = "", start = "", startTime = "", end = "", endTime = "", extraDates = [], priceText = "", ticketUrl = "", showInMenu = False, menuLabel = "", cancelled = False, mainPhoto = Just { id = 12, alt = "", photographerId = Nothing, updatedAt = "2026-11-09T17:02:10Z" }, extraPhotos = [] }
+                    { updatedAt = "", slug = "", title = "", summary = "", body = "", start = "", startTime = "", end = "", endTime = "", extraDates = [], priceText = "", ticketUrl = "", showInMenu = False, menuLabel = "", cancelled = False, mainPhoto = Just { id = 12, alt = "", caption = "", photographerId = Nothing, updatedAt = "2026-11-09T17:02:10Z" }, extraPhotos = [], poster = Nothing }
                     |> E.encode 0
                     |> D.decodeString (D.at [ "mainPhoto", "updatedAt" ] D.string)
                     |> Expect.equal (Ok "2026-11-09T17:02:10Z")
         , test "a photo reference without a photographer sends null" <|
             \_ ->
                 Api.encodeEventInput
-                    { updatedAt = "", slug = "", title = "", summary = "", body = "", start = "", startTime = "", end = "", endTime = "", extraDates = [], priceText = "", ticketUrl = "", showInMenu = False, menuLabel = "", cancelled = False, mainPhoto = Just { id = 12, alt = "", photographerId = Nothing, updatedAt = "" }, extraPhotos = [] }
+                    { updatedAt = "", slug = "", title = "", summary = "", body = "", start = "", startTime = "", end = "", endTime = "", extraDates = [], priceText = "", ticketUrl = "", showInMenu = False, menuLabel = "", cancelled = False, mainPhoto = Just { id = 12, alt = "", caption = "", photographerId = Nothing, updatedAt = "" }, extraPhotos = [], poster = Nothing }
                     |> E.encode 0
                     |> D.decodeString (D.at [ "mainPhoto", "photographerId" ] (D.null "none"))
                     |> Expect.equal (Ok "none")

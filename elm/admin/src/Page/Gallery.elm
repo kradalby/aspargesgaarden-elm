@@ -28,6 +28,7 @@ type alias Model =
 
     -- What she changed on a photo that the server has not confirmed yet.
     , alts : Dict Int String
+    , captions : Dict Int String
     , credits : Dict Int (Maybe Int)
     , saves : Dict Int Save
     , photos : Photos.Model
@@ -81,6 +82,7 @@ init =
       , orderSave = Idle
       , orderFailed = Nothing
       , alts = Dict.empty
+      , captions = Dict.empty
       , credits = Dict.empty
       , saves = Dict.empty
       , photos = photos
@@ -99,6 +101,7 @@ isDirty model =
         /= Idle
         || Photos.unsaved model.photos
         || List.any (\( id, alt ) -> Just (String.trim alt) /= Maybe.map .alt (Photos.get id model.photos)) (Dict.toList model.alts)
+        || List.any (\( id, c ) -> Just (String.trim c) /= Maybe.map .caption (Photos.get id model.photos)) (Dict.toList model.captions)
         || List.any (\( id, ph ) -> Just ph /= Maybe.map storedCredit (Photos.get id model.photos)) (Dict.toList model.credits)
 
 
@@ -111,6 +114,7 @@ type Msg
     | OrderSaved (Result Api.Error (List Photo))
     | RetryOrder
     | SetAlt Int String
+    | SetCaption Int String
     | SavePhoto Int
     | SetPhotographer Int (Maybe Int)
     | PhotoSaved Int (Result Api.Error Photo)
@@ -192,6 +196,9 @@ update msg model =
         SetAlt id s ->
             ( { model | alts = Dict.insert id s model.alts, saves = Dict.remove id model.saves }, Cmd.none )
 
+        SetCaption id s ->
+            ( { model | captions = Dict.insert id s model.captions, saves = Dict.remove id model.saves }, Cmd.none )
+
         SavePhoto id ->
             savePhoto id model
 
@@ -210,6 +217,12 @@ update msg model =
 
                     else
                         model.alts
+                , captions =
+                    if Maybe.map String.trim (Dict.get id model.captions) == Just photo.caption then
+                        Dict.remove id model.captions
+
+                    else
+                        model.captions
                 , credits =
                     if Dict.get id model.credits == Just (storedCredit photo) then
                         Dict.remove id model.credits
@@ -317,6 +330,16 @@ altOf id model =
             Photos.get id model.photos |> Maybe.map .alt |> Maybe.withDefault ""
 
 
+captionOf : Int -> Model -> String
+captionOf id model =
+    case Dict.get id model.captions of
+        Just s ->
+            s
+
+        Nothing ->
+            Photos.get id model.photos |> Maybe.map .caption |> Maybe.withDefault ""
+
+
 {-| The photographer she chose for the photo, saved or not.
 -}
 creditOf : Int -> Model -> Maybe Int
@@ -337,7 +360,7 @@ storedCredit photo =
 savePhoto : Int -> Model -> ( Model, Cmd Msg )
 savePhoto id model =
     ( { model | saves = Dict.insert id Saving model.saves }
-    , Api.updatePhoto id { alt = String.trim (altOf id model), photographerId = creditOf id model } (PhotoSaved id)
+    , Api.updatePhoto id { alt = String.trim (altOf id model), caption = String.trim (captionOf id model), photographerId = creditOf id model } (PhotoSaved id)
     )
 
 
@@ -435,6 +458,13 @@ photoCard model n i photo =
 
           else
             text ""
+        , Ui.field
+            { id = "bildetekst-" ++ String.fromInt photo.id
+            , label = Text.captionLabel
+            , help = Text.captionHelp
+            , errors = []
+            , control = Ui.input [ A.value (captionOf photo.id model), onInput (SetCaption photo.id), on "change" (D.map (\_ -> SavePhoto photo.id) targetValue) ]
+            }
         , case Dict.get photo.id model.saves of
             Just Saving ->
                 Ui.spinnerText "Lagrer …"

@@ -80,6 +80,9 @@ type alias Photo =
     , width : Int
     , height : Int
     , alt : String
+
+    -- Shown under the photo in the lightbox; "" for none.
+    , caption : String
     , photographer : Maybe Photographer
     , previewUrl : String
     , thumbUrl : String
@@ -145,6 +148,7 @@ type alias Event =
     , cancelled : Bool
     , mainPhoto : Maybe Photo
     , extraPhotos : List Photo
+    , poster : Maybe Photo
     , updatedAt : String
     }
 
@@ -154,7 +158,7 @@ type alias EventLists =
 
 
 type alias PhotoRef =
-    { id : Int, alt : String, photographerId : Maybe Int, updatedAt : String }
+    { id : Int, alt : String, caption : String, photographerId : Maybe Int, updatedAt : String }
 
 
 type alias EventInput =
@@ -175,6 +179,7 @@ type alias EventInput =
     , cancelled : Bool
     , mainPhoto : Maybe PhotoRef
     , extraPhotos : List PhotoRef
+    , poster : Maybe PhotoRef
     }
 
 
@@ -221,6 +226,7 @@ photoDecoder =
         |> field "width" D.int
         |> field "height" D.int
         |> field "alt" D.string
+        |> field "caption" D.string
         |> field "photographer" (D.nullable photographerDecoder)
         |> field "previewUrl" D.string
         |> field "thumbUrl" D.string
@@ -291,6 +297,7 @@ eventDecoder =
         |> field "cancelled" D.bool
         |> field "mainPhoto" (D.nullable photoDecoder)
         |> field "extraPhotos" (D.list photoDecoder)
+        |> field "poster" (D.nullable photoDecoder)
         |> field "updatedAt" D.string
 
 
@@ -353,6 +360,7 @@ encodePhotoRef p =
     E.object
         [ ( "id", E.int p.id )
         , ( "alt", E.string p.alt )
+        , ( "caption", E.string p.caption )
         , ( "photographerId", maybe E.int p.photographerId )
         , ( "updatedAt", E.string p.updatedAt )
         ]
@@ -378,6 +386,7 @@ encodeEventInput e =
         , ( "cancelled", E.bool e.cancelled )
         , ( "mainPhoto", maybe encodePhotoRef e.mainPhoto )
         , ( "extraPhotos", E.list encodePhotoRef e.extraPhotos )
+        , ( "poster", maybe encodePhotoRef e.poster )
         ]
 
 
@@ -568,11 +577,11 @@ prepare id toMsg =
     request "POST" ("photos/" ++ String.fromInt id ++ "/prepare") Http.emptyBody toMsg statusDecoder
 
 
-updatePhoto : Int -> { alt : String, photographerId : Maybe Int } -> (Result Error Photo -> msg) -> Cmd msg
+updatePhoto : Int -> { alt : String, caption : String, photographerId : Maybe Int } -> (Result Error Photo -> msg) -> Cmd msg
 updatePhoto id p toMsg =
     request "PUT"
         ("photos/" ++ String.fromInt id)
-        (Http.jsonBody (E.object [ ( "alt", E.string p.alt ), ( "photographerId", maybe E.int p.photographerId ) ]))
+        (Http.jsonBody (E.object [ ( "alt", E.string p.alt ), ( "caption", E.string p.caption ), ( "photographerId", maybe E.int p.photographerId ) ]))
         toMsg
         photoDecoder
 

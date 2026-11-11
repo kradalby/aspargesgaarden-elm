@@ -36,6 +36,12 @@ suite =
                 \_ -> Form.fieldId (problem "end_before_start" (Just "endTime") Nothing) |> Expect.equal (Just "slutter")
             , test "a missing photo goes to the photo button" <|
                 \_ -> Form.fieldId (problem "main_photo_required" (Just "mainPhoto") Nothing) |> Expect.equal (Just "hovedbilde")
+            , test "a poster used twice goes to the poster button, its description to its field" <|
+                \_ ->
+                    [ Form.fieldId (problem "duplicate_photo" (Just "poster") (Just 12))
+                    , Form.fieldId (problem "alt_required" (Just "poster") (Just 12))
+                    ]
+                        |> Expect.equal [ Just "plakat", Just "alt-12" ]
             , test "an unknown field has no control" <|
                 \_ -> Form.fieldId (problem "x" (Just "nope") Nothing) |> Expect.equal Nothing
             , test "a field gets all its messages, in words" <|
@@ -89,7 +95,7 @@ suite =
                 \_ ->
                     let
                         photo v alt =
-                            Just { id = 12, alt = alt, photographerId = Nothing, updatedAt = v }
+                            Just { id = 12, alt = alt, caption = "", photographerId = Nothing, updatedAt = v }
                     in
                     Form.afterSave
                         { sent = { emptyForm | mainPhoto = photo "1" "Låven" }
