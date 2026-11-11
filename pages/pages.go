@@ -25,6 +25,10 @@ type Site struct {
 	Umami ui.Umami
 	// NoIndex is the beta site (--noindex); see seo.Meta.
 	NoIndex bool
+	// Booked are the taken days the contact page's calendar shows; nil
+	// shows no calendar. Today is the day it is drawn for.
+	Booked map[site.Date]bool
+	Today  site.Date
 }
 
 // photoRef is what ui.Picture needs to show an uploaded photo as kind. A

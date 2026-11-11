@@ -129,6 +129,12 @@ func buildDashboard() (dashboard.Dashboard, error) {
 				"failed means rejected, or still failing after retries.",
 			units.Short,
 			query(`sum by (result) (increase(asparges_indexnow_submissions_total{`+job+`}`+hour+`))`, "{{result}}"))).
+		WithPanel(panel("Booking calendar age",
+			"Time since the contact page's calendar was last read from Google. "+
+				"It is read every 15 minutes; hours mean the feed is failing and the "+
+				"page shows the last good copy. The cause is in journalctl -u asparges.",
+			units.Seconds,
+			query(`time() - (asparges_calendar_last_read_timestamp_seconds{`+job+`} > 0)`, "since last read"))).
 		WithRow(dashboard.NewRowBuilder("Process")).
 		WithPanel(panel("Memory",
 			"Resident memory of the service and the Go heap in use. "+

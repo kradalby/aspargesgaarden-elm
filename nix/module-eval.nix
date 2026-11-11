@@ -44,6 +44,7 @@ let
     baseURL = "https://beta.aspargesgaarden.no";
     noindex = true;
     umamiSiteId = "11111111-2222-4333-8444-555555555555";
+    calendarURL = "https://calendar.example/ical/a%40b/basic.ics";
     logLevel = "debug";
     tailscaleKeyPath = "/run/agenix/asparges-tskey";
     environmentFile = "/run/agenix/asparges-env";
@@ -76,6 +77,12 @@ assert check (
 ) "the default must load no tracker: ${default.ExecStart}";
 assert check (lib.hasInfix "--umami-site-id=11111111-2222-4333-8444-555555555555" custom.ExecStart)
   "custom ExecStart missing umami-site-id: ${custom.ExecStart}";
+assert check
+  (lib.hasInfix "--calendar-url=https://calendar.example/ical/a%%40b/basic.ics" custom.ExecStart)
+  "custom ExecStart must pass calendar-url with % escaped for systemd: ${custom.ExecStart}";
+assert check (
+  !lib.hasInfix "--calendar-url" default.ExecStart
+) "the default must read no calendar: ${default.ExecStart}";
 assert check (lib.hasInfix "--noindex" custom.ExecStart)
   "custom ExecStart missing noindex: ${custom.ExecStart}";
 assert check (lib.hasInfix "--hostname=asparges-beta" custom.ExecStart)

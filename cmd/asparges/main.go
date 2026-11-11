@@ -28,6 +28,7 @@ import (
 	"golang.org/x/sync/errgroup"
 	"tailscale.com/net/tsaddr"
 
+	"github.com/kradalby/asparges/booking"
 	"github.com/kradalby/asparges/db"
 	"github.com/kradalby/asparges/images"
 	"github.com/kradalby/asparges/seo"
@@ -109,6 +110,7 @@ type serveConfig struct {
 	dev         bool
 	noindex     bool
 	umamiSiteID string
+	calendarURL string
 	e2eFixtures string
 }
 
@@ -135,6 +137,7 @@ func newServeCmd(a *app, parent *ff.FlagSet) *ff.Command {
 	fs.BoolVar(&cfg.dev, 0, "dev", "local development: no Tailscale, metrics and admin on the loopback-only local listener")
 	fs.BoolVar(&cfg.noindex, 0, "noindex", "keep the site out of search engines (beta): noindex on every response, robots.txt disallows all, no IndexNow")
 	fs.StringVar(&cfg.umamiSiteID, 0, "umami-site-id", "", "the site's id on the Umami server; empty puts no tracker on the pages")
+	fs.StringVar(&cfg.calendarURL, 0, "calendar-url", "", "public iCal address of the booking calendar, read every quarter hour; empty shows no calendar")
 	fs.StringVar(&cfg.e2eFixtures, 0, "e2e-fixtures", "", "with --dev: the admin browser tests' photo folder; mounts their hooks POST /__reset (deletes everything), /__touch/{id} and /__crop/{id}")
 
 	return &ff.Command{
@@ -157,6 +160,7 @@ var (
 	errBaseURL     = errors.New("--base-url must be an http(s) origin without path, query or trailing slash")
 	errDevLoopback = errors.New("--dev serves metrics on the local listener, so --listen-addr must be a loopback address")
 	errDevOnly     = errors.New("--e2e-fixtures needs --dev: its hooks delete everything")
+	errCalendarURL = errors.New("--calendar-url must be an http(s) address")
 )
 
 func (c serveConfig) validate() error {
@@ -172,6 +176,13 @@ func (c serveConfig) validate() error {
 
 	if !c.dev && c.e2eFixtures != "" {
 		return errDevOnly
+	}
+
+	if c.calendarURL != "" {
+		u, err := url.Parse(c.calendarURL)
+		if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" {
+			return fmt.Errorf("%w: %q", errCalendarURL, c.calendarURL)
+		}
 	}
 
 	return nil
@@ -259,7 +270,21 @@ func serve(ctx context.Context, log *slog.Logger, cfg serveConfig) error {
 		admin.Tailnet = lc
 	}
 
-	public := server.New(server.Config{
+	var public *server.Server
+
+	var cal *booking.Feed
+	if cfg.calendarURL != "" {
+		cal = booking.Open(booking.Config{
+			URL:  cfg.calendarURL,
+			Path: filepath.Join(cfg.dataDir, booking.FileName),
+			Now:  now,
+			Log:  log,
+			// Run, the only caller, starts once public is set.
+			Changed: func() { public.Changed() },
+		})
+	}
+
+	public = server.New(server.Config{
 		BaseURL:          cfg.baseURL,
 		Dev:              cfg.dev,
 		Store:            store,
@@ -271,6 +296,7 @@ func serve(ctx context.Context, log *slog.Logger, cfg serveConfig) error {
 		IndexNowEndpoint: cfg.indexNowEndpoint(),
 		Admin:            admin,
 		UmamiSiteID:      cfg.umamiSiteID,
+		Calendar:         cal,
 	})
 	srv.Handle("/", adminFilesOnTailnet(public.Public()))
 
@@ -291,6 +317,10 @@ func serve(ctx context.Context, log *slog.Logger, cfg serveConfig) error {
 	g.Go(func() error { return imgs.Run(ctx) })
 	g.Go(func() error { return public.Run(ctx) })
 	g.Go(func() error { return sweepUnusedPhotos(ctx, log, store, public) })
+
+	if cal != nil {
+		g.Go(func() error { return cal.Run(ctx) })
+	}
 
 	return g.Wait()
 }

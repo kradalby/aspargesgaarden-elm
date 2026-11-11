@@ -16,6 +16,7 @@ import (
 	"github.com/chasefleming/elem-go"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 
+	"github.com/kradalby/asparges/booking"
 	"github.com/kradalby/asparges/pages"
 	"github.com/kradalby/asparges/render"
 	"github.com/kradalby/asparges/seo"
@@ -66,6 +67,9 @@ type Config struct {
 	// UmamiSiteID is the site's id on the Umami server; empty puts no
 	// tracker on the pages and leaves Umami out of the CSP.
 	UmamiSiteID string
+	// Calendar is the booking calendar the contact page shows; nil shows
+	// none.
+	Calendar *booking.Feed
 }
 
 // Images is the photo store (images.Store) as the server uses it.
@@ -352,7 +356,12 @@ func (s *Server) site(ctx context.Context) (pages.Site, error) {
 
 // base is site without the events' menu entries, which need the database.
 func (s *Server) base() pages.Site {
-	return pages.Site{BaseURL: s.cfg.BaseURL, Menu: pages.Menu(), Umami: s.umami, NoIndex: s.cfg.NoIndex}
+	st := pages.Site{BaseURL: s.cfg.BaseURL, Menu: pages.Menu(), Umami: s.umami, NoIndex: s.cfg.NoIndex}
+	if s.cfg.Calendar != nil {
+		st.Booked, st.Today = s.cfg.Calendar.Days(), site.Today(s.cfg.Now())
+	}
+
+	return st
 }
 
 func (s *Server) servePage(w http.ResponseWriter, r *http.Request, key string, build render.Builder) {
