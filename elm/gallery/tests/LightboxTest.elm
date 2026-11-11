@@ -62,6 +62,7 @@ suite =
                             (Ok
                                 ( "gallery-0"
                                 , [ { alt = "Låven pyntet til bryllup"
+                                    , caption = "Bryllup i juni"
                                     , size = { width = 2000, height = 1333 }
                                     , src = "/img/a-1200.jpeg"
                                     , srcset = "/img/a-480.jpeg 480w, /img/a-1200.jpeg 1200w"
@@ -69,6 +70,7 @@ suite =
                                     , credit = Just { name = "Lucky Thirteen", link = Just "https://luckythirteen.no/" }
                                     }
                                   , { alt = "Fjøset"
+                                    , caption = ""
                                     , size = { width = 800, height = 600 }
                                     , src = "/img/b-800.jpeg"
                                     , srcset = "/img/b-800.jpeg 800w"
@@ -76,6 +78,7 @@ suite =
                                     , credit = Just { name = "Sophia", link = Nothing }
                                     }
                                   , { alt = "Hagen"
+                                    , caption = ""
                                     , size = { width = 800, height = 600 }
                                     , src = "/img/c-800.jpeg"
                                     , srcset = "/img/c-800.jpeg 800w"
@@ -99,7 +102,7 @@ flags =
     { "id": "gallery-0"
     , "viewport": { "width": 390, "height": 844 }
     , "photos":
-        [ { "alt": "Låven pyntet til bryllup", "width": 2000, "height": 1333
+        [ { "alt": "Låven pyntet til bryllup", "caption": "Bryllup i juni", "width": 2000, "height": 1333
           , "src": "/img/a-1200.jpeg", "srcset": "/img/a-480.jpeg 480w, /img/a-1200.jpeg 1200w"
           , "sources": [ { "type": "image/webp", "srcset": "/img/a-480.webp 480w" } ]
           , "by": "Lucky Thirteen", "link": "https://luckythirteen.no/" }

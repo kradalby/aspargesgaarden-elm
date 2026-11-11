@@ -321,9 +321,11 @@ figure model photo =
         , Html.node "figcaption"
             [ Attr.class "w-0 min-w-full text-black" ]
             [ credit photo
+            , if photo.caption == "" then
+                Html.text ""
 
-            -- The <img> carries the same text as its alt.
-            , Html.div [ Attr.attribute "aria-hidden" "true" ] [ Html.text photo.alt ]
+              else
+                Html.div [] [ Html.text photo.caption ]
             ]
         ]
 

@@ -41,6 +41,9 @@ type alias Credit =
 -}
 type alias Photo =
     { alt : String
+
+    -- Shown under the photo; "" for none.
+    , caption : String
     , size : Size
     , src : String
     , srcset : String
@@ -72,8 +75,9 @@ flagsDecoder =
 
 photoDecoder : Decoder Photo
 photoDecoder =
-    Decode.map6 Photo
+    Decode.map7 Photo
         (Decode.field "alt" Decode.string)
+        (Decode.oneOf [ Decode.field "caption" Decode.string, Decode.succeed "" ])
         sizeDecoder
         (Decode.field "src" Decode.string)
         (Decode.field "srcset" Decode.string)
