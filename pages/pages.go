@@ -9,6 +9,7 @@ package pages
 import (
 	"github.com/chasefleming/elem-go"
 
+	"github.com/kradalby/asparges/booking"
 	"github.com/kradalby/asparges/images"
 	"github.com/kradalby/asparges/seo"
 	"github.com/kradalby/asparges/site"
@@ -25,10 +26,9 @@ type Site struct {
 	Umami ui.Umami
 	// NoIndex is the beta site (--noindex); see seo.Meta.
 	NoIndex bool
-	// Booked are the taken days the contact page's calendar shows; nil
-	// shows no calendar. Today is the day it is drawn for.
-	Booked map[site.Date]bool
-	Today  site.Date
+	// Calendar is the contact page's booking calendar; the zero value
+	// shows none.
+	Calendar booking.Calendar
 }
 
 // photoRef is what ui.Picture needs to show an uploaded photo as kind. A

@@ -358,7 +358,7 @@ func (s *Server) site(ctx context.Context) (pages.Site, error) {
 func (s *Server) base() pages.Site {
 	st := pages.Site{BaseURL: s.cfg.BaseURL, Menu: pages.Menu(), Umami: s.umami, NoIndex: s.cfg.NoIndex}
 	if s.cfg.Calendar != nil {
-		st.Booked, st.Today = s.cfg.Calendar.Days(), site.Today(s.cfg.Now())
+		st.Calendar = booking.NewCalendar(s.cfg.Calendar.Days(), site.Today(s.cfg.Now()))
 	}
 
 	return st

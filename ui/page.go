@@ -69,10 +69,14 @@ func Page(p PageProps, body ...elem.Node) *elem.Element {
 		}))
 	}
 
-	// The lightbox is the site's only own script, and loads only where a
-	// gallery is, so a page author cannot forget or misplace it.
+	// The site's own scripts load only where their markup is, so a page
+	// author cannot forget or misplace one.
 	if holdsGallery(body) {
 		head = append(head, elem.Script(attrs.Props{attrs.Src: static.URL("gallery.js"), attrs.Defer: "true"}))
+	}
+
+	if holdsCalendar(body) {
+		head = append(head, elem.Script(attrs.Props{attrs.Src: static.URL("calendar.js"), attrs.Defer: "true"}))
 	}
 
 	kids := append([]elem.Node{Header(p.Menu, p.Meta.Path)},

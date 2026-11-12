@@ -13,8 +13,6 @@ import (
 const (
 	// UmamiOrigin serves the analytics script and receives its beacons.
 	UmamiOrigin = "https://umami.kradalby.no"
-	// CalendarOrigin serves the booking calendar framed on the contact page.
-	CalendarOrigin = "https://calendar.google.com"
 )
 
 // The v2 tracker lives at /script.js (/umami.js was v1's and is gone) and
@@ -39,7 +37,7 @@ func (u Umami) On() bool { return u.SiteID != "" }
 // loadOrigins lists, per kind of load, the outside origins allowed. CSP and
 // the tests over rendered pages and built CSS both read it.
 func loadOrigins(u Umami) map[string][]string {
-	o := map[string][]string{"frame-src": {CalendarOrigin}}
+	o := map[string][]string{}
 	if u.On() {
 		o["script-src"] = []string{UmamiOrigin}
 		o["connect-src"] = []string{UmamiOrigin}
@@ -71,6 +69,10 @@ func csp(origins map[string][]string, ownFrames bool, lock string) string {
 		v := origins[directive]
 		if self {
 			v = append([]string{"'self'"}, v...)
+		}
+
+		if len(v) == 0 {
+			v = []string{"'none'"}
 		}
 
 		return directive + " " + strings.Join(v, " ")

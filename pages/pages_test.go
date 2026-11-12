@@ -17,6 +17,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"golang.org/x/net/html"
 
+	"github.com/kradalby/asparges/booking"
 	"github.com/kradalby/asparges/site"
 	"github.com/kradalby/asparges/static"
 	"github.com/kradalby/asparges/ui"
@@ -50,6 +51,10 @@ func rendered(t *testing.T, s Site) map[string]string {
 	for _, e := range testEvents() {
 		out[e.Path()] = Event(s, e, testNow).Render()
 	}
+
+	withCalendar := s
+	withCalendar.Calendar = booking.NewCalendar(booking.Days{site.Today(testNow).AddDays(3): true}, site.Today(testNow))
+	out["/kontakt (calendar)"] = Kontakt(withCalendar).Render()
 
 	return out
 }
@@ -171,13 +176,15 @@ func TestEveryPageDescribesItself(t *testing.T) {
 			continue
 		}
 
-		require.Equal(t, testBase+strings.TrimSuffix(path, " (empty)"), h.links["canonical"], path)
+		// "/arrangementer (empty)": the same page in another state.
+		address, _, variant := strings.Cut(path, " (")
+		require.Equal(t, testBase+address, h.links["canonical"], path)
 		require.Equal(t, h.links["canonical"], h.meta["og:url"][0], path)
 
 		description := h.meta["description"][0]
 		require.LessOrEqual(t, len([]rune(description)), 160, "%s: %q is cut in results", path, description)
 
-		if strings.HasSuffix(path, " (empty)") {
+		if variant {
 			continue
 		}
 
@@ -393,16 +400,19 @@ func TestStylesheetLoadsNothingFromOutside(t *testing.T) {
 	}
 }
 
-// The lightbox only shows the gallery's own images: it requests nothing
-// itself, and the only addresses in it are links in Elm's error messages.
-func TestLightboxScriptLoadsNothingFromOutside(t *testing.T) {
-	js := staticFile(t, "gallery.js")
+// The lightbox only shows the gallery's own images, and the calendar has
+// its taken days in the page: neither requests anything itself, and the
+// only addresses in them are links in Elm's error messages.
+func TestPageScriptsLoadNothingFromOutside(t *testing.T) {
+	for _, name := range []string{"gallery.js", "calendar.js"} {
+		js := staticFile(t, name)
 
-	for _, api := range []string{"XMLHttpRequest", "fetch(", "WebSocket", "EventSource", "sendBeacon", "import("} {
-		require.NotContains(t, js, api)
-	}
+		for _, api := range []string{"XMLHttpRequest", "fetch(", "WebSocket", "EventSource", "sendBeacon", "import("} {
+			require.NotContains(t, js, api, name)
+		}
 
-	for _, u := range regexp.MustCompile(`https?://[^\s"'\x60)]+`).FindAllString(js, -1) {
-		require.Regexp(t, `^https://(github\.com/elm/|package\.elm-lang\.org/)`, u, "gallery.js names an outside address")
+		for _, u := range regexp.MustCompile(`https?://[^\s"'\x60)]+`).FindAllString(js, -1) {
+			require.Regexp(t, `^https://(github\.com/elm/|package\.elm-lang\.org/)`, u, "%s names an outside address", name)
+		}
 	}
 }
