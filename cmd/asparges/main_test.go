@@ -233,7 +233,7 @@ func TestEveryServeFlagIsInTheModule(t *testing.T) {
 }
 
 func TestDevOnlyFlagsNotFromEnv(t *testing.T) {
-	for _, key := range []string{"ASPARGES_DEV", "ASPARGES_E2E_FIXTURES"} {
+	for _, key := range []string{"ASPARGES_DEV", "ASPARGES_E2E_FIXTURES", "ASPARGES_E2E_CLOCK"} {
 		t.Run(key, func(t *testing.T) {
 			t.Setenv(key, "true")
 			require.ErrorIs(t, parse(newRootCmd(&app{}), []string{"serve"}), errDevFromEnv)
@@ -252,6 +252,9 @@ func TestServeE2EOnlyInDev(t *testing.T) {
 
 	c.dev = true
 	require.NoError(t, c.validate())
+
+	c = serveConfig{baseURL: "https://aspargesgaarden.no", listenAddr: "127.0.0.1:8090", e2eClock: true}
+	require.ErrorIs(t, c.validate(), errDevOnly)
 }
 
 // A photo taken out of the gallery survives the daily sweep for

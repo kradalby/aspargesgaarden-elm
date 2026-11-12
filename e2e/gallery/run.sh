@@ -1,13 +1,16 @@
 #!/usr/bin/env bash
-# Browser tests of the gallery (ui.Gallery and the elm/gallery lightbox) in
-# Chromium, Firefox and WebKit, with Playwright from the pinned nixpkgs.
+# Browser tests of the public pages' scripts in Chromium, Firefox and WebKit,
+# with Playwright from the pinned nixpkgs: the gallery (ui.Gallery and the
+# elm/gallery lightbox) and the booking calendar (ui.BookingCalendar and
+# elm/calendar).
 #
 #   nix develop -c e2e/gallery/run.sh [pytest args]   e.g. -k swipe
 #
 # Builds static/dist (go generate), runs `asparges import` of the import
 # tests' miniature old site (cmd/asparges/testdata/oldsite) into $DATA, a
-# fresh directory unless set, serves it with `asparges serve --dev`, waits
-# for the pictures the tested pages show, and runs test_gallery.py.
+# fresh directory unless set, serves it with `asparges serve --dev` on the
+# tests' fixed day with calendar.ics as the calendar's last good copy, waits
+# for the pictures the tested pages show, and runs test_*.py.
 # Screenshots go to $OUT. BROWSERS narrows the browsers ("chromium webkit").
 set -euo pipefail
 
@@ -52,8 +55,11 @@ if (exec 3<>"/dev/tcp/127.0.0.1/$port") 2>/dev/null; then
   echo "port $port is in use; set PORT to a free one" >&2
   exit 1
 fi
-"$work/asparges" serve --dev --listen-addr "127.0.0.1:$port" --base-url "http://127.0.0.1:$port" \
-  --data-dir "$data" >"$work/log" 2>&1 &
+# The feed address answers nothing, so the calendar is the copy, as when
+# Google is down.
+cp "$here/calendar.ics" "$data/calendar.ics"
+"$work/asparges" serve --dev --e2e-clock --listen-addr "127.0.0.1:$port" --base-url "http://127.0.0.1:$port" \
+  --data-dir "$data" --calendar-url http://127.0.0.1:9/calendar.ics >"$work/log" 2>&1 &
 server=$!
 base=http://127.0.0.1:$port
 until curl -sf -o /dev/null "$base/galleri"; do
@@ -71,4 +77,4 @@ for u in $(grep -o '/img/[^"&, ]*' <<<"$pages" | sort -u); do
 done
 
 photos=$(curl -sf "$base/galleri" | grep -o 'data-index="[0-9]*"' | sort -u | wc -l)
-BASE=$base OUT=$out PHOTOS=$photos "$py" -I -m pytest -p no:cacheprovider "$here/test_gallery.py" "$@"
+BASE=$base OUT=$out PHOTOS=$photos "$py" -I -m pytest -p no:cacheprovider "$here/test_gallery.py" "$here/test_calendar.py" "$@"

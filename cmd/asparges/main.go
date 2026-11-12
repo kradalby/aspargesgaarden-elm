@@ -79,6 +79,7 @@ func run() int {
 var devOnlyFlags = map[string]bool{
 	"dev":          true, // no Tailscale, the admin on the local listener
 	"e2e-fixtures": true, // hooks that delete everything
+	"e2e-clock":    true, // a fixed day
 }
 
 var errDevFromEnv = errors.New("dev-only flags must be given on the command line")
@@ -112,6 +113,7 @@ type serveConfig struct {
 	umamiSiteID string
 	calendarURL string
 	e2eFixtures string
+	e2eClock    bool
 }
 
 func newRootCmd(a *app) *ff.Command {
@@ -138,6 +140,7 @@ func newServeCmd(a *app, parent *ff.FlagSet) *ff.Command {
 	fs.BoolVar(&cfg.noindex, 0, "noindex", "keep the site out of search engines (beta): noindex on every response, robots.txt disallows all, no IndexNow")
 	fs.StringVar(&cfg.umamiSiteID, 0, "umami-site-id", "", "the site's id on the Umami server; empty puts no tracker on the pages")
 	fs.StringVar(&cfg.calendarURL, 0, "calendar-url", "", "public iCal address of the booking calendar, read every quarter hour; empty shows no calendar")
+	fs.BoolVar(&cfg.e2eClock, 0, "e2e-clock", "with --dev: run the clock from the browser tests' fixed day, as --e2e-fixtures does")
 	fs.StringVar(&cfg.e2eFixtures, 0, "e2e-fixtures", "", "with --dev: the admin browser tests' photo folder; mounts their hooks POST /__reset (deletes everything), /__touch/{id} and /__crop/{id}")
 
 	return &ff.Command{
@@ -159,7 +162,7 @@ func newServeCmd(a *app, parent *ff.FlagSet) *ff.Command {
 var (
 	errBaseURL     = errors.New("--base-url must be an http(s) origin without path, query or trailing slash")
 	errDevLoopback = errors.New("--dev serves metrics on the local listener, so --listen-addr must be a loopback address")
-	errDevOnly     = errors.New("--e2e-fixtures needs --dev: its hooks delete everything")
+	errDevOnly     = errors.New("--e2e-fixtures and --e2e-clock need --dev")
 	errCalendarURL = errors.New("--calendar-url must be an http(s) address")
 )
 
@@ -174,7 +177,7 @@ func (c serveConfig) validate() error {
 		return fmt.Errorf("%w: %q", errDevLoopback, c.listenAddr)
 	}
 
-	if !c.dev && c.e2eFixtures != "" {
+	if !c.dev && (c.e2eFixtures != "" || c.e2eClock) {
 		return errDevOnly
 	}
 
@@ -242,7 +245,7 @@ func serve(ctx context.Context, log *slog.Logger, cfg serveConfig) error {
 	now := time.Now
 
 	var e2eClk *e2eClock
-	if cfg.e2eFixtures != "" {
+	if cfg.e2eFixtures != "" || cfg.e2eClock {
 		e2eClk = &e2eClock{}
 		now = e2eClk.now
 	}
@@ -305,7 +308,7 @@ func serve(ctx context.Context, log *slog.Logger, cfg serveConfig) error {
 		srv.HandleTSOnly("/admin/", public.Admin())
 	}
 
-	if e2eClk != nil {
+	if cfg.e2eFixtures != "" {
 		hooks := e2eHooks(store, imgs, public, cfg.e2eFixtures, e2eClk)
 		srv.Handle("POST /__reset", hooks)
 		srv.Handle("POST /__touch/{id}", hooks)
