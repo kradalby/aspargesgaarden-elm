@@ -61,6 +61,9 @@ func TestLLMsFreeWeekends(t *testing.T) {
 		taken[d] = true
 	}
 
+	// Not while the site cannot vouch for it.
+	require.NotContains(t, LLMs(testBase, nil, nil, booking.Calendar{Unavailable: true}), "Ledige helger")
+
 	got := LLMs(testBase, nil, nil, booking.NewCalendar(taken, date("2026-11-11")))
 
 	require.Contains(t, got, `## Ledige helger

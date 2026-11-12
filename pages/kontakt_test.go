@@ -19,6 +19,21 @@ func TestKontakt(t *testing.T) {
 	require.NotContains(t, got, "<iframe")
 }
 
+// A calendar the site may not vouch for is a sentence and the number to
+// call: no months, no list, no app.
+func TestKontaktCalendarUnavailable(t *testing.T) {
+	s := testSite
+	s.Calendar = booking.Calendar{Unavailable: true}
+
+	got := Kontakt(s).Render()
+	require.Contains(t, got, "Kalenderen er ikke tilgjengelig akkurat nå. Ring")
+	require.Contains(t, got, `href="tel:+4790919812"`)
+	require.NotContains(t, got, "<table")
+	require.NotContains(t, got, "data-calendar")
+	require.NotContains(t, got, "calendar.js")
+	require.NotContains(t, got, "Helgene det neste året")
+}
+
 func TestKontaktCalendar(t *testing.T) {
 	s := testSite
 	s.Calendar = booking.NewCalendar(booking.Days{

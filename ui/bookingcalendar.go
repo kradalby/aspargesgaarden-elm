@@ -35,6 +35,9 @@ type BookingData struct {
 	// Phone and Tel are the number to call and its tel: link.
 	Phone string `json:"phone"`
 	Tel   string `json:"tel"`
+	// MaxAge is how many seconds the page's bookings may be shown in an
+	// open tab: the server's own limit (booking.MaxAge).
+	MaxAge int `json:"maxAge"`
 }
 
 // BookingCalendarProps configures BookingCalendar.
@@ -109,6 +112,23 @@ func BookingCalendar(p BookingCalendarProps) elem.Node {
 			BookingWeekends(p.Weekends...),
 		),
 	)
+}
+
+// BookingUnavailable stands in for the calendar while the site cannot
+// vouch for it: a sentence and the number to call, not a hole. The
+// calendar app says the same in a tab left open too long.
+func BookingUnavailable(phone, tel string) elem.Node {
+	return elem.Section(attrs.Props{attrs.ID: "kalender", "aria-labelledby": "kalender-tittel", attrs.Class: "px-2 pt-12 pb-16 md:px-0"},
+		elem.H2(attrs.Props{attrs.ID: "kalender-tittel", attrs.Class: "pb-2 font-display text-4xl text-tre"}, elem.Text("Ledige datoer")),
+		bookingUnavailableLine(phone, tel),
+	)
+}
+
+func bookingUnavailableLine(phone, tel string) elem.Node {
+	return elem.P(attrs.Props{attrs.Class: "max-w-2xl text-lg text-sort"},
+		elem.Text("Kalenderen er ikke tilgjengelig akkurat nå. Ring "),
+		elem.A(attrs.Props{attrs.Href: tel, attrs.Class: "underline whitespace-nowrap"}, elem.Text(phone)),
+		elem.Text(" for å spørre om en dato."))
 }
 
 var weekdays = [7][2]string{

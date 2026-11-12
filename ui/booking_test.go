@@ -22,7 +22,7 @@ func TestBookingCalendar(t *testing.T) {
 		Edge:   "Kalenderen går til september 2028. Spør oss om datoer etter det.",
 		Data: BookingData{
 			Today: "2026-11-03", Last: "2028-09-30", Taken: []string{"2026-11-01", "2026-11-06"},
-			Phone: "+47 90 91 98 12", Tel: "tel:+4790919812",
+			Phone: "+47 90 91 98 12", Tel: "tel:+4790919812", MaxAge: 1800,
 		},
 		Weekends:  []BookingWeekendMonth{{Name: "November 2026", Weekends: []BookingWeekend{{Dates: "6.–8. november", Status: "Ledig søndag"}}}},
 		ListLabel: "Helgene det neste året",
@@ -35,6 +35,10 @@ func TestBookingCalendar(t *testing.T) {
 	}
 	require.Contains(t, page(cal), "/static/calendar.js")
 	require.NotContains(t, page(elem.P(nil)), "/static/calendar.js")
+}
+
+func TestBookingUnavailable(t *testing.T) {
+	golden.HTML(t, "bookingunavailable", BookingUnavailable("+47 90 91 98 12", "tel:+4790919812").Render())
 }
 
 func TestBookingWeekends(t *testing.T) {

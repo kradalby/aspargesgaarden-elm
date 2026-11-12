@@ -36,8 +36,13 @@ func Kontakt(s Site) *elem.Element {
 // shown must match.
 const shownMonths = 3
 
-// calendar is the booking calendar, or nothing when there is none.
+// calendar is the booking calendar, the line saying it is not available,
+// or nothing when the site has none.
 func calendar(c booking.Calendar) elem.Node {
+	if c.Unavailable {
+		return ui.BookingUnavailable(seo.Venue.Phone, "tel:"+seo.Venue.PhoneE164)
+	}
+
 	if !c.On() {
 		return elem.None()
 	}
@@ -63,11 +68,12 @@ func calendar(c booking.Calendar) elem.Node {
 		Months: months,
 		Edge:   "Kalenderen går til " + site.MonthName(c.Last.Month) + fmt.Sprintf(" %d. Spør oss om datoer etter det.", c.Last.Year),
 		Data: ui.BookingData{
-			Today: c.Today.String(),
-			Last:  c.Last.String(),
-			Taken: taken,
-			Phone: seo.Venue.Phone,
-			Tel:   "tel:" + seo.Venue.PhoneE164,
+			Today:  c.Today.String(),
+			Last:   c.Last.String(),
+			Taken:  taken,
+			Phone:  seo.Venue.Phone,
+			Tel:    "tel:" + seo.Venue.PhoneE164,
+			MaxAge: int(booking.MaxAge.Seconds()),
 		},
 		Weekends:  weekendList(c),
 		ListLabel: "Helgene det neste året",
