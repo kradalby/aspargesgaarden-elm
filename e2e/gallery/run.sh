@@ -9,8 +9,10 @@
 # Builds static/dist (go generate), runs `asparges import` of the import
 # tests' miniature old site (cmd/asparges/testdata/oldsite) into $DATA, a
 # fresh directory unless set, serves it with `asparges serve --dev` on the
-# tests' fixed day with calendar.ics as the calendar's last good copy, waits
-# for the pictures the tested pages show, and runs test_*.py.
+# tests' fixed day with calendar.ics as the feed, waits
+# for the pictures the tested pages show, and runs test_gallery.py and
+# test_calendar.py; then again with a feed that never answers for
+# test_calendar_hidden.py.
 # Screenshots go to $OUT. BROWSERS narrows the browsers ("chromium webkit").
 set -euo pipefail
 
@@ -40,7 +42,8 @@ if [ ! -d /run/opengl-driver ]; then
 fi
 
 work=$(mktemp -d) server=
-trap 'kill "$server" 2>/dev/null || true; rm -rf "$work"' EXIT
+feed=
+trap 'kill "$server" $feed 2>/dev/null || true; rm -rf "$work"' EXIT
 mkdir -p "$out"
 data=${DATA:-$work/data}
 
@@ -55,12 +58,18 @@ if (exec 3<>"/dev/tcp/127.0.0.1/$port") 2>/dev/null; then
   echo "port $port is in use; set PORT to a free one" >&2
   exit 1
 fi
-# The feed address answers nothing, so the calendar is the copy, as when
-# Google is down.
-cp "$here/calendar.ics" "$data/calendar.ics"
-"$work/asparges" serve --dev --e2e-clock --listen-addr "127.0.0.1:$port" --base-url "http://127.0.0.1:$port" \
-  --data-dir "$data" --calendar-url http://127.0.0.1:9/calendar.ics >"$work/log" 2>&1 &
-server=$!
+# calendar.ics is the feed, served as Google would.
+feedport=$((port + 1))
+"$py" -I -m http.server --bind 127.0.0.1 --directory "$here" "$feedport" >"$work/feed.log" 2>&1 &
+feed=$!
+until curl -sf -o /dev/null "http://127.0.0.1:$feedport/calendar.ics"; do sleep 0.2; done
+
+serve() {
+  "$work/asparges" serve --dev --e2e-clock --listen-addr "127.0.0.1:$port" --base-url "http://127.0.0.1:$port" \
+    --data-dir "$data" --calendar-url "$1" >"$work/log" 2>&1 &
+  server=$!
+}
+serve "http://127.0.0.1:$feedport/calendar.ics"
 base=http://127.0.0.1:$port
 until curl -sf -o /dev/null "$base/galleri"; do
   if ! kill -0 "$server" 2>/dev/null; then
@@ -77,4 +86,16 @@ for u in $(grep -o '/img/[^"&, ]*' <<<"$pages" | sort -u); do
 done
 
 photos=$(curl -sf "$base/galleri" | grep -o 'data-index="[0-9]*"' | sort -u | wc -l)
-BASE=$base OUT=$out PHOTOS=$photos "$py" -I -m pytest -p no:cacheprovider "$here/test_gallery.py" "$here/test_calendar.py" "$@"
+status=0
+BASE=$base OUT=$out PHOTOS=$photos "$py" -I -m pytest -p no:cacheprovider "$here/test_gallery.py" "$here/test_calendar.py" "$@" || status=$?
+
+# Again with a feed that never answers and no copy kept: the calendar the
+# site cannot vouch for.
+kill "$server"
+wait "$server" 2>/dev/null || true
+rm -f "$data/calendar.json"
+serve http://127.0.0.1:9/calendar.ics
+until curl -sf -o /dev/null "$base/kontakt"; do sleep 0.2; done
+# 5 is "no tests": a -k for the other phase.
+BASE=$base OUT=$out "$py" -I -m pytest -p no:cacheprovider "$here/test_calendar_hidden.py" "$@" || [ $? = 5 ] || status=1
+exit $status

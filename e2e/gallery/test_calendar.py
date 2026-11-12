@@ -1,9 +1,9 @@
 """Browser checks of the booking calendar on /kontakt: ui.BookingCalendar's
 months and weekend list, and the elm/calendar app that takes them over.
 
-run.sh serves calendar.ics as the last good copy of the feed, with the clock
-on the browser tests' fixed day, Tuesday 10 November 2026, so the answers
-never change with the date the suite runs on.
+run.sh serves calendar.ics as the feed, with the server's clock on the
+browser tests' fixed day, Tuesday 10 November 2026, so the answers never
+change with the date the suite runs on.
 """
 
 import datetime
@@ -173,18 +173,37 @@ def test_screenshots(browser, width, height):
     c.close()
 
 
-def test_today_never_goes_back(desktop):
-    """The browser's day comes in when the tab is shown again; one before the
-    server's is ignored, a later one moves today on."""
-    page = desktop.page("/kontakt")
+def oslo(*args):
+    return datetime.datetime(*args, tzinfo=datetime.timezone(datetime.timedelta(hours=1)))
+
+
+def test_the_open_tab(desktop):
+    """The browser's clock comes in every minute and when the tab is shown
+    again. A day before the server's is ignored, a later one moves today on;
+    past the server's limit since the page loaded, the tab stops showing
+    bookings at all."""
+    page = desktop.ctx.new_page()
+    desktop.pages.append(page)
+    page.clock.install(time=oslo(2026, 11, 10, 23, 50))
+    page.goto(BASE + "/kontakt")
     today = page.locator("#kalender td[aria-current=date]")
     expect(today).to_have_text(re.compile(r"^10"))
-    page.clock.set_system_time(datetime.datetime(2026, 11, 1, 12, tzinfo=datetime.UTC))
-    page.evaluate("document.dispatchEvent(new Event('visibilitychange'))")
+
+    def shown_again(at):
+        page.clock.set_system_time(at)
+        page.evaluate("document.dispatchEvent(new Event('visibilitychange'))")
+
+    shown_again(oslo(2026, 11, 1, 12))
     expect(today).to_have_text(re.compile(r"^10"))
-    page.clock.set_system_time(datetime.datetime(2026, 11, 12, 12, tzinfo=datetime.UTC))
-    page.evaluate("document.dispatchEvent(new Event('visibilitychange'))")
-    expect(today).to_have_text(re.compile(r"^12"))
+    shown_again(oslo(2026, 11, 11, 0, 5))
+    expect(today).to_have_text(re.compile(r"^11"))
+
+    # Past 30 minutes since loading, by the minute's tick alone.
+    page.clock.fast_forward("27:00")
+    line = page.locator("#kalender").get_by_text("Kalenderen er ikke tilgjengelig akkurat nå.")
+    expect(line).to_be_visible()
+    expect(line.get_by_role("link", name="+47 90 91 98 12")).to_be_visible()
+    assert page.locator("#kalender table, #kalender input, #kalender details").count() == 0
 
 
 def test_answer_in_view_on_a_phone(phone):
