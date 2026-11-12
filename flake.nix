@@ -94,6 +94,7 @@
         # their dependencies apart. Adding an app is adding its name here.
         elmApps = [
           "gallery"
+          "calendar"
           "admin"
         ];
         elmHome =
