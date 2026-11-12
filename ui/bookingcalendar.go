@@ -87,7 +87,9 @@ func BookingCalendar(p BookingCalendarProps) elem.Node {
 		panic("ui: calendar data: " + err.Error())
 	}
 
-	return elem.Section(attrs.Props{attrs.ID: "kalender", "aria-labelledby": "kalender-tittel", attrs.Class: "px-2 pt-12 pb-16 md:px-0"},
+	// Capped so a month keeps a wall calendar's near-square days on a wide
+	// screen instead of spreading over a third of it.
+	return elem.Section(attrs.Props{attrs.ID: "kalender", "aria-labelledby": "kalender-tittel", attrs.Class: "max-w-5xl px-2 pt-12 pb-16 md:px-0"},
 		elem.H2(attrs.Props{attrs.ID: "kalender-tittel", attrs.Class: "pb-2 font-display text-4xl text-tre"}, elem.Text("Ledige datoer")),
 		elem.P(attrs.Props{attrs.Class: "pb-6 max-w-2xl text-lg text-sort"},
 			elem.Text("Kalenderen viser dagene gården er leid ut.")),
@@ -159,7 +161,7 @@ func BookingMonthTable(m BookingMonth) elem.Node {
 		rows[i] = elem.Tr(nil, cells...)
 	}
 
-	return elem.Table(attrs.Props{attrs.Class: "w-full table-fixed border-separate border-spacing-1"},
+	return elem.Table(attrs.Props{attrs.Class: "w-full table-fixed border-separate border-spacing-1 p-2 border border-brown-border/50"},
 		elem.Caption(attrs.Props{attrs.Class: "pb-1 text-left font-display text-2xl text-tre"}, elem.Text(m.Name)),
 		elem.THead(nil, elem.Tr(nil, heads...)),
 		elem.TBody(nil, rows...),
@@ -209,7 +211,7 @@ func bookingLegend() elem.Node {
 
 	return elem.Ul(attrs.Props{attrs.Class: "flex flex-wrap gap-x-6 gap-y-2 pb-4 text-sm text-sort"},
 		item("bg-rust", "Opptatt"),
-		item("border border-brown-border", "Ledig"),
+		item("border border-brown-border/50", "Ledig"),
 		item("outline-2 -outline-offset-2 outline-sort", "I dag"),
 	)
 }

@@ -34,7 +34,7 @@ func BookingWeekends(months ...BookingWeekendMonth) elem.Node {
 
 	return elem.Div(nil,
 		elem.P(attrs.Props{attrs.Class: "pb-6 text-sort"}, elem.Text("Helgene er fredag til søndag. Spør oss om hverdager.")),
-		elem.Div(attrs.Props{attrs.Class: "grid gap-x-12 gap-y-8 md:grid-cols-2 lg:grid-cols-3"}, kids...))
+		elem.Div(attrs.Props{attrs.Class: "grid gap-x-10 gap-y-8 md:grid-cols-2 lg:grid-cols-3"}, kids...))
 }
 
 func weekendMonth(m BookingWeekendMonth) elem.Node {

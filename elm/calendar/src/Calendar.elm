@@ -215,7 +215,7 @@ legend =
     in
     ul [ class "flex flex-wrap gap-x-6 gap-y-2 pb-4 text-sm text-sort" ]
         [ item "bg-rust" "Opptatt"
-        , item "border border-brown-border" "Ledig"
+        , item "border border-brown-border/50" "Ledig"
         , item "outline-2 -outline-offset-2 outline-sort" "I dag"
         ]
 
@@ -280,7 +280,7 @@ monthTable model first =
         pad week =
             week ++ List.repeat (7 - List.length week) Nothing
     in
-    table [ class "w-full table-fixed border-separate border-spacing-1" ]
+    table [ class "w-full table-fixed border-separate border-spacing-1 p-2 border border-brown-border/50" ]
         [ Html.caption [ class "pb-1 text-left font-display text-2xl text-tre" ] [ text (Booking.monthRange first first) ]
         , thead [] [ tr [] (List.map (\( short, long ) -> th [ attribute "scope" "col", attribute "abbr" long, class "pb-1 text-xs font-bold uppercase text-gray-600" ] [ text short ]) weekdayHeads) ]
         , tbody [] (List.map (\week -> tr [] (List.map (cell model) (pad week))) (weeks cells))
