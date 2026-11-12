@@ -114,7 +114,7 @@ func (s *Server) llms(w http.ResponseWriter, r *http.Request) {
 
 		upcoming, _ := site.Split(events, s.cfg.Now())
 
-		return []byte(seo.LLMs(s.cfg.BaseURL, links, upcoming)), nil
+		return []byte(seo.LLMs(s.cfg.BaseURL, links, upcoming, st.Calendar)), nil
 	})
 }
 
