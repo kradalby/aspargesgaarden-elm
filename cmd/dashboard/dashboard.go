@@ -129,12 +129,29 @@ func buildDashboard() (dashboard.Dashboard, error) {
 				"failed means rejected, or still failing after retries.",
 			units.Short,
 			query(`sum by (result) (increase(asparges_indexnow_submissions_total{`+job+`}`+hour+`))`, "{{result}}"))).
-		WithPanel(panel("Booking calendar age",
-			"Time since the contact page's calendar was last read from Google. "+
-				"It is read every 15 minutes; hours mean the feed is failing and the "+
-				"page shows the last good copy. The cause is in journalctl -u asparges.",
+		WithRow(dashboard.NewRowBuilder("Booking calendar — is it current?")).
+		WithPanel(panel("Calendar shown",
+			"1 while the contact page shows the booking calendar; 0 while it is hidden "+
+				"because no read has succeeded for 30 minutes.",
+			units.NoUnit,
+			query(`asparges_calendar_shown{`+job+`}`, "shown")).
+			Min(0).Max(1)).
+		WithPanel(panel("Calendar age",
+			"Time since the calendar was last read whole from Google. It is read every "+
+				"5 minutes and hidden at 30. The cause of failures is in journalctl -u asparges.",
 			units.Seconds,
-			query(`time() - (asparges_calendar_last_read_timestamp_seconds{`+job+`} > 0)`, "since last read"))).
+			query(`time() - asparges_calendar_last_read_timestamp_seconds{`+job+`}`, "since last good read"))).
+		WithPanel(panel("Calendar reads (1h)",
+			"Reads by result: ok, fetch_failed (Google not answering), refused (content "+
+				"the reader cannot be sure of; the journal names the event).",
+			units.Short,
+			query(`sum by (result) (increase(asparges_calendar_reads_total{`+job+`}`+hour+`))`, "{{result}}"))).
+		WithPanel(panel("Calendar contents",
+			"Bookings and taken days in the calendar in use. A sudden fall is either "+
+				"cancellations or a fault in the feed.",
+			units.Short,
+			query(`asparges_calendar_events{`+job+`}`, "bookings"),
+			query(`asparges_calendar_taken_dates{`+job+`}`, "taken days"))).
 		WithRow(dashboard.NewRowBuilder("Process")).
 		WithPanel(panel("Memory",
 			"Resident memory of the service and the Go heap in use. "+
