@@ -6,8 +6,9 @@ farm's owners over Tailscale.
 
 - **Public pages** are HTML rendered in Go with
   [elem-go](https://github.com/chasefleming/elem-go) components. They work
-  without JavaScript; the only script is the gallery lightbox (Elm), on pages
-  that show a gallery. Pages, the 404 page, `/sitemap.xml` and `/llms.txt`
+  without JavaScript; the only scripts are the gallery lightbox and the
+  booking calendar on the contact page (both Elm), each loaded only where it
+  is used. Pages, the 404 page, `/sitemap.xml` and `/llms.txt`
   are kept in memory after the first request and thrown away on any change;
   only the admin preview is rendered every time.
 - **Content** (events, the Christmas market, the gallery, photographers)
@@ -40,7 +41,7 @@ Open work is in [TODO.md](TODO.md). Rules for changing the code are in
 | `db/`                      | `schema.sql`, `queries/`, sqlc output in `dbsqlc/`.                                                                          |
 | `images/`                  | Every image file: originals, crops, variants, URLs, the vips pipeline, the build worker.                                     |
 | `static/`                  | Embedded assets: Tailwind input, font sources, logo and icons, fixed-page photo masters, and `build.sh` that builds `dist/`. |
-| `elm/admin`, `elm/gallery` | The two Elm apps.                                                                                                            |
+| `elm/<app>`                | The Elm apps: `admin`, `gallery` (the lightbox), `calendar` (the contact page's booking calendar).                           |
 | `golden/`                  | The golden-file helper.                                                                                                      |
 | `nix/`                     | The NixOS module, its eval test, two VM tests, the hardening smoke, the slim vips.                                           |
 | `e2e/admin`, `e2e/gallery` | Browser suites.                                                                                                              |
@@ -109,15 +110,18 @@ checks (whitespace, large files, private keys).
 | `--tailscale-auth-key-path` | `tailscaleKeyPath` | none                         | Auth key file for the first start; `TS_AUTHKEY` also works.                     |
 | `--noindex`                 | `noindex`          | off                          | Beta: `X-Robots-Tag: noindex`, `robots.txt` disallows all, no IndexNow.         |
 | `--umami-site-id`           | `umamiSiteId`      | none                         | Umami site on umami.kradalby.no. Unset: no tracker, no Umami origin in the CSP. |
+| `--calendar-url`            | `calendarURL`      | none                         | Public iCal feed of the booking calendar. Unset: no calendar on `/kontakt`.     |
 | `--log-level`               | `logLevel`         | `info`                       |                                                                                 |
 
-`--dev` and `--e2e-fixtures` are for local work and tests only: no module
-option, and `serve` refuses to start when `ASPARGES_DEV` or
-`ASPARGES_E2E_FIXTURES` is set.
+`--dev`, `--e2e-fixtures` and `--e2e-clock` are for local work and tests
+only: no module option, and `serve` refuses to start when `ASPARGES_DEV`,
+`ASPARGES_E2E_FIXTURES` or `ASPARGES_E2E_CLOCK` is set.
 
 State lives in the data directory: `asparges.db` (WAL mode),
-`originals/` (uploads as received), `variants/` (built sizes), `tmp/`, and
-`tsnet/`. A restore needs only the database and `originals/`: at start
+`originals/` (uploads as received), `variants/` (built sizes), `tmp/`,
+`tsnet/`, and `calendar.ics` (the last good copy of the booking calendar,
+read every quarter hour and shown while the feed is down). A restore needs
+only the database and `originals/`: at start
 `serve` queues every photo and builds the sizes that are missing, one photo at
 a time; until a size is built, its picture is missing on the page.
 

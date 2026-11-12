@@ -17,7 +17,7 @@ numbers.
 ```
 visitor ──▶ nginx vhost (TLS, ACME) ──▶ 127.0.0.1:<listenAddr>   public site
 admin   ──▶ tailnet ──▶ tsnet node <hostname>:80/443            /admin/, /static/, /img/, kra's /metrics, /debug, …
-state: /var/lib/asparges/{asparges.db, originals/, variants/, tmp/, tsnet/}
+state: /var/lib/asparges/{asparges.db, originals/, variants/, tmp/, tsnet/, calendar.ics}
 ```
 
 - One systemd unit, `asparges.service`, from `services.asparges`
@@ -46,26 +46,28 @@ state: /var/lib/asparges/{asparges.db, originals/, variants/, tmp/, tsnet/}
 | `hostname` (tailnet) | `asparges-beta`                   | `asparges`                   |
 | `noindex`            | `true`                            | `false`                      |
 | `umamiSiteId`        | unset                             | the site's id                |
+| `calendarURL`        | the farm's Google feed            | same                         |
 | `dataDir`            | `/var/lib/asparges`               | `/var/lib/asparges`          |
 
 ## Module options
 
 Every `asparges serve` flag is an option (a test fails otherwise):
 
-| Option             | Default                      |                                                                                                    |
-| ------------------ | ---------------------------- | -------------------------------------------------------------------------------------------------- |
-| `enable`           | `false`                      |                                                                                                    |
-| `package`          | this flake's package         | Must find `vips`; the flake's binary carries it.                                                   |
-| `user`, `group`    | `asparges`                   | Created by the module. Do not define them again.                                                   |
-| `dataDir`          | `/var/lib/asparges`          | Must be under `/var/lib`.                                                                          |
-| `listenAddr`       | `127.0.0.1:8090`             | Public site; the vhost proxies here.                                                               |
-| `baseURL`          | `https://aspargesgaarden.no` | Canonical links, sitemap, share images. No trailing slash.                                         |
-| `hostname`         | `asparges`                   | tsnet node name.                                                                                   |
-| `tailscaleKeyPath` | `null`                       | Auth key file, read through `LoadCredential` (no owner needed). Used only while `tsnet/` is empty. |
-| `environmentFile`  | `null`                       | Alternative: `TS_AUTHKEY=…` in an env file.                                                        |
-| `noindex`          | `false`                      | `X-Robots-Tag: noindex`, `robots.txt` disallows all, IndexNow off.                                 |
-| `umamiSiteId`      | `null`                       | Unset: no tracker and no Umami origin in the CSP.                                                  |
-| `logLevel`         | `info`                       |                                                                                                    |
+| Option             | Default                      |                                                                                                                        |
+| ------------------ | ---------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| `enable`           | `false`                      |                                                                                                                        |
+| `package`          | this flake's package         | Must find `vips`; the flake's binary carries it.                                                                       |
+| `user`, `group`    | `asparges`                   | Created by the module. Do not define them again.                                                                       |
+| `dataDir`          | `/var/lib/asparges`          | Must be under `/var/lib`.                                                                                              |
+| `listenAddr`       | `127.0.0.1:8090`             | Public site; the vhost proxies here.                                                                                   |
+| `baseURL`          | `https://aspargesgaarden.no` | Canonical links, sitemap, share images. No trailing slash.                                                             |
+| `hostname`         | `asparges`                   | tsnet node name.                                                                                                       |
+| `tailscaleKeyPath` | `null`                       | Auth key file, read through `LoadCredential` (no owner needed). Used only while `tsnet/` is empty.                     |
+| `environmentFile`  | `null`                       | Alternative: `TS_AUTHKEY=…` in an env file.                                                                            |
+| `noindex`          | `false`                      | `X-Robots-Tag: noindex`, `robots.txt` disallows all, IndexNow off.                                                     |
+| `umamiSiteId`      | `null`                       | Unset: no tracker and no Umami origin in the CSP.                                                                      |
+| `calendarURL`      | `null`                       | Public iCal feed of the booking calendar (Google's "public address in iCal format"). Unset: no calendar on `/kontakt`. |
+| `logLevel`         | `info`                       |                                                                                                                        |
 
 Worked example, the beta (a new file `machines/core.oracldn/asparges.nix` in
 `dotfiles`):
@@ -85,6 +87,7 @@ in
     listenAddr = "127.0.0.1:63464";
     noindex = true;
     tailscaleKeyPath = config.age.secrets.asparges-tskey.path;
+    calendarURL = "https://calendar.google.com/calendar/ical/klatrerosen.no_hgf7kiksq8hrmilogq5nd6f4rs%40group.calendar.google.com/public/basic.ics";
   };
 
   services.vhost."beta.aspargesgaarden.no".proxyPass = "http://${cfg.listenAddr}";
@@ -466,17 +469,19 @@ Keep `/root/asparges-old` until the site is right.
 Metrics are on the tsnet node at `http://<hostname>/metrics`, beside the
 Go runtime's:
 
-| Metric                                              |                                                                 |
-| --------------------------------------------------- | --------------------------------------------------------------- |
-| `asparges_images_build_errors_total{kind}`          | Builds of a photo's sizes of one kind that left a file unbuilt. |
-| `asparges_images_queue_length`                      | Photos waiting for their sizes; returns to 0.                   |
-| `asparges_images_variants_built_total{kind,format}` | Size files written.                                             |
-| `asparges_images_build_seconds{kind}`               | Time to build one photo's sizes of one kind.                    |
-| `asparges_bot_requests_total{agent,purpose}`        | Search and AI crawlers.                                         |
-| `asparges_referrals_total{source}`                  | Visits from search engines and AI answers.                      |
-| `asparges_indexnow_submissions_total{result}`       | IndexNow pings (off with `noindex`).                            |
-| `asparges_http_requests_total{code}`                | Public requests answered, by status code.                       |
-| `asparges_http_request_duration_seconds`            | Time to answer a public request.                                |
+| Metric                                              |                                                                   |
+| --------------------------------------------------- | ----------------------------------------------------------------- |
+| `asparges_images_build_errors_total{kind}`          | Builds of a photo's sizes of one kind that left a file unbuilt.   |
+| `asparges_images_queue_length`                      | Photos waiting for their sizes; returns to 0.                     |
+| `asparges_images_variants_built_total{kind,format}` | Size files written.                                               |
+| `asparges_images_build_seconds{kind}`               | Time to build one photo's sizes of one kind.                      |
+| `asparges_bot_requests_total{agent,purpose}`        | Search and AI crawlers.                                           |
+| `asparges_referrals_total{source}`                  | Visits from search engines and AI answers.                        |
+| `asparges_indexnow_submissions_total{result}`       | IndexNow pings (off with `noindex`).                              |
+| `asparges_http_requests_total{code}`                | Public requests answered, by status code.                         |
+| `asparges_http_request_duration_seconds`            | Time to answer a public request.                                  |
+| `asparges_calendar_reads_total{result}`             | Reads of the booking calendar feed: `ok` or `failed`.             |
+| `asparges_calendar_last_read_timestamp_seconds`     | When the calendar shown was read; hours old means a failing feed. |
 
 A photo that fails before any build (its original missing or unreadable)
 counts in no metric; it shows as `images: photo not prepared` in the journal

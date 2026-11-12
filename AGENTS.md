@@ -16,9 +16,9 @@ conventions (Go, Nix, Elm, git, services, secrets) are in
   `images/`; `TestLayoutsWithinSharpWidth` fails when a layout draws a kind
   wider.
 - **Nothing is fetched at runtime.** Pages, CSS and JS load only from the
-  binary, plus the origins in `ui/external.go` (Umami, the Google calendar
-  frame), which also build the CSP header. Tests over the rendered pages,
-  `site.css`, `gallery.js` and the admin's files fail on any other address.
+  binary, plus the origins in `ui/external.go` (Umami), which also build the
+  CSP header. Tests over the rendered pages, `site.css`, `gallery.js`,
+  `calendar.js` and the admin's files fail on any other address.
   New JS libraries are pinned in the app's `yarn.lock` and bundled at build
   time, never linked from a CDN.
 - **Every serve flag has a module option.** `TestEveryServeFlagIsInTheModule`
