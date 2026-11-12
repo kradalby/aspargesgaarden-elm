@@ -2,15 +2,17 @@ package booking
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
-	"sync/atomic"
+	"sync"
 	"testing"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus/testutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -21,7 +23,12 @@ var weekend = feed("DTSTART:20270611T100000\nDTEND:20270613T170000")
 func google(t *testing.T, body *string, status *int) string {
 	t.Helper()
 
+	var mu sync.Mutex
+
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		mu.Lock()
+		defer mu.Unlock()
+
 		if *status != 0 {
 			w.WriteHeader(*status)
 			return
@@ -34,73 +41,201 @@ func google(t *testing.T, body *string, status *int) string {
 	return srv.URL
 }
 
-func TestFeedKeepsTheLastGoodCopy(t *testing.T) {
-	ctx := context.Background()
-	path := filepath.Join(t.TempDir(), FileName)
-	now := func() time.Time { return time.Date(2026, 11, 11, 12, 0, 0, 0, time.UTC) }
+// clock is a time the test moves by hand.
+type clock struct {
+	mu sync.Mutex
+	t  time.Time
+}
 
-	body, status := weekend, 0
-	url := google(t, &body, &status)
+func (c *clock) now() time.Time {
+	c.mu.Lock()
+	defer c.mu.Unlock()
 
-	var changes atomic.Int32
-	open := func() *Feed {
-		return Open(Config{URL: url, Path: path, Now: now, Changed: func() { changes.Add(1) }})
+	return c.t
+}
+
+func (c *clock) advance(d time.Duration) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	c.t = c.t.Add(d)
+}
+
+// testFeed is a Feed on a fake clock against a fake Google, counting the
+// times it tells the site to drop its pages.
+type testFeed struct {
+	*Feed
+
+	clock   *clock
+	body    string
+	status  int
+	path    string
+	url     string
+	changes int
+}
+
+func newTestFeed(t *testing.T) *testFeed {
+	t.Helper()
+
+	tf := &testFeed{
+		clock: &clock{t: time.Date(2026, 11, 11, 12, 0, 0, 0, time.UTC)},
+		body:  weekend,
+		path:  filepath.Join(t.TempDir(), FileName),
 	}
+	tf.url = google(t, &tf.body, &tf.status)
+	tf.open()
+
+	return tf
+}
+
+func (tf *testFeed) open() {
+	tf.Feed = Open(Config{URL: tf.url, Path: tf.path, Now: tf.clock.now, Changed: func() { tf.changes++ }})
+}
+
+// read is one turn of Run: a read, then telling the site.
+func (tf *testFeed) read() {
+	tf.Refresh(context.Background())
+	tf.Settle()
+}
+
+func (tf *testFeed) shown() bool {
+	_, ok := tf.Shown()
+	return ok
+}
+
+func TestFeedHidesAnOldCalendarAndShowsItAgain(t *testing.T) {
+	tf := newTestFeed(t)
 
 	// First start, nothing kept: no calendar until a read succeeds.
-	f := open()
-	require.Nil(t, f.Days())
+	require.False(t, tf.shown())
+	tf.read()
+	require.True(t, tf.shown())
+	require.Equal(t, 1, tf.changes)
+	require.InDelta(t, 1, testutil.ToFloat64(metricShown), 0)
+	require.InDelta(t, 3, testutil.ToFloat64(metricTakenDays), 0)
 
-	status = http.StatusServiceUnavailable
-	require.Error(t, f.Refresh(ctx))
-	require.Nil(t, f.Days())
-	require.NoFileExists(t, path)
+	// The same days again change nothing.
+	tf.clock.advance(Every)
+	tf.read()
+	require.Equal(t, 1, tf.changes)
 
-	status = 0
-	require.NoError(t, f.Refresh(ctx))
-	require.Len(t, f.Days(), 3)
-	require.Equal(t, int32(1), changes.Load())
+	// Google down: shown through five failed reads, hidden at the sixth,
+	// MaxAge after the last good one, and the site told once.
+	tf.status = http.StatusServiceUnavailable
+	fetchFailed := testutil.ToFloat64(metricReads.WithLabelValues(resultFetch))
 
-	// The same days again change nothing, though the bytes differ.
-	body = strings.Replace(weekend, "VERSION:2.0", "VERSION:2.0\r\nX-STAMP:1", 1)
-	require.NoError(t, f.Refresh(ctx))
-	require.Equal(t, int32(1), changes.Load())
-
-	// A failed or bad read keeps what was there.
-	for _, bad := range []string{"<html>Service unavailable</html>", "", strings.TrimSuffix(weekend, "END:VCALENDAR\r\n")} {
-		body = bad
-		require.Error(t, f.Refresh(ctx))
-		require.Len(t, f.Days(), 3)
+	for range 5 {
+		tf.clock.advance(Every)
+		tf.read()
+		require.True(t, tf.shown())
 	}
 
-	require.Equal(t, int32(1), changes.Load())
+	require.Equal(t, 1, tf.changes)
 
-	// A restart while the feed is down has the kept copy.
-	status = http.StatusInternalServerError
-	f = open()
-	require.Len(t, f.Days(), 3)
-	require.Error(t, f.Refresh(ctx))
-	require.Len(t, f.Days(), 3)
+	tf.clock.advance(Every)
+	tf.read()
+	require.False(t, tf.shown())
+	require.Equal(t, 2, tf.changes)
+	require.InDelta(t, 0, testutil.ToFloat64(metricShown), 0)
+	require.InDelta(t, fetchFailed+6, testutil.ToFloat64(metricReads.WithLabelValues(resultFetch)), 0)
 
-	// A booking cancelled: the days change.
-	status, body = 0, feed()
-	require.NoError(t, f.Refresh(ctx))
-	require.NotNil(t, f.Days())
-	require.Empty(t, f.Days())
-	require.Equal(t, int32(2), changes.Load())
+	tf.clock.advance(Every)
+	tf.read()
+	require.Equal(t, 2, tf.changes, "hidden stays hidden without telling the site again")
+
+	// Back: shown at once, the site told once.
+	tf.status = 0
+	tf.clock.advance(Every)
+	tf.read()
+	require.True(t, tf.shown())
+	require.Equal(t, 3, tf.changes)
+}
+
+// Run hides the calendar at the moment it turns MaxAge old, between reads.
+func TestSettleBetweenReads(t *testing.T) {
+	tf := newTestFeed(t)
+	tf.read()
+
+	tf.clock.advance(MaxAge - time.Second)
+	tf.Settle()
+	require.Equal(t, 1, tf.changes)
+
+	tf.clock.advance(time.Second)
+	tf.Settle()
+	require.False(t, tf.shown())
+	require.Equal(t, 2, tf.changes)
+}
+
+func TestRestartHonoursTheCopysAge(t *testing.T) {
+	tf := newTestFeed(t)
+	tf.read()
+
+	tf.status = http.StatusInternalServerError
+
+	// Ten minutes later, Google down: the copy is shown.
+	tf.clock.advance(10 * time.Minute)
+	tf.open()
+	require.True(t, tf.shown())
+	tf.read()
+	require.True(t, tf.shown())
+
+	// Two hours after the read: not shown, however new the process.
+	tf.clock.advance(110 * time.Minute)
+	tf.open()
+	require.False(t, tf.shown())
+
+	// A copy's file time does not count, only the read time in it.
+	require.NoError(t, os.Chtimes(tf.path, tf.clock.now(), tf.clock.now()))
+	tf.open()
+	require.False(t, tf.shown())
+
+	var c copyFile
+
+	raw, err := os.ReadFile(tf.path)
+	require.NoError(t, err)
+	require.NoError(t, json.Unmarshal(raw, &c))
+	assert.Equal(t, time.Date(2026, 11, 11, 12, 0, 0, 0, time.UTC), c.Read.UTC())
+}
+
+func TestRefusedReadsKeepTheCopyAndCountAsRefused(t *testing.T) {
+	tf := newTestFeed(t)
+	tf.read()
+
+	refused := testutil.ToFloat64(metricReads.WithLabelValues(resultRefused))
+
+	for _, bad := range []string{
+		"<html>Service unavailable</html>",
+		"",
+		strings.TrimSuffix(weekend, "END:VCALENDAR\r\n"),
+		// Used to be left out and counted: now it fails the read.
+		feed("DTSTART:20270611T100000\nDTEND:20270613T170000", "DTSTART:not a date\nDTEND:20270614T200000"),
+		// No bookings at all after a calendar full of them.
+		feed(),
+		feed("DTSTART:20270611T100000\nDTEND:20270613T170000\nSTATUS:CANCELLED"),
+	} {
+		tf.body = bad
+		tf.clock.advance(Every)
+		tf.read()
+		require.Len(t, tf.days, 3)
+	}
+
+	assert.InDelta(t, refused+6, testutil.ToFloat64(metricReads.WithLabelValues(resultRefused)), 0)
+	assert.False(t, tf.shown(), "six refused reads in a row hide it")
 }
 
 func TestFeedRefusesHugeBodies(t *testing.T) {
-	body, status := feed(strings.Repeat("X-PAD:"+strings.Repeat("x", 1000)+"\n", MaxBody/1000)), 0
-	f := Open(Config{URL: google(t, &body, &status), Path: filepath.Join(t.TempDir(), FileName)})
-	require.ErrorIs(t, f.Refresh(context.Background()), errNotCalendar)
-	require.Nil(t, f.Days())
+	tf := newTestFeed(t)
+	tf.body = feed(strings.Repeat("X-PAD:"+strings.Repeat("x", 1000)+"\n", MaxBody/1000))
+	tf.read()
+	require.False(t, tf.shown())
 }
 
 func TestFeedIgnoresAnUnreadableCopy(t *testing.T) {
 	path := filepath.Join(t.TempDir(), FileName)
 	require.NoError(t, os.WriteFile(path, []byte("garbage"), 0o600))
-	assert.Nil(t, Open(Config{URL: "http://127.0.0.1:1/", Path: path}).Days())
+
+	_, ok := Open(Config{URL: "http://127.0.0.1:1/", Path: path}).Shown()
+	assert.False(t, ok)
 }
 
 func TestFeedTimesOut(t *testing.T) {
@@ -110,5 +245,6 @@ func TestFeedTimesOut(t *testing.T) {
 	t.Cleanup(func() { close(block) })
 
 	f := Open(Config{URL: srv.URL, Path: filepath.Join(t.TempDir(), FileName), Client: &http.Client{Timeout: 50 * time.Millisecond}})
-	require.Error(t, f.Refresh(context.Background()))
+	_, err := f.refresh(context.Background())
+	require.Error(t, err)
 }

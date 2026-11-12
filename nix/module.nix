@@ -101,7 +101,7 @@ in
       example = "https://calendar.google.com/calendar/ical/…/public/basic.ics";
       description = ''
         Public iCal address of the booking calendar. The service reads it every
-        quarter hour, keeps the last good copy in dataDir, and draws the taken
+        5 minutes, keeps the last good copy in dataDir, and draws the taken
         days on the contact page. Null shows no calendar.
       '';
     };

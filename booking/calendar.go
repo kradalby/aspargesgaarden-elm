@@ -17,6 +17,10 @@ const MinMonths = 12
 // Calendar is the booking calendar as the site shows it: today's month to
 // Last. The zero Calendar is "no calendar".
 type Calendar struct {
+	// Unavailable is a calendar the site has but may not show: never read
+	// whole, or not recently enough (Feed.Shown).
+	Unavailable bool
+
 	Taken Days
 	Today site.Date
 	// Last is the end of the month of the last booking, or of MinMonths
@@ -43,7 +47,7 @@ func NewCalendar(taken Days, today site.Date) Calendar {
 }
 
 // On reports whether there is a calendar to show.
-func (c Calendar) On() bool { return c.Taken != nil }
+func (c Calendar) On() bool { return c.Taken != nil && !c.Unavailable }
 
 // First is the first day the calendar covers: the 1st of today's month.
 func (c Calendar) First() site.Date { return c.Today.MonthStart(0) }

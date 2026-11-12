@@ -139,7 +139,7 @@ func newServeCmd(a *app, parent *ff.FlagSet) *ff.Command {
 	fs.BoolVar(&cfg.dev, 0, "dev", "local development: no Tailscale, metrics and admin on the loopback-only local listener")
 	fs.BoolVar(&cfg.noindex, 0, "noindex", "keep the site out of search engines (beta): noindex on every response, robots.txt disallows all, no IndexNow")
 	fs.StringVar(&cfg.umamiSiteID, 0, "umami-site-id", "", "the site's id on the Umami server; empty puts no tracker on the pages")
-	fs.StringVar(&cfg.calendarURL, 0, "calendar-url", "", "public iCal address of the booking calendar, read every quarter hour; empty shows no calendar")
+	fs.StringVar(&cfg.calendarURL, 0, "calendar-url", "", "public iCal address of the booking calendar, read every 5 minutes; empty shows no calendar")
 	fs.BoolVar(&cfg.e2eClock, 0, "e2e-clock", "with --dev: run the clock from the browser tests' fixed day, as --e2e-fixtures does")
 	fs.StringVar(&cfg.e2eFixtures, 0, "e2e-fixtures", "", "with --dev: the admin browser tests' photo folder; mounts their hooks POST /__reset (deletes everything), /__touch/{id} and /__crop/{id}")
 

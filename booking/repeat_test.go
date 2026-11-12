@@ -1,7 +1,12 @@
 package booking
 
 import (
+	"bytes"
+	"context"
+	"log/slog"
 	"os"
+	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -211,4 +216,29 @@ func TestUnsupportedRepeats(t *testing.T) {
 			assert.Contains(t, err.Error(), tt.says)
 		})
 	}
+}
+
+// What Kristine did wrong must be in the journal, and the calendar stays.
+func TestUnsupportedRepeatKeepsTheCopyAndSaysWhy(t *testing.T) {
+	path := filepath.Join(t.TempDir(), FileName)
+	body, status := weekend, 0
+
+	var log bytes.Buffer
+
+	f := Open(Config{
+		URL: google(t, &body, &status), Path: path,
+		Now: func() time.Time { return time.Date(2026, 11, 11, 12, 0, 0, 0, site.Oslo) },
+		Log: slog.New(slog.NewTextHandler(&log, nil)),
+	})
+	f.Refresh(context.Background())
+
+	body = strings.Replace(weekend, "DTSTART:", "RRULE:FREQ=MONTHLY;BYSETPOS=2;BYDAY=SA\r\nDTSTART:", 1)
+	f.Refresh(context.Background())
+
+	days, ok := f.Shown()
+	assert.True(t, ok)
+	assert.Len(t, days, 3)
+	assert.Contains(t, log.String(), "event 1: RRULE:FREQ=MONTHLY;BYSETPOS=2;BYDAY=SA")
+	assert.Contains(t, log.String(), "part BYSETPOS=2")
+	assert.Contains(t, log.String(), "result=refused")
 }
