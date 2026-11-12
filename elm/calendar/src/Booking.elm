@@ -1,9 +1,11 @@
 module Booking exposing
-    ( Answer(..)
+    ( Age
+    , Answer(..)
     , Calendar
     , answer
     , clampStart
     , edge
+    , expired
     , longDate
     , monthName
     , monthRange
@@ -64,6 +66,24 @@ end allows: under the answer, the asked month is the one in view.
 startAt : Calendar -> Day -> Day
 startAt cal d =
     clampStart cal (Day.monthStart d)
+
+
+{-| When the tab was loaded and how long its bookings may be shown, by the
+browser's clock (ms) and the server's limit (s).
+-}
+type alias Age =
+    { loaded : Float
+    , maxAge : Int
+    }
+
+
+{-| The page's bookings were current when it was served; past maxAge in an
+open tab they may not be. Only the browser's clock is compared with
+itself, so a clock that is simply wrong ages a tab like a right one.
+-}
+expired : Age -> Float -> Bool
+expired age now =
+    now - age.loaded > toFloat age.maxAge * 1000
 
 
 type Answer

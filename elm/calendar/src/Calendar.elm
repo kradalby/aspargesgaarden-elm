@@ -16,11 +16,18 @@ import Json.Decode as Decode exposing (Decoder)
 import Set
 
 
-{-| A later day in Oslo from the browser, sent when the tab comes back into
-view: a tab left open over midnight moves on, and a wrong clock can never
-take the calendar back before the server's day.
+{-| The browser's clock, sent every minute and when the tab comes back into
+view: its day in Oslo, and its milliseconds. A later day moves today on (a
+tab left open over midnight); a wrong clock can never take it back before
+the server's day. The milliseconds age the tab (Booking.expired).
 -}
-port today : (String -> msg) -> Sub msg
+port tick : ({ today : String, now : Float } -> msg) -> Sub msg
+
+
+{-| The tab is too old to show bookings: boot.js removes the server's
+weekend list too.
+-}
+port expired : () -> Cmd msg
 
 
 {-| An answer is drawn: boot.js scrolls it into view if it is not.
@@ -36,6 +43,8 @@ type alias Model =
     , input : String
     , asked : Maybe Day
     , chosen : Maybe Day
+    , age : Booking.Age
+    , stale : Bool
     }
 
 
@@ -45,7 +54,7 @@ type Msg
     | Input String
     | Ask
     | Pick Day
-    | Today String
+    | Tick { today : String, now : Float }
 
 
 main : Program Decode.Value (Maybe Model) Msg
@@ -61,7 +70,7 @@ main =
                     Nothing ->
                         ( Nothing, Cmd.none )
         , view = Maybe.map view >> Maybe.withDefault (text "")
-        , subscriptions = \_ -> today Today
+        , subscriptions = \_ -> tick Tick
         }
 
 
@@ -80,7 +89,7 @@ decoder =
                                 Decode.fail ("not a date: " ++ s)
                     )
 
-        model t l taken phone tel =
+        model t l taken phone tel maxAge loaded =
             { cal = { today = t, last = l, taken = Set.fromList taken }
             , phone = phone
             , tel = tel
@@ -88,14 +97,18 @@ decoder =
             , input = ""
             , asked = Nothing
             , chosen = Nothing
+            , age = { loaded = loaded, maxAge = maxAge }
+            , stale = False
             }
     in
-    Decode.map5 model
+    Decode.map7 model
         (Decode.field "today" day)
         (Decode.field "last" day)
         (Decode.field "taken" (Decode.list day))
         (Decode.field "phone" Decode.string)
         (Decode.field "tel" Decode.string)
+        (Decode.field "maxAge" Decode.int)
+        (Decode.field "loaded" Decode.float)
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -125,21 +138,28 @@ update msg model =
         Pick d ->
             ( { model | chosen = Just d, start = Booking.startAt cal d }, Cmd.none )
 
-        Today s ->
-            case Day.fromIso s of
-                Just d ->
-                    if d > cal.today then
-                        let
-                            moved =
-                                { cal | today = d }
-                        in
-                        ( { model | cal = moved, start = Booking.clampStart moved model.start }, Cmd.none )
+        Tick t ->
+            if model.stale then
+                ( model, Cmd.none )
 
-                    else
+            else if Booking.expired model.age t.now then
+                ( { model | stale = True }, expired () )
+
+            else
+                case Day.fromIso t.today of
+                    Just d ->
+                        if d > cal.today then
+                            let
+                                moved =
+                                    { cal | today = d }
+                            in
+                            ( { model | cal = moved, start = Booking.clampStart moved model.start }, Cmd.none )
+
+                        else
+                            ( model, Cmd.none )
+
+                    Nothing ->
                         ( model, Cmd.none )
-
-                Nothing ->
-                    ( model, Cmd.none )
 
 
 
@@ -160,20 +180,30 @@ view model =
         end =
             Day.addMonths (Booking.shown - 1) model.start
     in
-    div [ attribute "data-booted" "", class "[overflow-anchor:none]" ]
-        [ question model
-        , legend
-        , div [ class "flex items-center justify-between gap-2 h-12 mb-2" ]
-            [ p [ class "font-bold text-sort", attribute "aria-live" "polite" ] [ text (Booking.monthRange model.start end) ]
-            , div [ class "flex gap-2" ]
-                [ pageButton Previous (model.start == Booking.clampStart cal (Day.addMonths -1 model.start)) "‹" "Forrige" True
-                , pageButton Next (model.start == Booking.clampStart cal (Day.addMonths 1 model.start)) "›" "Neste" False
+    if model.stale then
+        div [ attribute "data-booted" "" ]
+            [ p [ class "max-w-2xl text-lg text-sort", attribute "role" "status" ]
+                [ text "Kalenderen er ikke tilgjengelig akkurat nå. Last inn siden på nytt, eller ring "
+                , a [ href model.tel, class "underline whitespace-nowrap" ] [ text model.phone ]
+                , text " for å spørre om en dato."
                 ]
             ]
-        , div [ class "grid items-start gap-x-10 gap-y-8 sm:grid-cols-2 lg:grid-cols-3" ]
-            (List.map (\i -> monthTable model (Day.addMonths i model.start)) (List.range 0 (Booking.shown - 1)))
-        , p [ class "pt-6 text-sort" ] [ text (Booking.edge cal) ]
-        ]
+
+    else
+        div [ attribute "data-booted" "", class "[overflow-anchor:none]" ]
+            [ question model
+            , legend
+            , div [ class "flex items-center justify-between gap-2 h-12 mb-2" ]
+                [ p [ class "font-bold text-sort", attribute "aria-live" "polite" ] [ text (Booking.monthRange model.start end) ]
+                , div [ class "flex gap-2" ]
+                    [ pageButton Previous (model.start == Booking.clampStart cal (Day.addMonths -1 model.start)) "‹" "Forrige" True
+                    , pageButton Next (model.start == Booking.clampStart cal (Day.addMonths 1 model.start)) "›" "Neste" False
+                    ]
+                ]
+            , div [ class "grid items-start gap-x-10 gap-y-8 sm:grid-cols-2 lg:grid-cols-3" ]
+                (List.map (\i -> monthTable model (Day.addMonths i model.start)) (List.range 0 (Booking.shown - 1)))
+            , p [ class "pt-6 text-sort" ] [ text (Booking.edge cal) ]
+            ]
 
 
 legend : Html msg

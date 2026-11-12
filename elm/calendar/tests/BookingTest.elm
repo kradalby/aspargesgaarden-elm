@@ -63,6 +63,11 @@ suite =
                     Booking.nearestFree { cal | taken = Set.insert (ymd 2028 9 30) cal.taken } (ymd 2028 9 30)
                         |> Expect.equal [ ymd 2028 9 16, ymd 2028 9 23 ]
             ]
+        , describe "tab age"
+            [ test "fresh" <| \_ -> Booking.expired { loaded = 1000000, maxAge = 1800 } (1000000 + 1800000) |> Expect.equal False
+            , test "past the limit" <| \_ -> Booking.expired { loaded = 1000000, maxAge = 1800 } (1000000 + 1800001) |> Expect.equal True
+            , test "a clock set back is no age" <| \_ -> Booking.expired { loaded = 1000000, maxAge = 1800 } 0 |> Expect.equal False
+            ]
         , describe "words"
             [ test "long date" <| \_ -> Booking.longDate (ymd 2027 6 12) |> Expect.equal "Lørdag 12. juni 2027"
             , test "plural" <| \_ -> Booking.weekdayPlural (ymd 2027 6 12) |> Expect.equal "lørdager"

@@ -5,11 +5,12 @@
 document.querySelectorAll("[data-calendar]").forEach((node) => {
   let flags;
   try {
-    flags = JSON.parse(node.dataset.calendar);
+    flags = { ...JSON.parse(node.dataset.calendar), loaded: Date.now() };
   } catch {
     return;
   }
 
+  const list = node.closest("section")?.querySelector("details");
   const holder = document.createElement("div");
   const mount = holder.appendChild(document.createElement("div"));
   const app = Elm.Calendar.init({ node: mount, flags });
@@ -19,9 +20,18 @@ document.querySelectorAll("[data-calendar]").forEach((node) => {
 
   // en-CA writes YYYY-MM-DD.
   const oslo = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Oslo" });
+  const tick = () => {
+    const now = new Date();
+    app.ports.tick.send({ today: oslo.format(now), now: now.getTime() });
+  };
+  setInterval(tick, 60 * 1000);
   document.addEventListener("visibilitychange", () => {
-    if (!document.hidden) app.ports.today.send(oslo.format(new Date()));
+    if (!document.hidden) tick();
   });
+
+  // The weekend list is the server's: too old for the calendar, too old
+  // for it.
+  app.ports.expired.subscribe(() => list?.remove());
 
   // After Elm has drawn the answer.
   app.ports.answered.subscribe(() =>
