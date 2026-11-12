@@ -62,3 +62,13 @@ func TestToday(t *testing.T) {
 		})
 	}
 }
+
+func TestDateArithmetic(t *testing.T) {
+	d := Date{2027, time.March, 27}
+	require.Equal(t, Date{2027, time.March, 29}, d.AddDays(2), "over the spring DST change")
+	require.Equal(t, Date{2026, time.December, 31}, Date{2027, time.January, 1}.AddDays(-1))
+	require.Equal(t, time.Saturday, d.Weekday())
+	require.Equal(t, Date{2027, time.January, 1}, Date{2026, time.November, 30}.MonthStart(2))
+	require.Equal(t, Date{2026, time.December, 1}, Date{2027, time.January, 15}.MonthStart(-1))
+	require.Equal(t, 22, Date{2026, time.November, 11}.MonthsUntil(Date{2028, time.September, 2}))
+}

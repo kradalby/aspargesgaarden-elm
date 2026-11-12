@@ -5,12 +5,19 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"time"
 )
 
 var norwegianMonths = [...]string{
 	"januar", "februar", "mars", "april", "mai", "juni",
 	"juli", "august", "september", "oktober", "november", "desember",
 }
+
+// MonthName is m in Norwegian, lowercase: "juni".
+func MonthName(m time.Month) string { return norwegianMonths[m-1] }
+
+// DayMonth is d without its year: "12. juni".
+func DayMonth(d Date) string { return dayMonth(d) }
 
 // NorwegianDate is d as the site writes it: "1. desember 2025".
 func NorwegianDate(d Date) string {

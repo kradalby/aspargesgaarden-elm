@@ -77,3 +77,20 @@ func (d Date) Before(o Date) bool { return d.Compare(o) < 0 }
 
 // After reports whether d is a day after o.
 func (d Date) After(o Date) bool { return d.Compare(o) > 0 }
+
+// civil is d at noon UTC, for arithmetic no DST change can shift a day.
+func (d Date) civil() time.Time { return time.Date(d.Year, d.Month, d.Day, 12, 0, 0, 0, time.UTC) }
+
+// AddDays is the day n days after d (before, for a negative n).
+func (d Date) AddDays(n int) Date { return DateOf(d.civil().AddDate(0, 0, n)) }
+
+// Weekday is d's day of the week.
+func (d Date) Weekday() time.Weekday { return d.civil().Weekday() }
+
+// MonthStart is the first day of the month n months after d's.
+func (d Date) MonthStart(n int) Date {
+	return DateOf(time.Date(d.Year, d.Month+time.Month(n), 1, 12, 0, 0, 0, time.UTC))
+}
+
+// MonthsUntil is how many months o's month is after d's.
+func (d Date) MonthsUntil(o Date) int { return (o.Year-d.Year)*12 + int(o.Month-d.Month) }
