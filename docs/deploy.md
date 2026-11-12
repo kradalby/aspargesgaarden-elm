@@ -17,7 +17,7 @@ numbers.
 ```
 visitor ──▶ nginx vhost (TLS, ACME) ──▶ 127.0.0.1:<listenAddr>   public site
 admin   ──▶ tailnet ──▶ tsnet node <hostname>:80/443            /admin/, /static/, /img/, kra's /metrics, /debug, …
-state: /var/lib/asparges/{asparges.db, originals/, variants/, tmp/, tsnet/, calendar.ics}
+state: /var/lib/asparges/{asparges.db, originals/, variants/, tmp/, tsnet/, calendar.json}
 ```
 
 - One systemd unit, `asparges.service`, from `services.asparges`
@@ -68,6 +68,47 @@ Every `asparges serve` flag is an option (a test fails otherwise):
 | `umamiSiteId`      | `null`                       | Unset: no tracker and no Umami origin in the CSP.                                                                      |
 | `calendarURL`      | `null`                       | Public iCal feed of the booking calendar (Google's "public address in iCal format"). Unset: no calendar on `/kontakt`. |
 | `logLevel`         | `info`                       |                                                                                                                        |
+
+### The booking calendar
+
+No calendar, and an alert, is better than a wrong one. The service reads
+the feed every 5 minutes and keeps the last whole read, with its time, in
+`calendar.json`. While that read is under 30 minutes old (six failed reads
+in a row), `/kontakt` shows the calendar and `/llms.txt` the free weekends;
+older, or never read, `/kontakt` says "Kalenderen er ikke tilgjengelig
+akkurat nå. Ring … for å spørre om en dato." and `/llms.txt` leaves them
+out. Both change the moment the limit is crossed, either way; a restart
+judges the copy by the read time inside it. A tab left open shows the
+same sentence once the page is 30 minutes old by the browser's own clock.
+
+A read either takes the whole feed or fails; nothing is guessed:
+
+- Refused (`result="refused"`), with the event named in the journal: no
+  `END:VCALENDAR` or a cut-off body; an event whose start or end cannot be
+  read, ends before it starts, or mixes a day with a time; a `TZID` the
+  binary does not know; a time without a zone in a calendar without
+  `X-WR-TIMEZONE`; a `RECURRENCE-ID` of no repeating event; a repeat it
+  does not expand; a calendar with no bookings at all.
+- Counted as bookings: every event not `STATUS:CANCELLED`, also one marked
+  "free" (`TRANSP:TRANSPARENT`): wrongly taken is the safe side.
+- Repeats, expanded exactly by the service's own code: every day, week,
+  month or year, every n-th, on weekdays (the second Saturday, the last
+  Friday), on days of the month or in given months, a number of times or
+  until a day; deleted times (`EXDATE`), extra dates (`RDATE`), and single
+  times moved or cancelled (`RECURRENCE-ID`). A time repeats on its own
+  zone's clock (`TZID`, or UTC for a UTC start, as RFC 5545 says).
+- Repeats that fail the read: `BYSETPOS`, `BYWEEKNO`, `BYYEARDAY`, hourly
+  or finer, weekdays of a whole year without `BYMONTH`, `EXRULE`, `RDATE`
+  periods, "this and following" changes (`RANGE`), a rule whose first
+  time is not one of its own days (31 February), and a feed whose repeats
+  would take more than 500 000 steps to walk.
+  The journal names it (`calendar: read failed … event UID …: RRULE:…:
+part BYSETPOS=-1`); changing that event in the calendar fixes it at the
+  next read.
+
+A feed with far fewer bookings than before is accepted: cancellations are
+real, and a rule that waited for a person would itself fall out of step.
+The counts are exported so an alert can ask.
 
 Worked example, the beta (a new file `machines/core.oracldn/asparges.nix` in
 `dotfiles`):
@@ -469,19 +510,38 @@ Keep `/root/asparges-old` until the site is right.
 Metrics are on the tsnet node at `http://<hostname>/metrics`, beside the
 Go runtime's:
 
-| Metric                                              |                                                                   |
-| --------------------------------------------------- | ----------------------------------------------------------------- |
-| `asparges_images_build_errors_total{kind}`          | Builds of a photo's sizes of one kind that left a file unbuilt.   |
-| `asparges_images_queue_length`                      | Photos waiting for their sizes; returns to 0.                     |
-| `asparges_images_variants_built_total{kind,format}` | Size files written.                                               |
-| `asparges_images_build_seconds{kind}`               | Time to build one photo's sizes of one kind.                      |
-| `asparges_bot_requests_total{agent,purpose}`        | Search and AI crawlers.                                           |
-| `asparges_referrals_total{source}`                  | Visits from search engines and AI answers.                        |
-| `asparges_indexnow_submissions_total{result}`       | IndexNow pings (off with `noindex`).                              |
-| `asparges_http_requests_total{code}`                | Public requests answered, by status code.                         |
-| `asparges_http_request_duration_seconds`            | Time to answer a public request.                                  |
-| `asparges_calendar_reads_total{result}`             | Reads of the booking calendar feed: `ok` or `failed`.             |
-| `asparges_calendar_last_read_timestamp_seconds`     | When the calendar shown was read; hours old means a failing feed. |
+| Metric                                              |                                                                 |
+| --------------------------------------------------- | --------------------------------------------------------------- |
+| `asparges_images_build_errors_total{kind}`          | Builds of a photo's sizes of one kind that left a file unbuilt. |
+| `asparges_images_queue_length`                      | Photos waiting for their sizes; returns to 0.                   |
+| `asparges_images_variants_built_total{kind,format}` | Size files written.                                             |
+| `asparges_images_build_seconds{kind}`               | Time to build one photo's sizes of one kind.                    |
+| `asparges_bot_requests_total{agent,purpose}`        | Search and AI crawlers.                                         |
+| `asparges_referrals_total{source}`                  | Visits from search engines and AI answers.                      |
+| `asparges_indexnow_submissions_total{result}`       | IndexNow pings (off with `noindex`).                            |
+| `asparges_http_requests_total{code}`                | Public requests answered, by status code.                       |
+| `asparges_http_request_duration_seconds`            | Time to answer a public request.                                |
+| `asparges_calendar_reads_total{result}`             | Reads of the booking calendar: `ok`, `fetch_failed`, `refused`. |
+| `asparges_calendar_last_read_timestamp_seconds`     | Last whole read of the calendar in use; 0 is never.             |
+| `asparges_calendar_shown`                           | 1 while `/kontakt` shows the calendar, 0 while it is hidden.    |
+| `asparges_calendar_events`                          | Bookings (events not cancelled) in the calendar in use.         |
+| `asparges_calendar_taken_dates`                     | Taken days in the calendar in use.                              |
+
+The `asparges_calendar_*` gauges exist only where `calendarURL` is set.
+Alerts for the calendar:
+
+```promql
+# warning: no good read for 15 minutes (three in a row failed)
+time() - asparges_calendar_last_read_timestamp_seconds > 900
+# critical: the calendar is hidden
+asparges_calendar_shown == 0
+# warning: refused content, not just Google down (the journal says which event)
+increase(asparges_calendar_reads_total{result="refused"}[15m]) > 0
+# warning: half the taken days gone since yesterday: cancellations, or a fault
+asparges_calendar_taken_dates < 0.5 * max_over_time(asparges_calendar_taken_dates[1d])
+# critical canary, on the host that sets calendarURL
+absent(asparges_calendar_shown)
+```
 
 A photo that fails before any build (its original missing or unreadable)
 counts in no metric; it shows as `images: photo not prepared` in the journal

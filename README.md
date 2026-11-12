@@ -119,8 +119,9 @@ only: no module option, and `serve` refuses to start when `ASPARGES_DEV`,
 
 State lives in the data directory: `asparges.db` (WAL mode),
 `originals/` (uploads as received), `variants/` (built sizes), `tmp/`,
-`tsnet/`, and `calendar.ics` (the last good copy of the booking calendar,
-read every quarter hour and shown while the feed is down). A restore needs
+`tsnet/`, and `calendar.json` (the last whole read of the booking calendar
+and its time: read every 5 minutes, shown up to 30 minutes after it). A
+restore needs
 only the database and `originals/`: at start
 `serve` queues every photo and builds the sizes that are missing, one photo at
 a time; until a size is built, its picture is missing on the page.
