@@ -25,32 +25,49 @@ const maxLine = 64 << 10
 
 var (
 	errNotCalendar = errors.New("not an iCalendar feed")
-	errRecurring   = errors.New("a recurring booking of six hours or more, which the reader does not expand")
+	// errUnreadable is an event the reader cannot be sure of. It fails the
+	// whole read: leaving the event out could show a booked day free.
+	errUnreadable = errors.New("an event the calendar cannot read")
 )
 
 // event is a VEVENT's properties the reader uses.
 type event struct {
+	// n is its place in the feed, to name it when it has no UID.
+	n                    int
+	uid                  string
 	start, end, duration prop
-	recurs, cancelled    bool
+	// recurrenceID marks one time of a repeating event, moved, changed or
+	// cancelled: it stands in for the time the rule makes.
+	recurrenceID            prop
+	rrules, rdates, exdates []prop
+	// unsupported names a property the reader cannot follow.
+	unsupported string
+	cancelled   bool
 }
 
 type prop struct {
 	params map[string]string
 	value  string
 	set    bool
+	// floating is the calendar's zone, once its header has been read.
+	floating **time.Location
 }
 
-// parse reads the bookings in an iCalendar feed. It needs a whole
-// VCALENDAR, so an error page or a cut-off body is an error, not "no
-// bookings". An event it cannot date is left out; a recurring event is read
-// as its first time only, unless each time lasts six hours or more: then the
-// feed is refused, since dropping the repeats would show booked days free.
-func parse(r io.Reader) (spans []span, skipped int, err error) {
+// parse reads the bookings in an iCalendar feed between lo and hi, every
+// time of a repeating one included (see expand), and counts the events that
+// are bookings (not cancelled). It reads all of the feed or fails: a whole
+// VCALENDAR, every event dated without a guess. An error page, a cut-off
+// body or one event it cannot be sure of is an error, never fewer bookings.
+func parse(r io.Reader, lo, hi time.Time) (spans []span, bookings int, err error) {
 	var (
 		stack   []string
 		ev      *event
+		events  []*event
 		ended   bool
 		started bool
+		// floating is the calendar's own zone (X-WR-TIMEZONE), for times
+		// written without one.
+		floating *time.Location
 	)
 
 	handle := func(l string) error {
@@ -71,7 +88,7 @@ func parse(r io.Reader) (spans []span, skipped int, err error) {
 		case "BEGIN":
 			stack = append(stack, strings.ToUpper(value))
 			if len(stack) == 2 && stack[1] == "VEVENT" {
-				ev = &event{}
+				ev = &event{n: len(events) + 1}
 			}
 
 			return nil
@@ -81,16 +98,7 @@ func parse(r io.Reader) (spans []span, skipped int, err error) {
 			}
 
 			if len(stack) == 2 && ev != nil {
-				s, ok, err := ev.span()
-				switch {
-				case err != nil:
-					return err
-				case ok:
-					spans = append(spans, s)
-				case !ev.cancelled:
-					skipped++
-				}
-
+				events = append(events, ev)
 				ev = nil
 			}
 
@@ -100,24 +108,18 @@ func parse(r io.Reader) (spans []span, skipped int, err error) {
 			return nil
 		}
 
-		// Only the event's own properties: an alarm inside it has others.
-		if ev == nil || len(stack) != 2 {
-			return nil
+		if name == "X-WR-TIMEZONE" && len(stack) == 1 {
+			loc, err := time.LoadLocation(value)
+			if err != nil {
+				return fmt.Errorf("%w: X-WR-TIMEZONE %q unknown", errNotCalendar, value)
+			}
+
+			floating = loc
 		}
 
-		p := prop{params: params, value: value, set: true}
-
-		switch name {
-		case "DTSTART":
-			ev.start = p
-		case "DTEND":
-			ev.end = p
-		case "DURATION":
-			ev.duration = p
-		case "RRULE", "RDATE":
-			ev.recurs = true
-		case "STATUS":
-			ev.cancelled = strings.EqualFold(value, "CANCELLED")
+		// Only the event's own properties: an alarm inside it has others.
+		if ev != nil && len(stack) == 2 {
+			ev.set(name, prop{params: params, value: value, set: true, floating: &floating})
 		}
 
 		return nil
@@ -131,7 +133,60 @@ func parse(r io.Reader) (spans []span, skipped int, err error) {
 		return nil, 0, fmt.Errorf("%w: no END:VCALENDAR", errNotCalendar)
 	}
 
-	return spans, skipped, nil
+	for _, e := range events {
+		if !e.cancelled {
+			bookings++
+		}
+	}
+
+	spans, err = expand(events, lo, hi)
+
+	return spans, bookings, err
+}
+
+// set keeps the property name of e that the reader uses.
+func (e *event) set(name string, p prop) {
+	params, value := p.params, p.value
+
+	switch name {
+	case "UID":
+		e.uid = value
+	case "DTSTART":
+		e.start = p
+	case "DTEND":
+		e.end = p
+	case "DURATION":
+		e.duration = p
+	case "RECURRENCE-ID":
+		e.recurrenceID = p
+		if params["RANGE"] != "" {
+			e.unsupported = "RECURRENCE-ID;RANGE=" + params["RANGE"]
+		}
+	case "RRULE":
+		e.rrules = append(e.rrules, p)
+	case "RDATE":
+		e.rdates = append(e.rdates, p)
+	case "EXDATE":
+		e.exdates = append(e.exdates, p)
+	case "EXRULE":
+		e.unsupported = "EXRULE"
+	case "STATUS":
+		e.cancelled = strings.EqualFold(value, "CANCELLED")
+	}
+}
+
+// name says which event it is, for the journal.
+func (e *event) name() string {
+	if e.uid != "" {
+		return "event UID " + e.uid
+	}
+
+	return fmt.Sprintf("event %d", e.n)
+}
+
+// fail is an error about e that fails the read.
+func (e *event) fail(format string, args ...any) error {
+	return fmt.Errorf("%w: %s: %s", errUnreadable, e.name(), fmt.Sprintf(format, args...))
 }
 
 // unfold calls handle with each content line of r, its folds joined: a
@@ -215,23 +270,28 @@ func contentLine(l string) (name string, params map[string]string, value string,
 	return strings.ToUpper(parts[0]), params, l[colon+1:], true
 }
 
-// span is the event's time; ok is false for a cancelled event or one with
-// no readable start, or no length.
-func (e *event) span() (span, bool, error) {
-	if e.cancelled || !e.start.set {
-		return span{}, false, nil
+// times is the event's first time. One with a start and no end or length
+// is an instant (RFC 5545): it takes no time.
+func (e *event) times() (s span, allDay bool, err error) {
+	if !e.start.set {
+		return span{}, false, e.fail("no DTSTART")
 	}
 
 	start, allDay, err := e.start.time()
 	if err != nil {
-		return span{}, false, nil //nolint:nilerr // an undatable event is skipped, not the feed
+		return span{}, false, e.fail("DTSTART:%s: %v", e.start.value, err)
 	}
 
 	var end time.Time
 
 	switch {
 	case e.end.set:
-		end, _, err = e.end.time()
+		var endAllDay bool
+
+		end, endAllDay, err = e.end.time()
+		if err == nil && endAllDay != allDay {
+			return span{}, false, e.fail("DTSTART and DTEND are not both days or both times")
+		}
 	case e.duration.set:
 		var d time.Duration
 
@@ -247,28 +307,21 @@ func (e *event) span() (span, bool, error) {
 		end = start
 	}
 
-	if err != nil || !end.After(start) {
-		return span{}, false, nil //nolint:nilerr // as above
+	switch {
+	case err != nil:
+		return span{}, false, e.fail("end: %v", err)
+	case end.Before(start):
+		return span{}, false, e.fail("ends before it starts")
 	}
 
-	if e.recurs && (allDay || end.Sub(start) >= Long) {
-		return span{}, false, errRecurring
-	}
-
-	return span{start, end}, true, nil
+	return span{start, end}, allDay, nil
 }
 
-// time reads a DATE or DATE-TIME value. A time without a zone, or in a zone
-// the binary does not know (Outlook's Windows names), is Oslo time.
+// time reads a DATE or DATE-TIME value: a day is Oslo's, a time is in its
+// TZID, in UTC, or without either in the calendar's own zone. A zone the
+// binary does not know (Outlook's Windows names) is an error, not a guess.
 func (p prop) time() (t time.Time, allDay bool, err error) {
 	v := p.value
-	loc := site.Oslo
-
-	if tz := p.params["TZID"]; tz != "" {
-		if l, err := time.LoadLocation(tz); err == nil {
-			loc = l
-		}
-	}
 
 	switch {
 	case strings.EqualFold(p.params["VALUE"], "DATE") || len(v) == 8:
@@ -277,10 +330,33 @@ func (p prop) time() (t time.Time, allDay bool, err error) {
 	case strings.HasSuffix(v, "Z"):
 		t, err = time.Parse("20060102T150405Z", v)
 	default:
+		loc, zerr := p.zone()
+		if zerr != nil {
+			return time.Time{}, false, zerr
+		}
+
 		t, err = time.ParseInLocation("20060102T150405", v, loc)
 	}
 
 	return t, allDay, err
+}
+
+// zone is where p's wall clock is: its TZID, or the calendar's zone.
+func (p prop) zone() (*time.Location, error) {
+	if tz := p.params["TZID"]; tz != "" {
+		l, err := time.LoadLocation(tz)
+		if err != nil {
+			return nil, fmt.Errorf("TZID %q unknown", tz)
+		}
+
+		return l, nil
+	}
+
+	if p.floating == nil || *p.floating == nil {
+		return nil, errors.New("a time without a zone, in a calendar without X-WR-TIMEZONE")
+	}
+
+	return *p.floating, nil
 }
 
 // duration reads an RFC 5545 duration, "PT3H", "P1D", "P2W", "P1DT2H30M".

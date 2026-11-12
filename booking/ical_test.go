@@ -13,10 +13,11 @@ import (
 	"github.com/kradalby/asparges/site"
 )
 
-// feed wraps VEVENT bodies in a calendar, with CRLF as Google sends it.
+// feed wraps VEVENT bodies in a calendar in Oslo, with CRLF as Google
+// sends it.
 func feed(events ...string) string {
 	var b strings.Builder
-	b.WriteString("BEGIN:VCALENDAR\r\nVERSION:2.0\r\n")
+	b.WriteString("BEGIN:VCALENDAR\r\nVERSION:2.0\r\nX-WR-TIMEZONE:Europe/Oslo\r\n")
 
 	for _, e := range events {
 		b.WriteString("BEGIN:VEVENT\r\n" + strings.ReplaceAll(strings.TrimSpace(e), "\n", "\r\n") + "\r\nEND:VEVENT\r\n")
@@ -36,11 +37,18 @@ func day(s string) site.Date {
 	return d
 }
 
+// The tests' window, 2026–2028.
+var lo, hi = midnight(day("2026-01-01"), 0), midnight(day("2028-12-31"), 1)
+
+func parseAll(ics string) ([]span, int, error) {
+	return parse(strings.NewReader(ics), lo, hi)
+}
+
 // takenIn parses ics and returns the taken days of 2026–2028, sorted.
 func takenIn(t *testing.T, ics string) []string {
 	t.Helper()
 
-	spans, _, err := parse(strings.NewReader(ics))
+	spans, _, err := parseAll(ics)
 	require.NoError(t, err)
 
 	days := taken(spans, day("2026-01-01"), day("2028-12-31"))
@@ -65,10 +73,10 @@ func TestGoogleFeed(t *testing.T) {
 
 	defer f.Close()
 
-	spans, skipped, err := parse(f)
+	spans, bookings, err := parse(f, lo, hi)
 	require.NoError(t, err)
 	require.Len(t, spans, 82)
-	require.Zero(t, skipped)
+	require.Equal(t, 82, bookings)
 
 	days := taken(spans, day("2026-01-01"), day("2028-12-31"))
 
@@ -169,10 +177,6 @@ func TestTakenRule(t *testing.T) {
 			events: []string{"DTSTART:20270614T100000\nDTEND:20270614T200000\nSTATUS:CANCELLED"},
 		},
 		{
-			name:   "short recurring meeting counts once",
-			events: []string{"DTSTART:20270614T100000\nDTEND:20270614T110000\nRRULE:FREQ=WEEKLY"},
-		},
-		{
 			name:   "an alarm's properties are not the event's",
 			events: []string{"DTSTART:20270614T100000\nDTEND:20270614T200000\nBEGIN:VALARM\nDTSTART:20270101T000000\nEND:VALARM"},
 			want:   []string{"2027-06-14"},
@@ -198,47 +202,61 @@ func TestTakenRule(t *testing.T) {
 }
 
 func TestFoldedLines(t *testing.T) {
-	ics := "BEGIN:VCALENDAR\r\nBEGIN:VEVENT\r\nDTSTART;TZID=\"Europe/\r\n Oslo\":2027061\r\n\t4T100000\r\nDTEND:20270614T\r\n 200000\r\nEND:VEVENT\r\nEND:VCALENDAR"
+	ics := "BEGIN:VCALENDAR\r\nX-WR-TIMEZONE:Europe/Oslo\r\nBEGIN:VEVENT\r\nDTSTART;TZID=\"Europe/\r\n Oslo\":2027061\r\n\t4T100000\r\nDTEND:20270614T\r\n 200000\r\nEND:VEVENT\r\nEND:VCALENDAR"
 	assert.Equal(t, []string{"2027-06-14"}, takenIn(t, ics))
 }
 
-func TestUnknownZoneIsOslo(t *testing.T) {
-	ics := feed("DTSTART;TZID=W. Europe Standard Time:20270614T100000\nDTEND;TZID=W. Europe Standard Time:20270614T160000")
-	assert.Equal(t, []string{"2027-06-14"}, takenIn(t, ics))
+// Every event dated without a guess, or the read fails and says which.
+func TestUncertainEventsFailTheRead(t *testing.T) {
+	for name, ev := range map[string]string{
+		"unknown zone":          "UID:z\nDTSTART;TZID=W. Europe Standard Time:20270614T100000\nDTEND;TZID=W. Europe Standard Time:20270614T160000",
+		"not a date":            "UID:z\nDTSTART:not a date\nDTEND:20270614T200000",
+		"no such month":         "UID:z\nDTSTART:20271399T100000\nDTEND:20270614T200000",
+		"no start":              "UID:z\nDTEND:20270614T200000",
+		"ends before it starts": "UID:z\nDTSTART:20270614T200000\nDTEND:20270614T100000",
+		"bad duration":          "UID:z\nDTSTART:20270614T100000\nDURATION:P1Y",
+		"negative duration":     "UID:z\nDTSTART:20270614T100000\nDURATION:-PT6H",
+		"day and time mixed":    "UID:z\nDTSTART;VALUE=DATE:20270614\nDTEND:20270615T100000",
+		"markup":                "UID:z\n<script>alert(1)</script>",
+		"orphan RECURRENCE-ID":  "UID:z\nRECURRENCE-ID:20270614T100000Z\nDTSTART:20270615T100000Z\nDTEND:20270615T200000Z",
+	} {
+		t.Run(name, func(t *testing.T) {
+			_, _, err := parseAll(feed("UID:ok\nDTSTART:20270615T100000\nDTEND:20270615T200000", ev))
+			require.ErrorIs(t, err, errUnreadable)
+			assert.Contains(t, err.Error(), "event UID z")
+		})
+	}
+
+	// A time without a zone needs the calendar's.
+	_, _, err := parseAll(strings.Replace(feed("DTSTART:20270615T100000\nDTEND:20270615T200000"), "X-WR-TIMEZONE:Europe/Oslo\r\n", "", 1))
+	require.ErrorIs(t, err, errUnreadable)
+	assert.Contains(t, err.Error(), "event 1")
 }
 
 func TestJunk(t *testing.T) {
 	refused := map[string]string{
-		"empty":          "",
-		"html":           "<!DOCTYPE html>\n<html><head><meta charset=\"utf-8\"></head><body>Not found</body></html>",
-		"cut off":        strings.TrimSuffix(feed("DTSTART:20270614T100000\nDTEND:20270614T200000"), "END:VCALENDAR\r\n"),
-		"stray end":      "BEGIN:VCALENDAR\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n",
-		"huge line":      "BEGIN:VCALENDAR\r\nX-JUNK:" + strings.Repeat("x", maxLine+1) + "\r\nEND:VCALENDAR\r\n",
-		"huge fold":      "BEGIN:VCALENDAR\r\nX-JUNK:x" + strings.Repeat("\r\n "+strings.Repeat("x", 1000), maxLine/1000+1) + "\r\nEND:VCALENDAR\r\n",
-		"long recurring": feed("DTSTART:20270612T100000\nDTEND:20270612T200000\nRRULE:FREQ=YEARLY"),
-		"recurring day":  feed("DTSTART;VALUE=DATE:20270612\nRDATE;VALUE=DATE:20280612"),
+		"empty":     "",
+		"html":      "<!DOCTYPE html>\n<html><head><meta charset=\"utf-8\"></head><body>Not found</body></html>",
+		"cut off":   strings.TrimSuffix(feed("DTSTART:20270614T100000\nDTEND:20270614T200000"), "END:VCALENDAR\r\n"),
+		"stray end": "BEGIN:VCALENDAR\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n",
+		"huge line": "BEGIN:VCALENDAR\r\nX-JUNK:" + strings.Repeat("x", maxLine+1) + "\r\nEND:VCALENDAR\r\n",
+		"huge fold": "BEGIN:VCALENDAR\r\nX-JUNK:x" + strings.Repeat("\r\n "+strings.Repeat("x", 1000), maxLine/1000+1) + "\r\nEND:VCALENDAR\r\n",
 	}
 
 	for name, body := range refused {
 		t.Run(name, func(t *testing.T) {
-			_, _, err := parse(strings.NewReader(body))
+			_, _, err := parseAll(body)
 			require.Error(t, err)
 		})
 	}
 
-	// Events that cannot be dated are left out; the rest of the feed counts.
-	spans, skipped, err := parse(strings.NewReader(feed(
-		"DTSTART:not a date\nDTEND:20270614T200000",
-		"DTSTART:20271399T100000\nDTEND:20270614T200000",
-		"DTEND:20270614T200000",
-		"DTSTART:20270614T200000\nDTEND:20270614T100000",
-		"DTSTART:20270614T100000\nDURATION:P1Y",
-		"DTSTART:20270614T100000\nDURATION:-PT6H",
-		"<script>alert(1)</script>",
+	// Bookings are counted; cancelled events are none.
+	spans, bookings, err := parseAll(feed(
 		"DTSTART:20270615T100000\nDTEND:20270615T200000",
-	)))
+		"DTSTART:20270616T100000\nDTEND:20270616T200000\nSTATUS:CANCELLED",
+	))
 	require.NoError(t, err)
-	assert.Equal(t, 7, skipped)
+	assert.Equal(t, 1, bookings)
 	require.Len(t, spans, 1)
 	assert.Equal(t, time.Date(2027, 6, 15, 10, 0, 0, 0, site.Oslo), spans[0].start)
 }

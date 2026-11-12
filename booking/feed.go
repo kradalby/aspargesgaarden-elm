@@ -227,18 +227,15 @@ func (f *Feed) fetch(ctx context.Context) ([]byte, error) {
 // end of four years ahead; the feed holds the past too, and nothing is
 // booked further out.
 func (f *Feed) read(body []byte) (Days, error) {
-	spans, skipped, err := parse(bytes.NewReader(body))
+	y := site.Today(f.cfg.Now()).Year
+	first, last := site.Date{Year: y - 1, Month: time.January, Day: 1}, site.Date{Year: y + 4, Month: time.December, Day: 31}
+
+	spans, _, err := parse(bytes.NewReader(body), midnight(first, 0), midnight(last, 1))
 	if err != nil {
 		return nil, err
 	}
 
-	if skipped > 0 {
-		f.cfg.Log.Warn("calendar: events without a readable time left out", "count", skipped)
-	}
-
-	y := site.Today(f.cfg.Now()).Year
-
-	return taken(spans, site.Date{Year: y - 1, Month: time.January, Day: 1}, site.Date{Year: y + 4, Month: time.December, Day: 31}), nil
+	return taken(spans, first, last), nil
 }
 
 // writeFile replaces path with body whole or not at all.
